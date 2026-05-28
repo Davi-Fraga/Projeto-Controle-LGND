@@ -1,0 +1,34 @@
+{
+  "name": "central-da-manada",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Central da Manada Rota do Cerrado",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @central-da-manada/api --filter @central-da-manada/web dev",
+    "dev:api": "pnpm --filter @central-da-manada/api dev",
+    "dev:web": "pnpm --filter @central-da-manada/web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm prisma generate",
+    "db:migrate": "pnpm prisma migrate deploy",
+    "db:migrate:dev": "pnpm prisma migrate dev",
+    "db:deploy": "pnpm prisma migrate deploy",
+    "db:seed": "pnpm prisma db seed",
+    "db:studio": "pnpm prisma studio"
+  },
+  "devDependencies": {
+    "@prisma/client": "^5.22.0",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^2.4.3",
+    "prettier": "^3.3.3",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma",
+    "seed": "tsx prisma/seed.ts"
+  }
+}

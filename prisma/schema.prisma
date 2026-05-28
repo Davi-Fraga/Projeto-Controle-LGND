@@ -1,0 +1,618 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LegendaryStatus {
+  ACTIVE
+  INACTIVE
+  AWAY
+  VISITOR
+  UNKNOWN
+}
+
+enum TeamStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TeamMembershipStatus {
+  ACTIVE
+  INACTIVE
+  PAUSED
+}
+
+enum TopEventStatus {
+  PLANNED
+  REGISTRATION_OPEN
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum TopParticipantType {
+  NEW_PARTICIPANT
+  LEGENDARY
+}
+
+enum TopParticipantStatus {
+  REGISTERED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum TopServantStatus {
+  REGISTERED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum TopFamilyMemberStatus {
+  ACTIVE
+  INACTIVE
+  TRANSFERRED
+}
+
+enum LegendaryHistoryType {
+  LEGENDARY_CREATED
+  LEGENDARY_UPDATED
+  TEAM_JOINED
+  TEAM_LEFT
+  TEAM_ROLE_CHANGED
+  TOP_PARTICIPATED
+  TOP_PARTICIPATION_CANCELLED
+  TOP_SERVED
+  TOP_SERVICE_CANCELLED
+  TOP_REPRESENTATIVE_ASSIGNED
+  TOP_DEPUTY_ASSIGNED
+  FAMILY_JOINED
+  FAMILY_LEFT
+  FAMILY_TRANSFERRED
+  FAMILY_REPRESENTATIVE_ASSIGNED
+  FAMILY_DEPUTY_ASSIGNED
+  SOCIAL_ACTION_JOINED
+  SOCIAL_ACTION_LEFT
+  SOCIAL_ACTION_COMPLETED
+  MANUAL_NOTE
+}
+
+enum InternalMessageStatus {
+  DRAFT
+  SENT
+  CANCELLED
+}
+
+enum InternalMessageTargetType {
+  ALL_ACTIVE_LEGENDARIES
+  TOP_ALL
+  TOP_REPRESENTATIVES
+  TOP_FAMILY_REPRESENTATIVES
+  TOP_FAMILY
+  TEAM
+  TEAM_COORDINATORS
+  LEGENDARY
+}
+
+enum MessageRecipientStatus {
+  PENDING
+  READ
+  CONFIRMED
+}
+
+enum SocialActionStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum SocialActionParticipantStatus {
+  REGISTERED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model User {
+  id           String         @id @default(uuid()) @db.Uuid
+  name         String
+  email        String         @unique
+  passwordHash String
+  legendaryId  String?        @unique @db.Uuid
+  legendary    Legendary?     @relation(fields: [legendaryId], references: [id])
+  isActive     Boolean        @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?
+  roles        UserRole[]
+  refreshTokens RefreshToken[]
+  auditLogs    AuditLog[]     @relation("AuditActor")
+  legendaryHistory LegendaryHistory[] @relation("LegendaryHistoryActor")
+  internalMessages InternalMessage[] @relation("InternalMessageCreator")
+  messageRecipients MessageRecipient[]
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  key         String           @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  roles       RolePermission[]
+}
+
+model UserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  roleId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  role      Role     @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  id           String     @id @default(uuid()) @db.Uuid
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  createdAt    DateTime   @default(now())
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @db.Uuid
+  actor       User?    @relation("AuditActor", fields: [actorUserId], references: [id])
+  entityType  String
+  entityId    String?
+  action      String
+  before      Json?
+  after       Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([actorUserId])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+model Legendary {
+  id                    String               @id @default(uuid()) @db.Uuid
+  fullName              String
+  lgndNumber            String?              @unique
+  phone                 String?
+  city                  String?
+  isFromRotaDoCerrado   Boolean              @default(false)
+  churchId              String?              @db.Uuid
+  church                Church?              @relation(fields: [churchId], references: [id])
+  servesInChurch        Boolean              @default(false)
+  churchRole            String?
+  professionId          String?              @db.Uuid
+  profession            Profession?          @relation(fields: [professionId], references: [id])
+  status                LegendaryStatus      @default(UNKNOWN)
+  socialActionInterest  Boolean              @default(false)
+  notes                 String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  deletedAt             DateTime?
+  user                  User?
+  expertises            LegendaryExpertise[]
+  coordinatedTeams      Team[]               @relation("TeamCoordinator")
+  deputyCoordinatedTeams Team[]              @relation("TeamDeputyCoordinator")
+  teamMemberships       TeamMembership[]
+  representedTops       TopEvent[]           @relation("TopRepresentative")
+  deputyRepresentedTops TopEvent[]           @relation("TopDeputyRepresentative")
+  coordinatedTops       TopEvent[]           @relation("TopGeneralCoordinator")
+  topParticipants       TopParticipant[]
+  topServants           TopServant[]
+  coordinatedTopTeams   TopTeam[]            @relation("TopTeamCoordinator")
+  deputyCoordinatedTopTeams TopTeam[]        @relation("TopTeamDeputyCoordinator")
+  representedFamilies TopFamily[]            @relation("TopFamilyRepresentative")
+  deputyRepresentedFamilies TopFamily[]      @relation("TopFamilyDeputyRepresentative")
+  history              LegendaryHistory[]
+  messageRecipients    MessageRecipient[]
+  responsibleSocialActions SocialAction[]     @relation("SocialActionResponsible")
+  socialActionParticipants SocialActionParticipant[]
+
+  @@index([fullName])
+  @@index([lgndNumber])
+  @@index([phone])
+  @@index([city])
+  @@index([status])
+  @@index([churchId])
+  @@index([professionId])
+  @@index([socialActionInterest])
+}
+
+model Church {
+  id          String      @id @default(uuid()) @db.Uuid
+  name        String
+  city        String?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+  legendarios Legendary[]
+
+  @@index([name])
+  @@index([city])
+}
+
+model Profession {
+  id          String      @id @default(uuid()) @db.Uuid
+  name        String      @unique
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+  legendarios Legendary[]
+
+  @@index([name])
+}
+
+model Expertise {
+  id          String               @id @default(uuid()) @db.Uuid
+  name        String               @unique
+  description String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  deletedAt   DateTime?
+  legendarios LegendaryExpertise[]
+
+  @@index([name])
+}
+
+model LegendaryExpertise {
+  id          String    @id @default(uuid()) @db.Uuid
+  legendaryId String    @db.Uuid
+  expertiseId String    @db.Uuid
+  createdAt   DateTime  @default(now())
+  legendary   Legendary @relation(fields: [legendaryId], references: [id])
+  expertise   Expertise @relation(fields: [expertiseId], references: [id])
+
+  @@unique([legendaryId, expertiseId])
+  @@index([legendaryId])
+  @@index([expertiseId])
+}
+
+model Team {
+  id                            String           @id @default(uuid()) @db.Uuid
+  name                          String
+  description                   String?
+  status                        TeamStatus       @default(ACTIVE)
+  coordinatorLegendaryId        String?          @db.Uuid
+  coordinator                   Legendary?       @relation("TeamCoordinator", fields: [coordinatorLegendaryId], references: [id])
+  deputyCoordinatorLegendaryId  String?          @db.Uuid
+  deputyCoordinator             Legendary?       @relation("TeamDeputyCoordinator", fields: [deputyCoordinatorLegendaryId], references: [id])
+  createdAt                     DateTime         @default(now())
+  updatedAt                     DateTime         @updatedAt
+  deletedAt                     DateTime?
+  memberships                   TeamMembership[]
+  topServants                   TopServant[]
+  topTeams                      TopTeam[]
+  legendaryHistory              LegendaryHistory[]
+
+  @@index([name])
+  @@index([status])
+  @@index([coordinatorLegendaryId])
+}
+
+model TeamMembership {
+  id          String               @id @default(uuid()) @db.Uuid
+  teamId      String               @db.Uuid
+  team        Team                 @relation(fields: [teamId], references: [id])
+  legendaryId String               @db.Uuid
+  legendary   Legendary            @relation(fields: [legendaryId], references: [id])
+  role        String
+  status      TeamMembershipStatus @default(ACTIVE)
+  startedAt   DateTime             @default(now())
+  endedAt     DateTime?
+  notes       String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  deletedAt   DateTime?
+
+  @@index([teamId])
+  @@index([legendaryId])
+  @@index([status])
+}
+
+model TopEvent {
+  id                            String               @id @default(uuid()) @db.Uuid
+  name                          String
+  number                        Int
+  city                          String
+  location                      String?
+  startDate                     DateTime
+  endDate                       DateTime
+  status                        TopEventStatus
+  representativeLegendaryId     String?              @db.Uuid
+  representative                Legendary?           @relation("TopRepresentative", fields: [representativeLegendaryId], references: [id])
+  deputyRepresentativeLegendaryId String?            @db.Uuid
+  deputyRepresentative          Legendary?           @relation("TopDeputyRepresentative", fields: [deputyRepresentativeLegendaryId], references: [id])
+  generalCoordinatorLegendaryId String?              @db.Uuid
+  generalCoordinator            Legendary?           @relation("TopGeneralCoordinator", fields: [generalCoordinatorLegendaryId], references: [id])
+  notes                         String?
+  createdAt                     DateTime             @default(now())
+  updatedAt                     DateTime             @updatedAt
+  deletedAt                     DateTime?
+  participants                  TopParticipant[]
+  servants                      TopServant[]
+  teams                         TopTeam[]
+  families                      TopFamily[]
+  familyMembers                 TopFamilyMember[]
+  legendaryHistory              LegendaryHistory[]
+  internalMessages              InternalMessage[]
+
+  @@index([number])
+  @@index([name])
+  @@index([city])
+  @@index([status])
+  @@index([startDate])
+}
+
+model TopFamily {
+  id                              String            @id @default(uuid()) @db.Uuid
+  topEventId                      String            @db.Uuid
+  topEvent                        TopEvent          @relation(fields: [topEventId], references: [id])
+  name                            String
+  representativeLegendaryId       String            @db.Uuid
+  representative                  Legendary         @relation("TopFamilyRepresentative", fields: [representativeLegendaryId], references: [id])
+  deputyRepresentativeLegendaryId String?           @db.Uuid
+  deputyRepresentative            Legendary?        @relation("TopFamilyDeputyRepresentative", fields: [deputyRepresentativeLegendaryId], references: [id])
+  notes                           String?
+  createdAt                       DateTime          @default(now())
+  updatedAt                       DateTime          @updatedAt
+  deletedAt                       DateTime?
+  members                         TopFamilyMember[]
+  legendaryHistory                LegendaryHistory[]
+
+  @@index([topEventId])
+  @@index([name])
+  @@index([representativeLegendaryId])
+  @@index([deputyRepresentativeLegendaryId])
+}
+
+model TopFamilyMember {
+  id               String                @id @default(uuid()) @db.Uuid
+  topEventId       String                @db.Uuid
+  topEvent         TopEvent              @relation(fields: [topEventId], references: [id])
+  topFamilyId      String                @db.Uuid
+  topFamily        TopFamily             @relation(fields: [topFamilyId], references: [id])
+  topParticipantId String                @db.Uuid
+  topParticipant   TopParticipant        @relation(fields: [topParticipantId], references: [id])
+  status           TopFamilyMemberStatus @default(ACTIVE)
+  notes            String?
+  startedAt        DateTime              @default(now())
+  endedAt          DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  deletedAt        DateTime?
+
+  @@index([topEventId])
+  @@index([topFamilyId])
+  @@index([topParticipantId])
+  @@index([status])
+}
+
+model TopParticipant {
+  id          String               @id @default(uuid()) @db.Uuid
+  topEventId  String               @db.Uuid
+  topEvent    TopEvent             @relation(fields: [topEventId], references: [id])
+  legendaryId String               @db.Uuid
+  legendary   Legendary            @relation(fields: [legendaryId], references: [id])
+  type        TopParticipantType
+  status      TopParticipantStatus
+  notes       String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  deletedAt   DateTime?
+  familyMemberships TopFamilyMember[]
+
+  @@index([topEventId])
+  @@index([legendaryId])
+  @@index([status])
+}
+
+model LegendaryHistory {
+  id            String               @id @default(uuid()) @db.Uuid
+  legendaryId   String               @db.Uuid
+  legendary     Legendary            @relation(fields: [legendaryId], references: [id])
+  type          LegendaryHistoryType
+  title         String
+  description   String?
+  topEventId    String?              @db.Uuid
+  topEvent      TopEvent?            @relation(fields: [topEventId], references: [id])
+  teamId        String?              @db.Uuid
+  team          Team?                @relation(fields: [teamId], references: [id])
+  topFamilyId   String?              @db.Uuid
+  topFamily     TopFamily?           @relation(fields: [topFamilyId], references: [id])
+  socialActionId String?             @db.Uuid
+  socialAction   SocialAction?       @relation(fields: [socialActionId], references: [id])
+  actorUserId   String?              @db.Uuid
+  actor         User?                @relation("LegendaryHistoryActor", fields: [actorUserId], references: [id])
+  metadata      Json?
+  occurredAt    DateTime             @default(now())
+  createdAt     DateTime             @default(now())
+
+  @@index([legendaryId])
+  @@index([type])
+  @@index([topEventId])
+  @@index([teamId])
+  @@index([topFamilyId])
+  @@index([socialActionId])
+  @@index([actorUserId])
+  @@index([occurredAt])
+}
+
+model TopServant {
+  id          String           @id @default(uuid()) @db.Uuid
+  topEventId  String           @db.Uuid
+  topEvent    TopEvent         @relation(fields: [topEventId], references: [id])
+  legendaryId String           @db.Uuid
+  legendary   Legendary        @relation(fields: [legendaryId], references: [id])
+  teamId      String?          @db.Uuid
+  team        Team?            @relation(fields: [teamId], references: [id])
+  role        String?
+  status      TopServantStatus
+  notes       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  @@index([topEventId])
+  @@index([legendaryId])
+  @@index([teamId])
+  @@index([status])
+}
+
+model TopTeam {
+  id                            String      @id @default(uuid()) @db.Uuid
+  topEventId                    String      @db.Uuid
+  topEvent                      TopEvent    @relation(fields: [topEventId], references: [id])
+  teamId                        String      @db.Uuid
+  team                          Team        @relation(fields: [teamId], references: [id])
+  coordinatorLegendaryId        String?     @db.Uuid
+  coordinator                   Legendary?  @relation("TopTeamCoordinator", fields: [coordinatorLegendaryId], references: [id])
+  deputyCoordinatorLegendaryId  String?     @db.Uuid
+  deputyCoordinator             Legendary?  @relation("TopTeamDeputyCoordinator", fields: [deputyCoordinatorLegendaryId], references: [id])
+  notes                         String?
+  createdAt                     DateTime    @default(now())
+  updatedAt                     DateTime    @updatedAt
+  deletedAt                     DateTime?
+
+  @@index([topEventId])
+  @@index([teamId])
+}
+
+model InternalMessage {
+  id                   String                    @id @default(uuid()) @db.Uuid
+  title                String
+  body                 String
+  status               InternalMessageStatus     @default(DRAFT)
+  targetType           InternalMessageTargetType
+  targetId             String?                   @db.Uuid
+  topEventId           String?                   @db.Uuid
+  topEvent             TopEvent?                 @relation(fields: [topEventId], references: [id])
+  requiresConfirmation Boolean                   @default(false)
+  createdByUserId      String                    @db.Uuid
+  createdBy            User                      @relation("InternalMessageCreator", fields: [createdByUserId], references: [id])
+  sentAt               DateTime?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  deletedAt            DateTime?
+  recipients           MessageRecipient[]
+
+  @@index([status])
+  @@index([targetType])
+  @@index([targetId])
+  @@index([topEventId])
+  @@index([createdByUserId])
+  @@index([sentAt])
+  @@index([createdAt])
+}
+
+model MessageRecipient {
+  id          String                 @id @default(uuid()) @db.Uuid
+  messageId   String                 @db.Uuid
+  message     InternalMessage        @relation(fields: [messageId], references: [id])
+  legendaryId String                 @db.Uuid
+  legendary   Legendary              @relation(fields: [legendaryId], references: [id])
+  userId      String?                @db.Uuid
+  user        User?                  @relation(fields: [userId], references: [id])
+  status      MessageRecipientStatus @default(PENDING)
+  readAt      DateTime?
+  confirmedAt DateTime?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@unique([messageId, legendaryId])
+  @@index([messageId])
+  @@index([legendaryId])
+  @@index([userId])
+  @@index([status])
+}
+
+model SocialAction {
+  id                     String                    @id @default(uuid()) @db.Uuid
+  title                  String
+  description            String?
+  location               String?
+  city                   String?
+  startDate              DateTime
+  endDate                DateTime
+  status                 SocialActionStatus        @default(PLANNED)
+  responsibleLegendaryId String                    @db.Uuid
+  responsible            Legendary                 @relation("SocialActionResponsible", fields: [responsibleLegendaryId], references: [id])
+  notes                  String?
+  resultSummary          String?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  deletedAt              DateTime?
+  participants           SocialActionParticipant[]
+  legendaryHistory       LegendaryHistory[]
+
+  @@index([title])
+  @@index([city])
+  @@index([status])
+  @@index([startDate])
+  @@index([responsibleLegendaryId])
+}
+
+model SocialActionParticipant {
+  id             String                        @id @default(uuid()) @db.Uuid
+  socialActionId String                        @db.Uuid
+  socialAction   SocialAction                  @relation(fields: [socialActionId], references: [id])
+  legendaryId    String                        @db.Uuid
+  legendary      Legendary                     @relation(fields: [legendaryId], references: [id])
+  role           String?
+  status         SocialActionParticipantStatus @default(REGISTERED)
+  attended       Boolean                       @default(false)
+  notes          String?
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+  deletedAt      DateTime?
+
+  @@index([socialActionId])
+  @@index([legendaryId])
+  @@index([status])
+  @@index([attended])
+}

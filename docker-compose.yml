@@ -17,5 +17,32 @@ services:
       timeout: 5s
       retries: 5
 
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: central-da-manada-pgbouncer
+    restart: unless-stopped
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-central}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-central}
+      - DB_NAME=${POSTGRES_DB:-central_da_manada}
+      - LISTEN_PORT=6432
+    ports:
+      - "6432:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: central-da-manada-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
 volumes:
   postgres_data:
+  redis_data:

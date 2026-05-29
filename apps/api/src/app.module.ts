@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { BullModule } from '@nestjs/bullmq';
+import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './modules/auth/auth.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { DatabaseModule } from './database/prisma.module';
@@ -17,11 +19,21 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CommunicationsModule } from './modules/communications/communications.module';
 import { SocialActionsModule } from './modules/social-actions/social-actions.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { CacheModule } from './common/cache/cache.module';
+import { REDIS_CONFIG } from './config/env';
+import { RateLimitGuard } from './common/guards/rate-limit.guard';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env'] }),
     DatabaseModule,
+    CacheModule,
+    BullModule.forRoot({
+      connection: {
+        host: REDIS_CONFIG.host,
+        port: REDIS_CONFIG.port,
+      },
+    }),
     HealthModule,
     AuthModule,
     UsersModule,
@@ -38,6 +50,12 @@ import { ReportsModule } from './modules/reports/reports.module';
     CommunicationsModule,
     SocialActionsModule,
     ReportsModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
   ],
 })
 export class AppModule {}

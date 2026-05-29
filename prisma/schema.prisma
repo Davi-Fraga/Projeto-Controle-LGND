@@ -464,6 +464,8 @@ model TopFamilyMember {
   @@index([topParticipantId])
   @@index([status])
   @@index([needsReview])
+  @@index([topEventId, topFamilyId])
+
 }
 
 model TopParticipant {
@@ -483,6 +485,8 @@ model TopParticipant {
   @@index([topEventId])
   @@index([legendaryId])
   @@index([status])
+  @@index([topEventId, legendaryId])
+
 }
 
 model LegendaryHistory {
@@ -514,6 +518,8 @@ model LegendaryHistory {
   @@index([socialActionId])
   @@index([actorUserId])
   @@index([occurredAt])
+  @@index([legendaryId, occurredAt])
+
 }
 
 model TopServant {
@@ -602,6 +608,8 @@ model MessageRecipient {
   @@index([legendaryId])
   @@index([userId])
   @@index([status])
+  @@index([messageId, status])
+
 }
 
 model SocialAction {
@@ -648,4 +656,6 @@ model SocialActionParticipant {
   @@index([legendaryId])
   @@index([status])
   @@index([attended])
+  @@index([socialActionId, status])
+
 }

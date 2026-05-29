@@ -15,6 +15,7 @@ import {
 import type { Church, Expertise, Legendary, Profession } from '@/features/legendarios/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ActionMenu } from '@/components/ui/ActionMenu';
 import { Search, MapPin, Eye, Edit2, UserMinus } from 'lucide-react';
 
 export default function LegendariosPage() {
@@ -35,6 +36,7 @@ export default function LegendariosPage() {
     expertiseId: '',
     socialActionInterest: '',
     isFromRotaDoCerrado: '',
+    needsReview: '',
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +69,7 @@ export default function LegendariosPage() {
       expertiseId: filters.expertiseId || undefined,
       socialActionInterest: filters.socialActionInterest === '' ? undefined : filters.socialActionInterest === 'true',
       isFromRotaDoCerrado: filters.isFromRotaDoCerrado === '' ? undefined : filters.isFromRotaDoCerrado === 'true',
+      needsReview: filters.needsReview === '' ? undefined : filters.needsReview === 'true',
       orderBy: 'fullName',
       orderDirection: 'asc',
     })
@@ -164,6 +167,11 @@ export default function LegendariosPage() {
             <option value="true">Faz parte</option>
             <option value="false">Não faz parte</option>
           </select>
+          <select className="input" value={filters.needsReview} onChange={(event) => updateFilter('needsReview', event.target.value)}>
+            <option value="">Revisão</option>
+            <option value="true">Precisa de revisão</option>
+            <option value="false">Sem pendência</option>
+          </select>
         </div>
       </div>
 
@@ -211,6 +219,7 @@ export default function LegendariosPage() {
                         <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mt-0.5">
                           {item.lgndNumber ? `LGND ${item.lgndNumber}` : 'Sem LGND'}
                         </p>
+                        {item.needsReview ? <span className="mt-1 inline-flex rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">Revisar</span> : null}
                       </div>
                     </td>
                     <td className="px-6 py-4.5 text-zinc-300 font-medium">{item.phone || '-'}</td>
@@ -224,28 +233,14 @@ export default function LegendariosPage() {
                       <StatusBadge status={item.status} />
                     </td>
                     <td className="px-6 py-4.5">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link
-                          className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-850 hover:text-zinc-100"
-                          href={`/dashboard/legendarios/${item.id}`}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Ver
-                        </Link>
-                        <Link
-                          className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-850 hover:text-zinc-100"
-                          href={`/dashboard/legendarios/${item.id}/editar`}
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                          Editar
-                        </Link>
-                        <button
-                          className="flex h-8 items-center gap-1.5 rounded-lg border border-rose-900/30 bg-rose-950/20 px-3 text-xs font-bold uppercase tracking-wider text-rose-400 transition-all hover:bg-rose-950/50 hover:text-rose-300"
-                          onClick={() => setDeactivatingId(item.id)}
-                        >
-                          <UserMinus className="h-3.5 w-3.5" />
-                          Inativar
-                        </button>
+                      <div className="flex justify-end">
+                        <ActionMenu
+                          items={[
+                            { label: 'Ver', href: `/dashboard/legendarios/${item.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
+                            { label: 'Editar', href: `/dashboard/legendarios/${item.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> },
+                            { label: 'Inativar', onClick: () => setDeactivatingId(item.id), icon: <UserMinus className="h-3.5 w-3.5" />, destructive: true },
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>

@@ -9,6 +9,7 @@ import { deactivateTop, getTops } from '@/features/tops/api';
 import type { TopEvent } from '@/features/tops/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ActionMenu } from '@/components/ui/ActionMenu';
 import { Search, MapPin, Eye, Edit2, ShieldAlert, Calendar } from 'lucide-react';
 
 export default function TopsPage() {
@@ -22,7 +23,9 @@ export default function TopsPage() {
     status: '',
     city: '',
     startDateFrom: '',
-    startDateTo: ''
+    startDateTo: '',
+    needsReview: '',
+    missingFamilyCoordinator: '',
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +43,9 @@ export default function TopsPage() {
       status: (filters.status as TopEventStatus) || undefined,
       city: filters.city || undefined,
       startDateFrom: filters.startDateFrom || undefined,
-      startDateTo: filters.startDateTo || undefined
+      startDateTo: filters.startDateTo || undefined,
+      needsReview: filters.needsReview === '' ? undefined : filters.needsReview === 'true',
+      missingFamilyCoordinator: filters.missingFamilyCoordinator === '' ? undefined : filters.missingFamilyCoordinator === 'true',
     })
       .then((r) => {
         setTops(r.data);
@@ -97,8 +102,8 @@ export default function TopsPage() {
           <Search className="h-4 w-4 text-orange-500" />
           <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">Filtros de Busca</span>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <input className="input lg:col-span-2" placeholder="Buscar por nome ou número" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }} />
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          <input className="input col-span-1 sm:col-span-2" placeholder="Buscar por nome ou número" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }} />
           <input className="input" placeholder="Cidade" value={filters.city} onChange={(e) => setFilter('city', e.target.value)} />
           <select className="input" value={filters.status} onChange={(e) => setFilter('status', e.target.value)}>
             <option value="">Todos os status</option>
@@ -108,10 +113,19 @@ export default function TopsPage() {
               </option>
             ))}
           </select>
-          <div className="flex gap-2 lg:col-span-1 sm:col-span-2">
-            <input className="input text-xs" type="date" title="Data início a partir de" value={filters.startDateFrom} onChange={(e) => setFilter('startDateFrom', e.target.value)} />
-            <input className="input text-xs" type="date" title="Data início até" value={filters.startDateTo} onChange={(e) => setFilter('startDateTo', e.target.value)} />
+          <div className="flex gap-2 col-span-1 sm:col-span-2 lg:col-span-2">
+            <input className="input text-xs w-1/2" type="date" title="Data início a partir de" value={filters.startDateFrom} onChange={(e) => setFilter('startDateFrom', e.target.value)} />
+            <input className="input text-xs w-1/2" type="date" title="Data início até" value={filters.startDateTo} onChange={(e) => setFilter('startDateTo', e.target.value)} />
           </div>
+          <select className="input" value={filters.needsReview} onChange={(e) => setFilter('needsReview', e.target.value)}>
+            <option value="">Revisão</option>
+            <option value="true">Precisa de revisão</option>
+            <option value="false">Sem pendência</option>
+          </select>
+          <select className="input" value={filters.missingFamilyCoordinator} onChange={(e) => setFilter('missingFamilyCoordinator', e.target.value)}>
+            <option value="">Coord. famílias</option>
+            <option value="true">Sem coordenador</option>
+          </select>
         </div>
       </div>
 
@@ -158,7 +172,10 @@ export default function TopsPage() {
                 tops.map((top) => (
                   <tr key={top.id} className="hover:bg-zinc-900/40 transition-colors">
                     <td className="px-4 py-4.5 font-bold text-orange-500">#{top.number}</td>
-                    <td className="px-6 py-4.5 font-bold text-white">{top.name}</td>
+                    <td className="px-6 py-4.5 font-bold text-white">
+                      {top.name}
+                      {top.needsReview || !top.familyCoordinatorLegendaryId ? <span className="ml-2 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-300">Revisar</span> : null}
+                    </td>
                     <td className="px-6 py-4.5 text-zinc-300 font-semibold">
                       <div className="flex items-center gap-1">
                         <MapPin className="h-3.5 w-3.5 text-zinc-500" />
@@ -180,28 +197,14 @@ export default function TopsPage() {
                     <td className="px-4 py-4.5 text-center text-zinc-300 font-bold">{top.servantsCount}</td>
                     <td className="px-4 py-4.5 text-center text-zinc-300 font-bold">{top.teamsCount}</td>
                     <td className="px-6 py-4.5">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link
-                          className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-850 hover:text-zinc-100"
-                          href={`/dashboard/tops/${top.id}`}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Ver
-                        </Link>
-                        <Link
-                          className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-850 hover:text-zinc-100"
-                          href={`/dashboard/tops/${top.id}/editar`}
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                          Editar
-                        </Link>
-                        <button
-                          className="flex h-8 items-center gap-1.5 rounded-lg border border-rose-900/30 bg-rose-950/20 px-3 text-xs font-bold uppercase tracking-wider text-rose-400 transition-all hover:bg-rose-950/50 hover:text-rose-300"
-                          onClick={() => setDeactivatingId(top.id)}
-                        >
-                          <ShieldAlert className="h-3.5 w-3.5" />
-                          Inativar
-                        </button>
+                      <div className="flex justify-end">
+                        <ActionMenu
+                          items={[
+                            { label: 'Ver', href: `/dashboard/tops/${top.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
+                            { label: 'Editar', href: `/dashboard/tops/${top.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> },
+                            { label: 'Inativar', onClick: () => setDeactivatingId(top.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true },
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>

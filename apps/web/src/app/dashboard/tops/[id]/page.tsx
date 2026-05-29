@@ -60,6 +60,10 @@ export default function TopDetailPage() {
         <Info label="Representante" value={top.representative?.fullName ?? '-'} />
         <Info label="Sub-representante" value={top.deputyRepresentative?.fullName ?? '-'} />
         <Info label="Coordenador Geral" value={top.generalCoordinator?.fullName ?? '-'} />
+        <Info label="Coord. Famílias" value={top.familyCoordinator?.fullName ?? '-'} />
+        <Info label="Subcoord. Famílias" value={top.familyDeputyCoordinator?.fullName ?? '-'} />
+        <Info label="Coord. Geral Famílias" value={top.familyGeneralCoordinator?.fullName ?? '-'} />
+        <Info label="Revisão" value={top.needsReview ? <span className="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs text-amber-300">Revisar</span> : 'Sem pendência'} />
       </div>
 
       {/* Child sections & tables */}
@@ -89,4 +93,3 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
     </section>
   );
 }
-

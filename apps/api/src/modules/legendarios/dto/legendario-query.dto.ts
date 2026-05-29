@@ -39,6 +39,11 @@ export class LegendarioQueryDto extends PaginationDto {
   isFromRotaDoCerrado?: boolean;
 
   @IsOptional()
+  @Transform(({ value }) => (value === 'true' || value === true ? true : value === 'false' || value === false ? false : value))
+  @IsBoolean()
+  needsReview?: boolean;
+
+  @IsOptional()
   @IsIn(['fullName', 'createdAt'])
   orderBy?: 'fullName' | 'createdAt' = 'fullName';
 

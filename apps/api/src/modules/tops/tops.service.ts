@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { LegendaryHistoryType, TopEventStatus, TopFamilyMemberStatus, TopParticipantStatus, TopServantStatus } from '@central-da-manada/shared';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
+import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateTopDto, TopQueryDto } from './dto/top-query.dto';
@@ -14,6 +15,9 @@ const includeTop = {
   representative: true,
   deputyRepresentative: true,
   generalCoordinator: true,
+  familyCoordinator: true,
+  familyDeputyCoordinator: true,
+  familyGeneralCoordinator: true,
   _count: { select: { participants: true, servants: true, teams: true, families: true } },
 };
 const includeTopTeam = { team: true, coordinator: true, deputyCoordinator: true };
@@ -33,6 +37,8 @@ export class TopsService {
       status: query.status,
       city: query.city ? { contains: query.city, mode: 'insensitive' } : undefined,
       startDate: query.startDateFrom || query.startDateTo ? { gte: query.startDateFrom, lte: query.startDateTo } : undefined,
+      needsReview: query.needsReview,
+      familyCoordinatorLegendaryId: query.missingFamilyCoordinator ? null : undefined,
     };
     if (query.search) {
       where.OR = [
@@ -55,14 +61,38 @@ export class TopsService {
     return this.toTopResponse(top);
   }
 
+  async options(query: OptionsQueryDto) {
+    const where: any = { deletedAt: null };
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { city: { contains: query.search, mode: 'insensitive' } },
+        { number: Number.isNaN(Number(query.search)) ? undefined : Number(query.search) },
+      ].filter(Boolean);
+    }
+
+    const items = await this.prisma.topEvent.findMany({
+      where,
+      select: { id: true, name: true, number: true, city: true, status: true },
+      orderBy: { startDate: 'desc' },
+      take: query.limit ?? 20,
+    });
+
+    return items.map((item: any) => ({
+      id: item.id,
+      label: `TOP #${item.number} - ${item.name}`,
+      value: item.id,
+      metadata: { number: item.number, name: item.name, city: item.city, status: item.status },
+    }));
+  }
+
   async create(dto: CreateTopDto, actorUserId?: string) {
     this.validateDates(dto.startDate, dto.endDate);
     await this.ensureNumberAvailable(dto.number);
     await this.validateTopLeadership(dto);
     const top = await this.prisma.topEvent.create({ data: this.toTopData(dto), include: includeTop });
     await this.audit.create({ actorUserId, entityType: 'TopEvent', entityId: top.id, action: 'create', after: this.toTopResponse(top) });
-    if (dto.representativeLegendaryId) await this.createHistory(dto.representativeLegendaryId, LegendaryHistoryType.TOP_REPRESENTATIVE_ASSIGNED, 'Representante de TOP definido', `Definido como representante do ${top.name}.`, actorUserId, { topEventId: top.id });
-    if (dto.deputyRepresentativeLegendaryId) await this.createHistory(dto.deputyRepresentativeLegendaryId, LegendaryHistoryType.TOP_DEPUTY_ASSIGNED, 'Sub-representante de TOP definido', `Definido como sub-representante do ${top.name}.`, actorUserId, { topEventId: top.id });
+    await this.createTopLeadershipHistory({}, top, dto, actorUserId);
     return this.toTopResponse(top);
   }
 
@@ -111,7 +141,7 @@ export class TopsService {
     await this.validateFamilyRepresentatives(dto);
     const family = await this.prisma.topFamily.create({ data: this.toFamilyData(topEventId, dto), include: includeFamily });
     await this.audit.create({ actorUserId, entityType: 'TopFamily', entityId: family.id, action: 'create_family', after: this.toFamilyResponse(family) });
-    await this.createHistory(dto.representativeLegendaryId, LegendaryHistoryType.FAMILY_REPRESENTATIVE_ASSIGNED, 'Representante de familia definido', `Definido como representante da familia ${family.name}.`, actorUserId, { topEventId, topFamilyId: family.id });
+    if (dto.representativeLegendaryId) await this.createHistory(dto.representativeLegendaryId, LegendaryHistoryType.FAMILY_REPRESENTATIVE_ASSIGNED, 'Representante de familia definido', `Definido como representante da familia ${family.name}.`, actorUserId, { topEventId, topFamilyId: family.id, metadata: { representativeRole: dto.representativeRole } });
     if (dto.deputyRepresentativeLegendaryId) await this.createHistory(dto.deputyRepresentativeLegendaryId, LegendaryHistoryType.FAMILY_DEPUTY_ASSIGNED, 'Sub-representante de familia definido', `Definido como sub-representante da familia ${family.name}.`, actorUserId, { topEventId, topFamilyId: family.id });
     return this.toFamilyResponse(family);
   }
@@ -120,10 +150,11 @@ export class TopsService {
     await this.findExistingTop(topEventId);
     const before = await this.findExistingFamily(topEventId, familyId);
     if (dto.name) await this.ensureFamilyNameAvailable(topEventId, dto.name, familyId);
-    await this.validateFamilyRepresentatives({ representativeLegendaryId: dto.representativeLegendaryId ?? before.representativeLegendaryId, deputyRepresentativeLegendaryId: dto.deputyRepresentativeLegendaryId ?? before.deputyRepresentativeLegendaryId ?? undefined });
+    await this.validateFamilyRepresentatives({ representativeLegendaryId: dto.representativeLegendaryId ?? before.representativeLegendaryId ?? undefined, deputyRepresentativeLegendaryId: dto.deputyRepresentativeLegendaryId ?? before.deputyRepresentativeLegendaryId ?? undefined });
     const after = await this.prisma.topFamily.update({ where: { id: familyId }, data: this.toFamilyData(topEventId, dto), include: includeFamily });
     await this.audit.create({ actorUserId, entityType: 'TopFamily', entityId: familyId, action: 'update_family', before: this.toFamilyResponse(before), after: this.toFamilyResponse(after) });
-    if ('representativeLegendaryId' in dto && before.representativeLegendaryId !== after.representativeLegendaryId) await this.createHistory(after.representativeLegendaryId, LegendaryHistoryType.FAMILY_REPRESENTATIVE_ASSIGNED, 'Representante de familia definido', `Definido como representante da familia ${after.name}.`, actorUserId, { topEventId, topFamilyId: familyId });
+    await this.auditFamilyFieldChanges(before, after, dto, actorUserId);
+    if ('representativeLegendaryId' in dto && after.representativeLegendaryId && before.representativeLegendaryId !== after.representativeLegendaryId) await this.createHistory(after.representativeLegendaryId, LegendaryHistoryType.FAMILY_REPRESENTATIVE_ASSIGNED, 'Representante de familia definido', `Definido como representante da familia ${after.name}.`, actorUserId, { topEventId, topFamilyId: familyId, metadata: { representativeRole: after.representativeRole } });
     if ('deputyRepresentativeLegendaryId' in dto && after.deputyRepresentativeLegendaryId && before.deputyRepresentativeLegendaryId !== after.deputyRepresentativeLegendaryId) await this.createHistory(after.deputyRepresentativeLegendaryId, LegendaryHistoryType.FAMILY_DEPUTY_ASSIGNED, 'Sub-representante de familia definido', `Definido como sub-representante da familia ${after.name}.`, actorUserId, { topEventId, topFamilyId: familyId });
     return this.toFamilyResponse(after);
   }
@@ -153,11 +184,51 @@ export class TopsService {
     return this.prisma.topFamilyMember.findMany({ where: { topEventId, topFamilyId: familyId, deletedAt: null }, include: includeFamilyMember, orderBy: { createdAt: 'asc' } });
   }
 
+  async familyOptions(topEventId: string, query: OptionsQueryDto) {
+    await this.findExistingTop(topEventId);
+    const where: any = { topEventId, deletedAt: null };
+    if (query.search) where.name = { contains: query.search, mode: 'insensitive' };
+    const items = await this.prisma.topFamily.findMany({
+      where,
+      select: { id: true, name: true, needsReview: true, representative: { select: { fullName: true } } },
+      orderBy: { name: 'asc' },
+      take: query.limit ?? 50,
+    });
+    return items.map((item: any) => ({
+      id: item.id,
+      label: item.name,
+      value: item.id,
+      metadata: { representative: item.representative?.fullName, needsReview: item.needsReview },
+    }));
+  }
+
+  async participantOptions(topEventId: string, query: OptionsQueryDto) {
+    await this.findExistingTop(topEventId);
+    const where: any = {
+      topEventId,
+      deletedAt: null,
+      status: { not: TopParticipantStatus.CANCELLED },
+    };
+    if (query.search) where.legendary = { fullName: { contains: query.search, mode: 'insensitive' } };
+    const items = await this.prisma.topParticipant.findMany({
+      where,
+      include: { legendary: { select: { id: true, fullName: true, lgndNumber: true, city: true } } },
+      orderBy: { legendary: { fullName: 'asc' } },
+      take: query.limit ?? 50,
+    });
+    return items.map((item: any) => ({
+      id: item.id,
+      label: item.legendary?.lgndNumber ? `${item.legendary.fullName} - LGND ${item.legendary.lgndNumber}` : item.legendary?.fullName ?? item.id,
+      value: item.id,
+      metadata: { legendaryId: item.legendaryId, fullName: item.legendary?.fullName, lgndNumber: item.legendary?.lgndNumber, city: item.legendary?.city },
+    }));
+  }
+
   async addFamilyMember(topEventId: string, familyId: string, dto: CreateTopFamilyMemberDto, actorUserId?: string) {
     const family = await this.findExistingFamily(topEventId, familyId);
     const participant = await this.findEligibleFamilyParticipant(topEventId, dto.topParticipantId);
     await this.ensureParticipantNotInActiveFamily(topEventId, dto.topParticipantId);
-    const member = await this.prisma.topFamilyMember.create({ data: { topEventId, topFamilyId: familyId, topParticipantId: dto.topParticipantId, notes: dto.notes?.trim() || null }, include: includeFamilyMember });
+    const member = await this.prisma.topFamilyMember.create({ data: { topEventId, topFamilyId: familyId, topParticipantId: dto.topParticipantId, notes: dto.notes?.trim() || null, sourceNotes: dto.sourceNotes?.trim() || null, needsReview: dto.needsReview ?? false }, include: includeFamilyMember });
     await this.audit.create({ actorUserId, entityType: 'TopFamilyMember', entityId: member.id, action: 'add_family_member', after: member });
     await this.createHistory(participant.legendaryId, LegendaryHistoryType.FAMILY_JOINED, 'Entrou em familia', `Entrou na familia ${family.name}.`, actorUserId, { topEventId, topFamilyId: familyId });
     return member;
@@ -166,7 +237,7 @@ export class TopsService {
   async updateFamilyMember(topEventId: string, familyId: string, memberId: string, dto: UpdateTopFamilyMemberDto, actorUserId?: string) {
     await this.findExistingFamily(topEventId, familyId);
     const before = await this.findExistingFamilyMember(topEventId, familyId, memberId);
-    const after = await this.prisma.topFamilyMember.update({ where: { id: memberId }, data: { status: dto.status, notes: dto.notes === null ? null : (dto.notes !== undefined ? dto.notes.trim() : undefined) }, include: includeFamilyMember });
+    const after = await this.prisma.topFamilyMember.update({ where: { id: memberId }, data: { status: dto.status, notes: dto.notes === null ? null : (dto.notes !== undefined ? dto.notes.trim() : undefined), sourceNotes: dto.sourceNotes === null ? null : (dto.sourceNotes !== undefined ? dto.sourceNotes.trim() : undefined), needsReview: dto.needsReview }, include: includeFamilyMember });
     await this.audit.create({ actorUserId, entityType: 'TopFamilyMember', entityId: memberId, action: 'update_family_member', before, after });
     return after;
   }
@@ -309,6 +380,9 @@ export class TopsService {
     const ids = [dto.representativeLegendaryId, dto.deputyRepresentativeLegendaryId, dto.generalCoordinatorLegendaryId].filter(Boolean) as string[];
     if (new Set(ids).size !== ids.length) throw new BadRequestException('TOP leadership people must be different.');
     for (const id of ids) await this.ensureLegendaryExists(id);
+    const familyIds = [dto.familyCoordinatorLegendaryId, dto.familyDeputyCoordinatorLegendaryId, dto.familyGeneralCoordinatorLegendaryId].filter(Boolean) as string[];
+    if (new Set(familyIds).size !== familyIds.length) throw new BadRequestException('Family coordination people must be different.');
+    for (const id of familyIds) await this.ensureLegendaryExists(id);
   }
   private async validateTopTeamCoordinators(dto: Partial<CreateTopTeamDto>) {
     if (dto.coordinatorLegendaryId && dto.deputyCoordinatorLegendaryId && dto.coordinatorLegendaryId === dto.deputyCoordinatorLegendaryId) throw new BadRequestException('Coordinator and deputy must be different.');
@@ -329,22 +403,39 @@ export class TopsService {
   private async findExistingTopTeam(topEventId: string, id: string) { const item = await this.prisma.topTeam.findFirst({ where: { id, topEventId, deletedAt: null }, include: includeTopTeam }); if (!item) throw new NotFoundException('TOP team not found.'); return item; }
   private async findExistingParticipant(topEventId: string, id: string) { const item = await this.prisma.topParticipant.findFirst({ where: { id, topEventId, deletedAt: null }, include: includeParticipant }); if (!item) throw new NotFoundException('TOP participant not found.'); return item; }
   private async findExistingServant(topEventId: string, id: string) { const item = await this.prisma.topServant.findFirst({ where: { id, topEventId, deletedAt: null }, include: includeServant }); if (!item) throw new NotFoundException('TOP servant not found.'); return item; }
-  private toTopData(dto: Partial<CreateTopDto>) { const data: any = {}; for (const k of ['name','number','city','location','startDate','endDate','status','representativeLegendaryId','deputyRepresentativeLegendaryId','generalCoordinatorLegendaryId','notes']) if (k in dto) data[k] = typeof (dto as any)[k] === 'string' ? ((dto as any)[k].trim() || null) : (dto as any)[k]; return data; }
+  private toTopData(dto: Partial<CreateTopDto>) { const data: any = {}; for (const k of ['name','number','city','location','startDate','endDate','status','representativeLegendaryId','deputyRepresentativeLegendaryId','generalCoordinatorLegendaryId','familyCoordinatorLegendaryId','familyDeputyCoordinatorLegendaryId','familyGeneralCoordinatorLegendaryId','notes','needsReview']) if (k in dto) data[k] = typeof (dto as any)[k] === 'string' ? ((dto as any)[k].trim() || null) : (dto as any)[k]; return data; }
   private toTopTeamData(topEventId: string, dto: Partial<CreateTopTeamDto>) { const data: any = { topEventId }; if ('teamId' in dto) data.teamId = dto.teamId; if ('coordinatorLegendaryId' in dto) data.coordinatorLegendaryId = dto.coordinatorLegendaryId || null; if ('deputyCoordinatorLegendaryId' in dto) data.deputyCoordinatorLegendaryId = dto.deputyCoordinatorLegendaryId || null; if ('notes' in dto) data.notes = dto.notes?.trim() || null; return data; }
   private toTopResponse(top: any) { return { ...top, participantsCount: top._count?.participants ?? 0, servantsCount: top._count?.servants ?? 0, teamsCount: top._count?.teams ?? 0, familiesCount: top._count?.families ?? 0 }; }
-  private toFamilyData(topEventId: string, dto: Partial<CreateTopFamilyDto>) { const data: any = { topEventId }; if ('name' in dto) data.name = dto.name?.trim(); if ('representativeLegendaryId' in dto) data.representativeLegendaryId = dto.representativeLegendaryId; if ('deputyRepresentativeLegendaryId' in dto) data.deputyRepresentativeLegendaryId = dto.deputyRepresentativeLegendaryId || null; if ('notes' in dto) data.notes = dto.notes?.trim() || null; return data; }
+  private toFamilyData(topEventId: string, dto: Partial<CreateTopFamilyDto>) { const data: any = { topEventId }; if ('name' in dto) data.name = dto.name?.trim(); if ('representativeLegendaryId' in dto) data.representativeLegendaryId = dto.representativeLegendaryId || null; if ('representativeRole' in dto) data.representativeRole = dto.representativeRole?.trim() || null; if ('deputyRepresentativeLegendaryId' in dto) data.deputyRepresentativeLegendaryId = dto.deputyRepresentativeLegendaryId || null; if ('deputyRepresentativeRole' in dto) data.deputyRepresentativeRole = dto.deputyRepresentativeRole?.trim() || null; if ('notes' in dto) data.notes = dto.notes?.trim() || null; if ('needsReview' in dto) data.needsReview = dto.needsReview; return data; }
   private toFamilyResponse(family: any) { return { ...family, membersCount: family._count?.members ?? family.members?.filter((item: any) => item.status === TopFamilyMemberStatus.ACTIVE && !item.deletedAt).length ?? 0 }; }
   private async auditTopFieldChanges(before: any, after: any, dto: UpdateTopDto, actorUserId?: string) {
-    const fields = [['status','update_status'], ['representativeLegendaryId','update_representative'], ['deputyRepresentativeLegendaryId','update_deputy_representative'], ['generalCoordinatorLegendaryId','update_general_coordinator']];
+    const fields = [['status','update_status'], ['representativeLegendaryId','update_representative'], ['deputyRepresentativeLegendaryId','update_deputy_representative'], ['generalCoordinatorLegendaryId','update_general_coordinator'], ['familyCoordinatorLegendaryId','update_family_coordinator'], ['familyDeputyCoordinatorLegendaryId','update_family_deputy_coordinator'], ['familyGeneralCoordinatorLegendaryId','update_family_general_coordinator'], ['needsReview','update_needs_review']];
     for (const [field, action] of fields) if (field in dto && before[field] !== after[field]) await this.audit.create({ actorUserId, entityType: 'TopEvent', entityId: after.id, action, before: { [field]: before[field] }, after: { [field]: after[field] } });
-    if ('representativeLegendaryId' in dto && after.representativeLegendaryId && before.representativeLegendaryId !== after.representativeLegendaryId) await this.createHistory(after.representativeLegendaryId, LegendaryHistoryType.TOP_REPRESENTATIVE_ASSIGNED, 'Representante de TOP definido', `Definido como representante do ${after.name}.`, actorUserId, { topEventId: after.id });
-    if ('deputyRepresentativeLegendaryId' in dto && after.deputyRepresentativeLegendaryId && before.deputyRepresentativeLegendaryId !== after.deputyRepresentativeLegendaryId) await this.createHistory(after.deputyRepresentativeLegendaryId, LegendaryHistoryType.TOP_DEPUTY_ASSIGNED, 'Sub-representante de TOP definido', `Definido como sub-representante do ${after.name}.`, actorUserId, { topEventId: after.id });
+    await this.createTopLeadershipHistory(before, after, dto, actorUserId);
   }
   private async validateFamilyRepresentatives(dto: Partial<CreateTopFamilyDto>) {
-    if (!dto.representativeLegendaryId) throw new BadRequestException('Family representative is required.');
     if (dto.deputyRepresentativeLegendaryId && dto.representativeLegendaryId === dto.deputyRepresentativeLegendaryId) throw new BadRequestException('Representative and deputy must be different.');
-    await this.ensureLegendaryExists(dto.representativeLegendaryId);
+    if (dto.representativeLegendaryId) await this.ensureLegendaryExists(dto.representativeLegendaryId);
     if (dto.deputyRepresentativeLegendaryId) await this.ensureLegendaryExists(dto.deputyRepresentativeLegendaryId);
+  }
+  private async createTopLeadershipHistory(before: any, after: any, dto: Partial<CreateTopDto>, actorUserId?: string) {
+    const entries: Array<[keyof CreateTopDto, LegendaryHistoryType, string, string]> = [
+      ['representativeLegendaryId', LegendaryHistoryType.TOP_REPRESENTATIVE_ASSIGNED, 'Representante de TOP definido', `Definido como representante do ${after.name}.`],
+      ['deputyRepresentativeLegendaryId', LegendaryHistoryType.TOP_DEPUTY_ASSIGNED, 'Sub-representante de TOP definido', `Definido como sub-representante do ${after.name}.`],
+      ['familyCoordinatorLegendaryId', LegendaryHistoryType.TOP_FAMILY_COORDINATOR_ASSIGNED, 'Coordenador de familias definido', `Definido como coordenador das familias do ${after.name}.`],
+      ['familyDeputyCoordinatorLegendaryId', LegendaryHistoryType.TOP_FAMILY_DEPUTY_COORDINATOR_ASSIGNED, 'Subcoordenador de familias definido', `Definido como subcoordenador das familias do ${after.name}.`],
+      ['familyGeneralCoordinatorLegendaryId', LegendaryHistoryType.TOP_FAMILY_GENERAL_COORDINATOR_ASSIGNED, 'Coordenador geral de familias definido', `Definido como coordenador geral das familias do ${after.name}.`],
+    ];
+    for (const [field, type, title, description] of entries) {
+      const legendaryId = after[field];
+      if (field in dto && legendaryId && before[field] !== legendaryId) await this.createHistory(legendaryId, type, title, description, actorUserId, { topEventId: after.id });
+    }
+  }
+  private async auditFamilyFieldChanges(before: any, after: any, dto: UpdateTopFamilyDto, actorUserId?: string) {
+    const fields = ['representativeLegendaryId', 'representativeRole', 'deputyRepresentativeLegendaryId', 'deputyRepresentativeRole', 'needsReview'];
+    for (const field of fields) {
+      if (field in dto && before[field] !== after[field]) await this.audit.create({ actorUserId, entityType: 'TopFamily', entityId: after.id, action: `update_${field}`, before: { [field]: before[field] }, after: { [field]: after[field] } });
+    }
   }
   private async ensureFamilyNameAvailable(topEventId: string, name: string, currentId?: string) {
     const existing = await this.prisma.topFamily.findFirst({ where: { topEventId, deletedAt: null, name: { equals: name.trim(), mode: 'insensitive' } } });

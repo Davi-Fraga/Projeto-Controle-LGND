@@ -60,8 +60,55 @@ export class CreateLegendarioDto {
   notes?: string;
 
   @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  needsReview?: boolean;
+
+  @IsOptional()
   @IsArray()
   @ArrayUnique()
   @IsUUID(undefined, { each: true })
   expertiseIds?: string[];
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  firstTopIsExternal?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  firstTopEventId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  firstTopFamilyId?: string;
+
+  @IsOptional()
+  @IsString()
+  firstTopExternalText?: string;
+
+  @IsOptional()
+  @IsString()
+  firstTopNotes?: string;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  alreadyServedAsService?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  serviceTopEventId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  serviceTeamId?: string;
+
+  @IsOptional()
+  @IsString()
+  serviceRole?: string;
+
+  @IsOptional()
+  @IsString()
+  serviceNotes?: string;
 }

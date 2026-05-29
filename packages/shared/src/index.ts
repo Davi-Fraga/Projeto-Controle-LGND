@@ -73,6 +73,9 @@ export enum LegendaryHistoryType {
   TOP_SERVICE_CANCELLED = 'TOP_SERVICE_CANCELLED',
   TOP_REPRESENTATIVE_ASSIGNED = 'TOP_REPRESENTATIVE_ASSIGNED',
   TOP_DEPUTY_ASSIGNED = 'TOP_DEPUTY_ASSIGNED',
+  TOP_FAMILY_COORDINATOR_ASSIGNED = 'TOP_FAMILY_COORDINATOR_ASSIGNED',
+  TOP_FAMILY_DEPUTY_COORDINATOR_ASSIGNED = 'TOP_FAMILY_DEPUTY_COORDINATOR_ASSIGNED',
+  TOP_FAMILY_GENERAL_COORDINATOR_ASSIGNED = 'TOP_FAMILY_GENERAL_COORDINATOR_ASSIGNED',
   FAMILY_JOINED = 'FAMILY_JOINED',
   FAMILY_LEFT = 'FAMILY_LEFT',
   FAMILY_TRANSFERRED = 'FAMILY_TRANSFERRED',
@@ -175,10 +178,19 @@ export type Legendary = {
   status: LegendaryStatus;
   socialActionInterest: boolean;
   notes?: string | null;
+  needsReview: boolean;
   expertises: Expertise[];
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
+  firstTopIsExternal: boolean;
+  firstTopEventId?: string | null;
+  firstTopEvent?: TopEvent | null;
+  firstTopFamilyId?: string | null;
+  firstTopFamily?: TopFamily | null;
+  firstTopExternalText?: string | null;
+  firstTopNotes?: string | null;
+  topServants?: TopServant[] | null;
 };
 
 export type LegendaryFilters = PaginationParams & {
@@ -190,6 +202,7 @@ export type LegendaryFilters = PaginationParams & {
   expertiseId?: string;
   socialActionInterest?: boolean;
   isFromRotaDoCerrado?: boolean;
+  needsReview?: boolean;
   orderBy?: 'fullName' | 'createdAt';
   orderDirection?: 'asc' | 'desc';
 };
@@ -266,6 +279,7 @@ export type TopServant = {
   topEventId: string;
   legendaryId: string;
   legendary?: Legendary;
+  topEvent?: TopEvent | null;
   teamId?: string | null;
   team?: Team | null;
   role?: string | null;
@@ -280,11 +294,14 @@ export type TopFamily = {
   id: string;
   topEventId: string;
   name: string;
-  representativeLegendaryId: string;
+  representativeLegendaryId?: string | null;
   representative?: Legendary | null;
+  representativeRole?: string | null;
   deputyRepresentativeLegendaryId?: string | null;
   deputyRepresentative?: Legendary | null;
+  deputyRepresentativeRole?: string | null;
   notes?: string | null;
+  needsReview: boolean;
   membersCount?: number;
   createdAt: string;
   updatedAt: string;
@@ -299,6 +316,8 @@ export type TopFamilyMember = {
   topParticipant?: TopParticipant;
   status: TopFamilyMemberStatus;
   notes?: string | null;
+  sourceNotes?: string | null;
+  needsReview: boolean;
   startedAt: string;
   endedAt?: string | null;
   createdAt: string;
@@ -406,7 +425,14 @@ export type TopEvent = {
   deputyRepresentative?: Legendary | null;
   generalCoordinatorLegendaryId?: string | null;
   generalCoordinator?: Legendary | null;
+  familyCoordinatorLegendaryId?: string | null;
+  familyCoordinator?: Legendary | null;
+  familyDeputyCoordinatorLegendaryId?: string | null;
+  familyDeputyCoordinator?: Legendary | null;
+  familyGeneralCoordinatorLegendaryId?: string | null;
+  familyGeneralCoordinator?: Legendary | null;
   notes?: string | null;
+  needsReview: boolean;
   participantsCount: number;
   servantsCount: number;
   teamsCount: number;
@@ -422,6 +448,8 @@ export type TopFilters = PaginationParams & {
   city?: string;
   startDateFrom?: string;
   startDateTo?: string;
+  needsReview?: boolean;
+  missingFamilyCoordinator?: boolean;
   orderBy?: 'startDate' | 'name' | 'createdAt';
   orderDirection?: 'asc' | 'desc';
 };

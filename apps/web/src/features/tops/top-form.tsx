@@ -22,7 +22,11 @@ export function TopForm({ top }: { top?: TopEvent }) {
     representativeLegendaryId: top?.representativeLegendaryId ?? '',
     deputyRepresentativeLegendaryId: top?.deputyRepresentativeLegendaryId ?? '',
     generalCoordinatorLegendaryId: top?.generalCoordinatorLegendaryId ?? '',
+    familyCoordinatorLegendaryId: top?.familyCoordinatorLegendaryId ?? '',
+    familyDeputyCoordinatorLegendaryId: top?.familyDeputyCoordinatorLegendaryId ?? '',
+    familyGeneralCoordinatorLegendaryId: top?.familyGeneralCoordinatorLegendaryId ?? '',
     notes: top?.notes ?? '',
+    needsReview: top?.needsReview ?? false,
   });
 
   useEffect(() => {
@@ -41,7 +45,11 @@ export function TopForm({ top }: { top?: TopEvent }) {
         representativeLegendaryId: payload.representativeLegendaryId || undefined,
         deputyRepresentativeLegendaryId: payload.deputyRepresentativeLegendaryId || undefined,
         generalCoordinatorLegendaryId: payload.generalCoordinatorLegendaryId || undefined,
+        familyCoordinatorLegendaryId: payload.familyCoordinatorLegendaryId || undefined,
+        familyDeputyCoordinatorLegendaryId: payload.familyDeputyCoordinatorLegendaryId || undefined,
+        familyGeneralCoordinatorLegendaryId: payload.familyGeneralCoordinatorLegendaryId || undefined,
         notes: payload.notes || undefined,
+        needsReview: payload.needsReview,
       };
       const result = top ? await updateTop(top.id, cleaned) : await createTop(cleaned);
       router.push(`/dashboard/tops/${result.data.id}`);
@@ -94,6 +102,22 @@ export function TopForm({ top }: { top?: TopEvent }) {
         <Field label="Coordenador Geral">
           <PersonSelect value={payload.generalCoordinatorLegendaryId} items={legendarios} onChange={(v) => setField('generalCoordinatorLegendaryId', v)} />
         </Field>
+        <div className="md:col-span-2 mt-2 border-t border-zinc-800 pt-4">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Coordenação das Famílias</h2>
+        </div>
+        <Field label="Coordenador das Famílias">
+          <PersonSelect value={payload.familyCoordinatorLegendaryId} items={legendarios} onChange={(v) => setField('familyCoordinatorLegendaryId', v)} />
+        </Field>
+        <Field label="Subcoordenador das Famílias">
+          <PersonSelect value={payload.familyDeputyCoordinatorLegendaryId} items={legendarios} onChange={(v) => setField('familyDeputyCoordinatorLegendaryId', v)} />
+        </Field>
+        <Field label="Coordenador Geral das Famílias">
+          <PersonSelect value={payload.familyGeneralCoordinatorLegendaryId} items={legendarios} onChange={(v) => setField('familyGeneralCoordinatorLegendaryId', v)} />
+        </Field>
+        <label className="flex min-h-11 items-center gap-3 self-end rounded-lg border border-zinc-800 bg-zinc-900/20 px-4 py-2.5 text-xs font-semibold text-zinc-300">
+          <input type="checkbox" checked={Boolean(payload.needsReview)} onChange={(e) => setField('needsReview', e.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-orange-600 focus:ring-orange-500/20 focus:ring-offset-zinc-950" />
+          Precisa de revisão
+        </label>
         <Field label="Observações do Evento" className="md:col-span-2">
           <textarea className="input min-h-28 py-2.5" value={payload.notes} onChange={(e) => setField('notes', e.target.value)} />
         </Field>
@@ -146,4 +170,3 @@ export function PersonSelect({ value, items, onChange }: { value?: string; items
     </select>
   );
 }
-

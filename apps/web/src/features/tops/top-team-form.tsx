@@ -28,8 +28,12 @@ export function TopTeamForm({
   });
 
   useEffect(() => {
-    getTeamsOptions({ page: 1, perPage: 100 }).then((r) => setTeams(r.data));
-    searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' }).then((r) => setPeople(r.data));
+    getTeamsOptions({ page: 1, perPage: 100 })
+      .then((r) => setTeams(r.data))
+      .catch(() => setError('Nao foi possivel carregar equipes.'));
+    searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' })
+      .then((r) => setPeople(r.data))
+      .catch(() => setError('Nao foi possivel carregar Legendarios.'));
   }, []);
 
   async function submit(e: FormEvent) {

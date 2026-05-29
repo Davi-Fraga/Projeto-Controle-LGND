@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } f
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateLegendarioDto } from './dto/create-legendario.dto';
 import { LegendarioQueryDto } from './dto/legendario-query.dto';
@@ -18,6 +19,12 @@ export class LegendariosController {
   @Permissions('legendarios.read')
   findAll(@Query() query: LegendarioQueryDto) {
     return this.legendariosService.findAll(query);
+  }
+
+  @Get('options')
+  @Permissions('legendarios.read')
+  async options(@Query() query: OptionsQueryDto) {
+    return { data: await this.legendariosService.options(query) };
   }
 
   @Get(':id')

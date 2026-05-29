@@ -12,12 +12,18 @@ export function TopTeamsTable({ topId }: { topId: string }) {
   const [form, setForm] = useState(false);
   const [editing, setEditing] = useState<TopTeam | undefined>();
   const [refresh, setRefresh] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   // Custom dialog state
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
-    getTopTeams(topId).then((r) => setItems(r.data));
+    getTopTeams(topId)
+      .then((r) => {
+        setItems(r.data);
+        setError(null);
+      })
+      .catch(() => setError('Nao foi possivel carregar equipes vinculadas ao TOP.'));
   }, [topId, refresh]);
 
   function done() {
@@ -31,6 +37,8 @@ export function TopTeamsTable({ topId }: { topId: string }) {
     try {
       await removeTopTeam(topId, removingId);
       done();
+    } catch {
+      setError('Nao foi possivel remover a equipe do TOP.');
     } finally {
       setRemovingId(null);
     }
@@ -65,6 +73,8 @@ export function TopTeamsTable({ topId }: { topId: string }) {
           />
         </div>
       )}
+
+      {error ? <ErrorMessage message={error} /> : null}
 
       <div className="w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#0B0B0C]">
         <div className="overflow-x-auto">
@@ -134,4 +144,8 @@ export function TopTeamsTable({ topId }: { topId: string }) {
       />
     </section>
   );
+}
+
+function ErrorMessage({ message }: { message: string }) {
+  return <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-xs font-semibold text-rose-400">{message}</div>;
 }

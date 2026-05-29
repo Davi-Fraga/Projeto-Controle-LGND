@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { LegendaryHistoryType, TeamMembershipStatus, TeamStatus } from '@central-da-manada/shared';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
+import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AddTeamMemberDto } from './dto/add-team-member.dto';
@@ -73,6 +74,26 @@ export class TeamsService {
 
     if (!team) throw new NotFoundException('Team not found.');
     return this.toTeamResponse(team);
+  }
+
+  async options(query: OptionsQueryDto) {
+    const where: any = { deletedAt: null };
+    if (query.activeOnly !== false) where.status = TeamStatus.ACTIVE;
+    if (query.search) where.name = { contains: query.search, mode: 'insensitive' };
+
+    const items = await this.prisma.team.findMany({
+      where,
+      select: { id: true, name: true, status: true },
+      orderBy: { name: 'asc' },
+      take: query.limit ?? 20,
+    });
+
+    return items.map((item: any) => ({
+      id: item.id,
+      label: item.name,
+      value: item.id,
+      metadata: { status: item.status },
+    }));
   }
 
   async create(dto: CreateTeamDto, actorUserId?: string) {

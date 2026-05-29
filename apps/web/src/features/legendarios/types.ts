@@ -38,5 +38,22 @@ export type LegendarioPayload = {
   status: string;
   socialActionInterest: boolean;
   notes?: string;
+  needsReview?: boolean;
   expertiseIds: string[];
+  firstTopIsExternal: boolean;
+  firstTopEventId?: string;
+  firstTopFamilyId?: string;
+  firstTopExternalText?: string;
+  firstTopNotes?: string;
+  alreadyServedAsService: boolean;
+  serviceTopEventId?: string;
+  serviceTeamId?: string;
+  serviceRole?: string;
+  serviceNotes?: string;
+};
+
+export type ChurchPayload = {
+  name: string;
+  city?: string;
+  notes?: string;
 };

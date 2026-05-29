@@ -158,7 +158,7 @@ export default function DashboardPage() {
                 Próximo Evento Principal
               </span>
               <h2 className="mt-0.5 text-lg font-black text-white tracking-wide uppercase">
-                {summary.highlightedTop ? `TOP #${summary.highlightedTop.number} - ${summary.highlightedTop.name}` : 'Nenhum TOP Cadastrado'}
+                {summary.highlightedTop ? `TOP #${summary.highlightedTop.number} - ${summary.highlightedTop.name}` : 'Nenhum próximo TOP cadastrado.'}
               </h2>
               {summary.highlightedTop && (
                 <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mt-1">

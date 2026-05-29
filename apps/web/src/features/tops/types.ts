@@ -23,6 +23,8 @@ export type TopFamiliesResponse = { data: TopFamily[] };
 export type TopFamilyResponse = { data: TopFamily };
 export type TopFamilyMembersResponse = { data: TopFamilyMember[] };
 export type TeamsOptionsResponse = PaginatedResponse<Team>;
+export type OptionItem = { id: string; label: string; value: string; metadata?: Record<string, unknown> };
+export type OptionsResponse = { data: OptionItem[] };
 
 export type TopPayload = {
   name: string;
@@ -35,7 +37,11 @@ export type TopPayload = {
   representativeLegendaryId?: string;
   deputyRepresentativeLegendaryId?: string;
   generalCoordinatorLegendaryId?: string;
+  familyCoordinatorLegendaryId?: string;
+  familyDeputyCoordinatorLegendaryId?: string;
+  familyGeneralCoordinatorLegendaryId?: string;
   notes?: string;
+  needsReview?: boolean;
 };
 
 export type TopTeamPayload = {
@@ -63,12 +69,17 @@ export type TopServantPayload = {
 export type TopFamilyPayload = {
   name?: string;
   representativeLegendaryId?: string;
+  representativeRole?: string;
   deputyRepresentativeLegendaryId?: string;
+  deputyRepresentativeRole?: string;
   notes?: string;
+  needsReview?: boolean;
 };
 
 export type TopFamilyMemberPayload = {
   topParticipantId?: string;
   status?: string;
   notes?: string;
+  sourceNotes?: string;
+  needsReview?: boolean;
 };

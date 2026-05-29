@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { downloadCsv, getByChurchReport, getByCityReport, getByExpertiseReport, getByProfessionReport, getByTeamReport, getLegendariosReport, getSocialActionParticipantsReport, getSocialInterestedReport, getTopFamiliesReport, getTopParticipantsReport, getTopServantsReport } from '@/features/reports/api';
+import { downloadCsv, getByChurchReport, getByCityReport, getByExpertiseReport, getByProfessionReport, getByTeamReport, getLegendariosReport, getPendingReviewReport, getSocialActionParticipantsReport, getSocialInterestedReport, getTopFamiliesReport, getTopParticipantsReport, getTopServantsReport } from '@/features/reports/api';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { FileSpreadsheet, Download, Search } from 'lucide-react';
 
-type ReportKey = 'legendarios' | 'city' | 'church' | 'team' | 'profession' | 'expertise' | 'social' | 'topParticipants' | 'topServants' | 'topFamilies' | 'socialParticipants';
+type ReportKey = 'legendarios' | 'city' | 'church' | 'team' | 'profession' | 'expertise' | 'social' | 'pendingReview' | 'topParticipants' | 'topServants' | 'topFamilies' | 'socialParticipants';
 
 const reports: Array<{ key: ReportKey; label: string }> = [
   { key: 'legendarios', label: 'Todos Legendários' },
@@ -16,6 +16,7 @@ const reports: Array<{ key: ReportKey; label: string }> = [
   { key: 'profession', label: 'Por Profissão' },
   { key: 'expertise', label: 'Por Expertise' },
   { key: 'social', label: 'Interesse Social' },
+  { key: 'pendingReview', label: 'Pendentes de Revisão' },
   { key: 'topParticipants', label: 'Participantes por TOP' },
   { key: 'topServants', label: 'Servos por TOP' },
   { key: 'topFamilies', label: 'Famílias por TOP' },
@@ -43,6 +44,7 @@ export default function ReportsPage() {
       if (key === 'profession') response = await getByProfessionReport();
       if (key === 'expertise') response = await getByExpertiseReport();
       if (key === 'social') response = await getSocialInterestedReport();
+      if (key === 'pendingReview') response = await getPendingReviewReport();
       if (key === 'topParticipants') response = await getTopParticipantsReport(topId);
       if (key === 'topServants') response = await getTopServantsReport(topId);
       if (key === 'topFamilies') response = await getTopFamiliesReport(topId);
@@ -115,10 +117,10 @@ export default function ReportsPage() {
           <div className="flex-1 max-w-md">
             {active.startsWith('top') && (
               <label className="block space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">ID do TOP (UUID)</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">TOP</span>
                 <input
                   className="input text-xs"
-                  placeholder="Informe o UUID do TOP para filtrar..."
+                  placeholder="Informe o TOP para filtrar..."
                   value={topId}
                   onChange={(event) => setTopId(event.target.value)}
                 />
@@ -126,10 +128,10 @@ export default function ReportsPage() {
             )}
             {active === 'socialParticipants' && (
               <label className="block space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">ID da Ação Social (UUID)</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Ação Social</span>
                 <input
                   className="input text-xs"
-                  placeholder="Informe o UUID da Ação Social para filtrar..."
+                  placeholder="Informe a ação social para filtrar..."
                   value={socialActionId}
                   onChange={(event) => setSocialActionId(event.target.value)}
                 />
@@ -227,6 +229,9 @@ function flatten(row: any): Record<string, string | number | undefined> {
     profissao: row.profession?.name,
     equipe: row.team?.name,
     legendario: row.legendary?.fullName,
+    contexto: row.contexto,
+    motivo: row.motivo,
+    observacao: row.observacao,
     status: row.status,
     tipo: row.type,
     presente: typeof row.attended === 'boolean' ? (row.attended ? 'sim' : 'não') : undefined,

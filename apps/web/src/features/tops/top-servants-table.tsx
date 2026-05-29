@@ -13,12 +13,18 @@ export function TopServantsTable({ topId }: { topId: string }) {
   const [form, setForm] = useState(false);
   const [editing, setEditing] = useState<TopServant | undefined>();
   const [refresh, setRefresh] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   // Custom dialog state
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
-    getTopServants(topId, { page: 1, perPage: 50 }).then((r) => setItems(r.data));
+    getTopServants(topId, { page: 1, perPage: 50 })
+      .then((r) => {
+        setItems(r.data);
+        setError(null);
+      })
+      .catch(() => setError('Nao foi possivel carregar servos do TOP.'));
   }, [topId, refresh]);
 
   function done() {
@@ -32,6 +38,8 @@ export function TopServantsTable({ topId }: { topId: string }) {
     try {
       await cancelTopServant(topId, cancellingId);
       done();
+    } catch {
+      setError('Nao foi possivel cancelar a alocacao do servo.');
     } finally {
       setCancellingId(null);
     }
@@ -66,6 +74,8 @@ export function TopServantsTable({ topId }: { topId: string }) {
           />
         </div>
       )}
+
+      {error ? <ErrorMessage message={error} /> : null}
 
       <div className="w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#0B0B0C]">
         <div className="overflow-x-auto">
@@ -139,4 +149,8 @@ export function TopServantsTable({ topId }: { topId: string }) {
       />
     </section>
   );
+}
+
+function ErrorMessage({ message }: { message: string }) {
+  return <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-xs font-semibold text-rose-400">{message}</div>;
 }

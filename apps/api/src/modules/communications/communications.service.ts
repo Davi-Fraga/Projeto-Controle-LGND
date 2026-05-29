@@ -103,7 +103,7 @@ export class CommunicationsService {
   }
 
   private async resolveRecipients(message: any) {
-    const select = { id: true, user: { select: { id: true } } };
+    const select = { id: true, status: true, deletedAt: true, user: { select: { id: true } } };
     let items: any[] = [];
     if (message.targetType === InternalMessageTargetType.ALL_ACTIVE_LEGENDARIES) {
       items = await this.prisma.legendary.findMany({ where: { deletedAt: null, status: LegendaryStatus.ACTIVE }, select });
@@ -118,7 +118,11 @@ export class CommunicationsService {
     } else if ([InternalMessageTargetType.TOP_ALL, InternalMessageTargetType.TOP_REPRESENTATIVES, InternalMessageTargetType.TOP_FAMILY_REPRESENTATIVES, InternalMessageTargetType.TOP_FAMILY].includes(message.targetType)) {
       items = await this.resolveTopRecipients(message, select);
     }
-    return Array.from(new Map(items.filter(Boolean).map((legendary: any) => [legendary.id, { legendaryId: legendary.id, userId: legendary.user?.id }])).values());
+    return Array.from(new Map(
+      items
+        .filter((item: any) => item && item.deletedAt === null && item.status !== LegendaryStatus.INACTIVE)
+        .map((legendary: any) => [legendary.id, { legendaryId: legendary.id, userId: legendary.user?.id }])
+    ).values());
   }
 
   private async resolveTopRecipients(message: any, select: any) {

@@ -19,6 +19,11 @@ export class ChurchesService {
   }
 
   async create(dto: CreateChurchDto, actorUserId?: string) {
+    const normalized = this.normalizeName(dto.name);
+    const churches = await this.prisma.church.findMany({ where: { deletedAt: null } });
+    const existing = churches.find((church: any) => this.normalizeName(church.name) === normalized);
+    if (existing) return existing;
+
     const church = await this.prisma.church.create({
       data: {
         name: dto.name.trim(),
@@ -44,5 +49,9 @@ export class ChurchesService {
     });
     await this.audit.create({ actorUserId, entityType: 'Church', entityId: id, action: 'update', before, after });
     return after;
+  }
+
+  private normalizeName(value: string) {
+    return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLowerCase();
   }
 }

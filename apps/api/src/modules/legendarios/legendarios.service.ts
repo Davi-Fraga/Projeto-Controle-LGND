@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { LegendaryHistoryType, LegendaryStatus } from '@central-da-manada/shared';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
+import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateLegendarioDto } from './dto/create-legendario.dto';
@@ -14,6 +15,15 @@ const includeLegendario = {
   expertises: {
     include: {
       expertise: true,
+    },
+  },
+  firstTopEvent: true,
+  firstTopFamily: true,
+  topServants: {
+    where: { deletedAt: null },
+    include: {
+      topEvent: true,
+      team: true,
     },
   },
 };
@@ -35,6 +45,7 @@ export class LegendariosService {
       professionId: query.professionId,
       socialActionInterest: query.socialActionInterest,
       isFromRotaDoCerrado: query.isFromRotaDoCerrado,
+      needsReview: query.needsReview,
       expertises: query.expertiseId
         ? { some: { expertiseId: query.expertiseId } }
         : undefined,
@@ -71,6 +82,32 @@ export class LegendariosService {
     return this.toResponse(legendario);
   }
 
+  async options(query: OptionsQueryDto) {
+    const where: any = { deletedAt: null };
+    if (query.activeOnly !== false) where.status = { not: LegendaryStatus.INACTIVE };
+    if (query.search) {
+      where.OR = [
+        { fullName: { contains: query.search, mode: 'insensitive' } },
+        { lgndNumber: { contains: query.search, mode: 'insensitive' } },
+        { phone: { contains: this.normalizePhone(query.search), mode: 'insensitive' } },
+      ];
+    }
+
+    const items = await this.prisma.legendary.findMany({
+      where,
+      select: { id: true, fullName: true, lgndNumber: true, city: true, church: { select: { name: true } } },
+      orderBy: { fullName: 'asc' },
+      take: query.limit ?? 20,
+    });
+
+    return items.map((item: any) => ({
+      id: item.id,
+      label: item.lgndNumber ? `${item.fullName} - LGND ${item.lgndNumber}` : item.fullName,
+      value: item.id,
+      metadata: { fullName: item.fullName, lgndNumber: item.lgndNumber, city: item.city, church: item.church?.name },
+    }));
+  }
+
   async create(dto: CreateLegendarioDto, actorUserId?: string) {
     await this.validateRelations(dto);
     await this.ensureLgndIsAvailable(dto.lgndNumber);
@@ -85,6 +122,8 @@ export class LegendariosService {
       include: includeLegendario,
     });
 
+    await this.handleServiceInfo(legendario.id, dto, actorUserId);
+
     await this.audit.create({
       actorUserId,
       entityType: 'Legendary',
@@ -93,6 +132,27 @@ export class LegendariosService {
       after: this.toResponse(legendario),
     });
     await this.createHistory(legendario.id, LegendaryHistoryType.LEGENDARY_CREATED, 'Legendario criado', 'Cadastro do Legendario criado.', actorUserId);
+
+    if (dto.firstTopIsExternal) {
+      await this.createHistory(
+        legendario.id,
+        LegendaryHistoryType.MANUAL_NOTE,
+        'Primeira Montanha (Outra Rota)',
+        `Subiu a primeira montanha em outra rota/TOP de origem: ${dto.firstTopExternalText}.${dto.firstTopNotes ? ` Obs: ${dto.firstTopNotes}` : ''}`,
+        actorUserId
+      );
+    } else if (dto.firstTopEventId) {
+      const topEvent = await this.prisma.topEvent.findUnique({ where: { id: dto.firstTopEventId } });
+      const family = dto.firstTopFamilyId ? await this.prisma.topFamily.findUnique({ where: { id: dto.firstTopFamilyId } }) : null;
+      await this.createHistory(
+        legendario.id,
+        LegendaryHistoryType.TOP_PARTICIPATED,
+        'Primeira Montanha',
+        `Subiu a primeira montanha no TOP #${topEvent?.number} - ${topEvent?.name} na Família ${family?.name || ''}.${dto.firstTopNotes ? ` Obs: ${dto.firstTopNotes}` : ''}`,
+        actorUserId,
+        { topEventId: dto.firstTopEventId, topFamilyId: dto.firstTopFamilyId }
+      );
+    }
 
     return this.toResponse(legendario);
   }
@@ -115,7 +175,7 @@ export class LegendariosService {
         await tx.legendaryExpertise.deleteMany({ where: { legendaryId: id } });
       }
 
-      return tx.legendary.update({
+      const updated = await tx.legendary.update({
         where: { id },
         data: {
           ...this.toData(dto),
@@ -127,7 +187,11 @@ export class LegendariosService {
         },
         include: includeLegendario,
       });
+
+      return updated;
     });
+
+    await this.handleServiceInfo(id, dto, actorUserId);
 
     await this.audit.create({
       actorUserId,
@@ -137,6 +201,16 @@ export class LegendariosService {
       before: this.toResponse(before),
       after: this.toResponse(after),
     });
+    if ('needsReview' in dto && before.needsReview !== after.needsReview) {
+      await this.audit.create({
+        actorUserId,
+        entityType: 'Legendary',
+        entityId: id,
+        action: 'update_needs_review',
+        before: { needsReview: before.needsReview },
+        after: { needsReview: after.needsReview },
+      });
+    }
     await this.createHistory(id, LegendaryHistoryType.LEGENDARY_UPDATED, 'Legendario atualizado', 'Cadastro do Legendario atualizado.', actorUserId);
 
     if (dto.expertiseIds) {
@@ -246,6 +320,24 @@ export class LegendariosService {
       });
       if (count !== uniqueIds.length) throw new BadRequestException('One or more expertises do not exist.');
     }
+
+    if (dto.firstTopIsExternal) {
+      if (!dto.firstTopExternalText?.trim()) {
+        throw new BadRequestException('Informe a rota/TOP de origem para TOP externo.');
+      }
+    } else {
+      if (dto.firstTopEventId) {
+        const top = await this.prisma.topEvent.findFirst({ where: { id: dto.firstTopEventId, deletedAt: null } });
+        if (!top) throw new BadRequestException('Primeiro TOP não existe.');
+      }
+      if (dto.firstTopFamilyId) {
+        const family = await this.prisma.topFamily.findFirst({ where: { id: dto.firstTopFamilyId, deletedAt: null } });
+        if (!family) throw new BadRequestException('Família não existe.');
+        if (dto.firstTopEventId && family.topEventId !== dto.firstTopEventId) {
+          throw new BadRequestException('A família deve pertencer ao TOP selecionado.');
+        }
+      }
+    }
   }
 
   private async ensureLgndIsAvailable(lgndNumber?: string, currentId?: string) {
@@ -276,6 +368,13 @@ export class LegendariosService {
     if ('status' in dto) data.status = dto.status;
     if ('socialActionInterest' in dto) data.socialActionInterest = dto.socialActionInterest;
     if ('notes' in dto) data.notes = dto.notes?.trim() || null;
+    if ('needsReview' in dto) data.needsReview = dto.needsReview;
+
+    if ('firstTopIsExternal' in dto) data.firstTopIsExternal = dto.firstTopIsExternal ?? false;
+    if ('firstTopEventId' in dto) data.firstTopEventId = dto.firstTopEventId || null;
+    if ('firstTopFamilyId' in dto) data.firstTopFamilyId = dto.firstTopFamilyId || null;
+    if ('firstTopExternalText' in dto) data.firstTopExternalText = dto.firstTopExternalText?.trim() || null;
+    if ('firstTopNotes' in dto) data.firstTopNotes = dto.firstTopNotes?.trim() || null;
     return data;
   }
 
@@ -290,8 +389,83 @@ export class LegendariosService {
     };
   }
 
-  private async createHistory(legendaryId: string, type: LegendaryHistoryType, title: string, description: string, actorUserId?: string) {
+  private async createHistory(
+    legendaryId: string,
+    type: LegendaryHistoryType,
+    title: string,
+    description: string,
+    actorUserId?: string,
+    context?: { topEventId?: string | null; teamId?: string | null; topFamilyId?: string | null }
+  ) {
     if (!this.prisma.legendaryHistory) return;
-    await this.prisma.legendaryHistory.create({ data: { legendaryId, type, title, description, actorUserId } });
+    await this.prisma.legendaryHistory.create({
+      data: {
+        legendaryId,
+        type,
+        title,
+        description,
+        actorUserId,
+        topEventId: context?.topEventId || null,
+        teamId: context?.teamId || null,
+        topFamilyId: context?.topFamilyId || null,
+      },
+    });
+  }
+
+  private async handleServiceInfo(legendaryId: string, dto: Partial<CreateLegendarioDto>, actorUserId?: string) {
+    if (dto.alreadyServedAsService && dto.serviceTopEventId && dto.serviceTeamId) {
+      const topTeamExists = await this.prisma.topTeam.findFirst({
+        where: { topEventId: dto.serviceTopEventId, teamId: dto.serviceTeamId, deletedAt: null }
+      });
+      if (!topTeamExists) {
+        await this.prisma.topTeam.create({
+          data: {
+            topEventId: dto.serviceTopEventId,
+            teamId: dto.serviceTeamId
+          }
+        });
+      }
+
+      const existingServant = await this.prisma.topServant.findFirst({
+        where: {
+          topEventId: dto.serviceTopEventId,
+          legendaryId,
+          teamId: dto.serviceTeamId,
+          deletedAt: null,
+          status: { not: 'CANCELLED' }
+        }
+      });
+
+      if (!existingServant) {
+        const topServant = await this.prisma.topServant.create({
+          data: {
+            topEventId: dto.serviceTopEventId,
+            legendaryId,
+            teamId: dto.serviceTeamId,
+            role: dto.serviceRole?.trim() || null,
+            status: 'COMPLETED',
+            notes: dto.serviceNotes?.trim() || null
+          },
+          include: { team: true }
+        });
+
+        await this.createHistory(
+          legendaryId,
+          LegendaryHistoryType.TOP_SERVED,
+          'Serviu em TOP',
+          `Adicionado como servo do TOP${topServant.team?.name ? ` na equipe ${topServant.team.name}` : ''}.`,
+          actorUserId,
+          { topEventId: dto.serviceTopEventId, teamId: dto.serviceTeamId }
+        );
+      } else {
+        await this.prisma.topServant.update({
+          where: { id: existingServant.id },
+          data: {
+            role: dto.serviceRole?.trim() || null,
+            notes: dto.serviceNotes?.trim() || null
+          }
+        });
+      }
+    }
   }
 }

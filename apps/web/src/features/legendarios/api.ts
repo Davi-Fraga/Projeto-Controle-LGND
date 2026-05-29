@@ -9,6 +9,7 @@ import type {
   LegendaryHistoryResponse,
   OptionResponse,
   Profession,
+  ChurchPayload,
 } from './types';
 
 function buildQuery(filters: LegendaryFilters) {
@@ -65,6 +66,13 @@ export function deactivateLegendario(id: string) {
 
 export function getChurches() {
   return api<OptionResponse<Church>>('/churches');
+}
+
+export function createChurch(payload: ChurchPayload) {
+  return api<{ data: Church }>('/churches', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
 export function getProfessions() {

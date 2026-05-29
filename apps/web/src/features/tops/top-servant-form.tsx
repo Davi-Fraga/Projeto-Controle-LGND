@@ -29,8 +29,12 @@ export function TopServantForm({
   });
 
   useEffect(() => {
-    searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' }).then((r) => setPeople(r.data));
-    getTopTeams(topId).then((r) => setTeams(r.data));
+    searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' })
+      .then((r) => setPeople(r.data))
+      .catch(() => setError('Nao foi possivel carregar Legendarios.'));
+    getTopTeams(topId)
+      .then((r) => setTeams(r.data))
+      .catch(() => setError('Nao foi possivel carregar equipes do TOP.'));
   }, [topId]);
 
   async function submit(e: FormEvent) {

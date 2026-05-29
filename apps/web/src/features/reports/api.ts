@@ -8,6 +8,7 @@ export const getByTeamReport = () => api<{ data: any[] }>('/reports/legendarios/
 export const getByProfessionReport = () => api<{ data: any[] }>('/reports/legendarios/by-profession');
 export const getByExpertiseReport = () => api<{ data: any[] }>('/reports/legendarios/by-expertise');
 export const getSocialInterestedReport = () => api<{ data: any[] }>('/reports/legendarios/social-interested');
+export const getPendingReviewReport = () => api<{ data: any[] }>('/reports/pending-review');
 export const getTopParticipantsReport = (topId: string) => api<{ data: any[] }>(`/reports/tops/${topId}/participants`);
 export const getTopServantsReport = (topId: string) => api<{ data: any[] }>(`/reports/tops/${topId}/servants`);
 export const getTopFamiliesReport = (topId: string) => api<{ data: any[] }>(`/reports/tops/${topId}/families`);

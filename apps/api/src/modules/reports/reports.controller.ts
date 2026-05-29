@@ -19,6 +19,7 @@ export class ReportsController {
   @Get('legendarios/by-profession') @Permissions('reports.read') async byProfession() { return { data: await this.reports.byProfession() }; }
   @Get('legendarios/by-expertise') @Permissions('reports.read') async byExpertise() { return { data: await this.reports.byExpertise() }; }
   @Get('legendarios/social-interested') @Permissions('reports.read') async socialInterested() { return { data: await this.reports.socialInterested() }; }
+  @Get('pending-review') @Permissions('reports.read') async pendingReview() { return { data: await this.reports.pendingReview() }; }
   @Get('tops/:topId/participants') @Permissions('reports.read') async topParticipants(@Param('topId') topId: string) { return { data: await this.reports.topParticipants(topId) }; }
   @Get('tops/:topId/servants') @Permissions('reports.read') async topServants(@Param('topId') topId: string) { return { data: await this.reports.topServants(topId) }; }
   @Get('tops/:topId/families') @Permissions('reports.read') async topFamilies(@Param('topId') topId: string) { return { data: await this.reports.topFamilies(topId) }; }

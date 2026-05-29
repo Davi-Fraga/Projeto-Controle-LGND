@@ -91,7 +91,17 @@ export default function CommunicationDetailPage() {
           </Link>
           <h1 className="mt-3 text-2xl font-black tracking-wide text-white uppercase">{message.title}</h1>
           <p className="text-sm font-semibold text-zinc-400 mt-1">
-            Canal/Alvo: {message.targetType === 'ALL_ACTIVE_LEGENDARIES' ? 'Toda a Manada' : message.targetType}
+            Canal/Alvo: {
+              message.targetType === 'ALL_ACTIVE_LEGENDARIES' ? 'Toda a Manada' :
+              message.targetType === 'TOP_ALL' ? 'Todos de um TOP' :
+              message.targetType === 'TOP_REPRESENTATIVES' ? 'Representantes do TOP' :
+              message.targetType === 'TOP_FAMILY_REPRESENTATIVES' ? 'Representantes das Famílias do TOP' :
+              message.targetType === 'TOP_FAMILY' ? 'Família específica de um TOP' :
+              message.targetType === 'TEAM' ? 'Equipe específica' :
+              message.targetType === 'TEAM_COORDINATORS' ? 'Coordenadores de Equipe' :
+              message.targetType === 'LEGENDARY' ? 'Legendário individual' :
+              message.targetType
+            }
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

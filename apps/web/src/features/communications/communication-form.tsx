@@ -1,6 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { InternalMessageTargetType } from '@central-da-manada/shared';
+import { getTopOptions, getTopFamilyOptions, getLegendarioOptions, getTeamsOptionsList } from '@/features/tops/api';
+import type { OptionItem } from '@/features/tops/types';
 import type { CommunicationPayload } from './api';
 
 type Props = {
@@ -10,18 +13,39 @@ type Props = {
   onSubmit: () => void;
 };
 
-const targetTypes = Object.values(InternalMessageTargetType);
-
 export function CommunicationForm({ value, saving, onChange, onSubmit }: Props) {
-  const needsTop = ['TOP_ALL', 'TOP_REPRESENTATIVES', 'TOP_FAMILY_REPRESENTATIVES'].includes(value.targetType);
-  const needsTarget = ['TOP_FAMILY', 'TEAM', 'LEGENDARY'].includes(value.targetType);
+  const [topOptions, setTopOptions] = useState<OptionItem[]>([]);
+  const [teamOptions, setTeamOptions] = useState<OptionItem[]>([]);
+  const [legendaryOptions, setLegendaryOptions] = useState<OptionItem[]>([]);
+  const [familyOptions, setFamilyOptions] = useState<OptionItem[]>([]);
+
+  useEffect(() => {
+    getTopOptions().then((r) => setTopOptions(r.data)).catch(console.error);
+    getTeamsOptionsList().then((r) => setTeamOptions(r.data)).catch(console.error);
+    getLegendarioOptions({ limit: 100 }).then((r) => setLegendaryOptions(r.data)).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (value.topEventId) {
+      getTopFamilyOptions(value.topEventId)
+        .then((r) => setFamilyOptions(r.data))
+        .catch(console.error);
+    } else {
+      setFamilyOptions([]);
+    }
+  }, [value.topEventId]);
+
+  const needsTop = ['TOP_ALL', 'TOP_REPRESENTATIVES', 'TOP_FAMILY_REPRESENTATIVES', 'TOP_FAMILY'].includes(value.targetType);
+  const needsFamily = value.targetType === 'TOP_FAMILY';
+  const needsTeam = value.targetType === 'TEAM';
+  const needsLegendary = value.targetType === 'LEGENDARY';
 
   function patch(partial: Partial<CommunicationPayload>) {
     onChange({ ...value, ...partial });
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-300">
       <div className="grid gap-5">
         <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Título / Assunto</span>
@@ -36,28 +60,108 @@ export function CommunicationForm({ value, saving, onChange, onSubmit }: Props) 
         <div className="grid gap-4 md:grid-cols-3">
           <label className="block space-y-2">
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Público-Alvo</span>
-            <select className="input" value={value.targetType} onChange={(event) => patch({ targetType: event.target.value as InternalMessageTargetType, targetId: '', topEventId: '' })}>
-              {targetTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type === 'ALL_ACTIVE_LEGENDARIES' ? 'Toda a Manada Ativa' : type === 'TOP_ALL' ? 'Todos de um TOP' : type === 'TOP_REPRESENTATIVES' ? 'Representantes do TOP' : type === 'TEAM' ? 'Equipe' : type === 'TEAM_COORDINATORS' ? 'Coordenadores de Equipe' : type === 'LEGENDARY' ? 'Legendário Individual' : type}
-                </option>
-              ))}
+            <select
+              className="input"
+              value={value.targetType}
+              onChange={(event) =>
+                patch({
+                  targetType: event.target.value as InternalMessageTargetType,
+                  targetId: '',
+                  topEventId: '',
+                })
+              }
+            >
+              <option value="ALL_ACTIVE_LEGENDARIES">Toda a Manada</option>
+              <option value="TOP_ALL">Todos de um TOP</option>
+              <option value="TOP_REPRESENTATIVES">Representantes do TOP</option>
+              <option value="TOP_FAMILY_REPRESENTATIVES">Representantes das Famílias do TOP</option>
+              <option value="TOP_FAMILY">Família específica de um TOP</option>
+              <option value="TEAM">Equipe específica</option>
+              <option value="TEAM_COORDINATORS">Coordenadores de Equipe</option>
+              <option value="LEGENDARY">Legendário individual</option>
             </select>
           </label>
 
-          <label className="block space-y-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-              {needsTop || value.targetType === 'TOP_FAMILY' ? 'ID do TOP (Obrigatório)' : 'ID do TOP (Opcional)'}
-            </span>
-            <input className="input" placeholder="UUID do Evento TOP" value={value.topEventId ?? ''} onChange={(event) => patch({ topEventId: event.target.value })} />
-          </label>
+          {/* Conditional Select for TOP */}
+          {needsTop && (
+            <label className="block space-y-2 animate-in fade-in duration-200">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Selecione o TOP</span>
+              <select
+                className="input"
+                value={value.topEventId ?? ''}
+                onChange={(event) => patch({ topEventId: event.target.value, targetId: '' })}
+                required
+              >
+                <option value="">Selecione o TOP</option>
+                {topOptions.map((top) => (
+                  <option key={top.id} value={top.id}>
+                    {top.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
-          <label className="block space-y-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-              {needsTarget ? 'ID do Alvo (Obrigatório)' : 'ID do Alvo (Opcional)'}
-            </span>
-            <input className="input" placeholder="UUID da equipe/legendário" value={value.targetId ?? ''} onChange={(event) => patch({ targetId: event.target.value })} />
-          </label>
+          {/* Conditional Select for Family of a TOP */}
+          {needsFamily && (
+            <label className="block space-y-2 animate-in fade-in duration-200">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Selecione a Família</span>
+              <select
+                className="input"
+                value={value.targetId ?? ''}
+                disabled={!value.topEventId}
+                onChange={(event) => patch({ targetId: event.target.value })}
+                required
+              >
+                <option value="">Selecione a Família</option>
+                {familyOptions.map((fam) => (
+                  <option key={fam.id} value={fam.id}>
+                    {fam.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {/* Conditional Select for Team */}
+          {needsTeam && (
+            <label className="block space-y-2 animate-in fade-in duration-200">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Selecione a Equipe</span>
+              <select
+                className="input"
+                value={value.targetId ?? ''}
+                onChange={(event) => patch({ targetId: event.target.value })}
+                required
+              >
+                <option value="">Selecione a equipe</option>
+                {teamOptions.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {/* Conditional Select for Legendary */}
+          {needsLegendary && (
+            <label className="block space-y-2 animate-in fade-in duration-200">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Selecione o Legendário</span>
+              <select
+                className="input"
+                value={value.targetId ?? ''}
+                onChange={(event) => patch({ targetId: event.target.value })}
+                required
+              >
+                <option value="">Selecione o legendário</option>
+                {legendaryOptions.map((leg) => (
+                  <option key={leg.id} value={leg.id}>
+                    {leg.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
 
         <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/20 px-4 py-2.5 text-xs font-semibold text-zinc-300 transition-colors hover:bg-zinc-900/60 hover:text-zinc-100 w-fit">
@@ -72,7 +176,7 @@ export function CommunicationForm({ value, saving, onChange, onSubmit }: Props) 
 
         <div className="pt-4 border-t border-zinc-800 flex items-center justify-between">
           <p className="text-xs text-zinc-500 font-semibold max-w-lg">
-            * Para alvos específicos, informe o UUID do Legendário, equipe ou família. Comunicados direcionados a TOP_ALL e representantes necessitam do ID do TOP.
+            * Escolha o público-alvo e selecione os filtros acima para enviar mensagens direcionadas para a manada de forma correta e sem erros.
           </p>
           <button
             type="button"
@@ -87,4 +191,3 @@ export function CommunicationForm({ value, saving, onChange, onSubmit }: Props) 
     </div>
   );
 }
-

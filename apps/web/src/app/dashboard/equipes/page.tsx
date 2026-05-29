@@ -9,6 +9,7 @@ import { deactivateTeam, getTeams } from '@/features/teams/api';
 import type { Team } from '@/features/teams/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ActionMenu } from '@/components/ui/ActionMenu';
 import { Search, Eye, Edit2, ShieldAlert, Shield } from 'lucide-react';
 
 export default function TeamsPage() {
@@ -166,28 +167,14 @@ export default function TeamsPage() {
                       {team.activeMembersCount}
                     </td>
                     <td className="px-6 py-4.5">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link
-                          className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-850 hover:text-zinc-100"
-                          href={`/dashboard/equipes/${team.id}`}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Ver
-                        </Link>
-                        <Link
-                          className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-850 hover:text-zinc-100"
-                          href={`/dashboard/equipes/${team.id}/editar`}
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                          Editar
-                        </Link>
-                        <button
-                          className="flex h-8 items-center gap-1.5 rounded-lg border border-rose-900/30 bg-rose-950/20 px-3 text-xs font-bold uppercase tracking-wider text-rose-400 transition-all hover:bg-rose-950/50 hover:text-rose-300"
-                          onClick={() => setDeactivatingId(team.id)}
-                        >
-                          <ShieldAlert className="h-3.5 w-3.5" />
-                          Inativar
-                        </button>
+                      <div className="flex justify-end">
+                        <ActionMenu
+                          items={[
+                            { label: 'Ver', href: `/dashboard/equipes/${team.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
+                            { label: 'Editar', href: `/dashboard/equipes/${team.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> },
+                            { label: 'Inativar', onClick: () => setDeactivatingId(team.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true },
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>

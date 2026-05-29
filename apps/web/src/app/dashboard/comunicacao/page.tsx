@@ -9,6 +9,7 @@ import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useDebounce } from '@/hooks/use-debounce';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ActionMenu } from '@/components/ui/ActionMenu';
 import { Search, Eye, ShieldAlert, MessageSquare, Target } from 'lucide-react';
 
 export default function CommunicationsPage() {
@@ -154,13 +155,15 @@ export default function CommunicationsPage() {
                       <div className="flex items-center gap-1">
                         <Target className="h-3.5 w-3.5 text-zinc-500" />
                         <span>
-                          {item.targetType === 'ALL_ACTIVE_LEGENDARIES'
-                            ? 'Toda a Manada'
-                            : item.targetType === 'TEAM'
-                            ? 'Equipe Específica'
-                            : item.targetType === 'TOP_ALL'
-                            ? 'Todos do TOP'
-                            : item.targetType}
+                          {item.targetType === 'ALL_ACTIVE_LEGENDARIES' ? 'Toda a Manada' :
+                           item.targetType === 'TOP_ALL' ? 'Todos de um TOP' :
+                           item.targetType === 'TOP_REPRESENTATIVES' ? 'Representantes do TOP' :
+                           item.targetType === 'TOP_FAMILY_REPRESENTATIVES' ? 'Representantes das Famílias do TOP' :
+                           item.targetType === 'TOP_FAMILY' ? 'Família específica de um TOP' :
+                           item.targetType === 'TEAM' ? 'Equipe específica' :
+                           item.targetType === 'TEAM_COORDINATORS' ? 'Coordenadores de Equipe' :
+                           item.targetType === 'LEGENDARY' ? 'Legendário individual' :
+                           item.targetType}
                         </span>
                       </div>
                     </td>
@@ -171,21 +174,13 @@ export default function CommunicationsPage() {
                       <StatusBadge status={item.status} />
                     </td>
                     <td className="px-6 py-4.5">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link
-                          className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-850 hover:text-zinc-100"
-                          href={`/dashboard/comunicacao/${item.id}`}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Ver
-                        </Link>
-                        <button
-                          className="flex h-8 items-center gap-1.5 rounded-lg border border-rose-900/30 bg-rose-950/20 px-3 text-xs font-bold uppercase tracking-wider text-rose-400 transition-all hover:bg-rose-950/50 hover:text-rose-300"
-                          onClick={() => setDeletingId(item.id)}
-                        >
-                          <ShieldAlert className="h-3.5 w-3.5" />
-                          Excluir
-                        </button>
+                      <div className="flex justify-end">
+                        <ActionMenu
+                          items={[
+                            { label: 'Ver', href: `/dashboard/comunicacao/${item.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
+                            { label: 'Excluir', onClick: () => setDeletingId(item.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true },
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>

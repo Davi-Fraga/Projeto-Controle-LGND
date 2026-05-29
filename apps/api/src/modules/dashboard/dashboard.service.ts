@@ -71,18 +71,27 @@ export class DashboardService {
 
   private async findHighlightedTop() {
     const include = { representative: true, deputyRepresentative: true, _count: { select: { participants: true, servants: true, teams: true, families: true } } };
-    const [active, future, recent] = await Promise.all([
-      this.prisma.topEvent.findFirst({ where: { deletedAt: null, status: TopEventStatus.ACTIVE }, include, orderBy: { startDate: 'asc' } }),
-      this.prisma.topEvent.findFirst({ where: { deletedAt: null, startDate: { gte: new Date() } }, include, orderBy: { startDate: 'asc' } }),
-      this.prisma.topEvent.findFirst({ where: { deletedAt: null }, include, orderBy: { startDate: 'desc' } }),
-    ]);
-    if (active) return this.toTopResponse(active);
-    if (future) return this.toTopResponse(future);
-    return recent ? this.toTopResponse(recent) : null;
+    const top = await this.prisma.topEvent.findFirst({
+      where: {
+        deletedAt: null,
+        startDate: { gte: new Date() },
+        status: { notIn: [TopEventStatus.CANCELLED, TopEventStatus.COMPLETED] },
+      },
+      include,
+      orderBy: { startDate: 'asc' },
+    });
+    return top ? this.toTopResponse(top) : null;
   }
 
   private async findNextTop() {
-    const top = await this.prisma.topEvent.findFirst({ where: { deletedAt: null, startDate: { gte: new Date() } }, orderBy: { startDate: 'asc' } });
+    const top = await this.prisma.topEvent.findFirst({
+      where: {
+        deletedAt: null,
+        startDate: { gte: new Date() },
+        status: { notIn: [TopEventStatus.CANCELLED, TopEventStatus.COMPLETED] },
+      },
+      orderBy: { startDate: 'asc' },
+    });
     return top ? this.toTopResponse(top) : null;
   }
 

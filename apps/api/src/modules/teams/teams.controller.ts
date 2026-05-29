@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } f
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AddTeamMemberDto } from './dto/add-team-member.dto';
 import { CreateTeamDto } from './dto/create-team.dto';
@@ -20,6 +21,12 @@ export class TeamsController {
   @Permissions('teams.read')
   findAll(@Query() query: TeamQueryDto) {
     return this.teamsService.findAll(query);
+  }
+
+  @Get('options')
+  @Permissions('teams.read')
+  async options(@Query() query: OptionsQueryDto) {
+    return { data: await this.teamsService.options(query) };
   }
 
   @Get(':id')

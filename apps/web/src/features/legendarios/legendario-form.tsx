@@ -3,7 +3,10 @@
 import { FormEvent, ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LegendaryStatus } from '@central-da-manada/shared';
+import { getTopOptions, getTopFamilyOptions, getTeamsOptionsList } from '@/features/tops/api';
+import type { OptionItem } from '@/features/tops/types';
 import {
+  createChurch,
   createLegendario,
   getChurches,
   getExpertises,
@@ -25,8 +28,21 @@ const emptyPayload: LegendarioPayload = {
   status: LegendaryStatus.UNKNOWN,
   socialActionInterest: false,
   notes: '',
+  needsReview: false,
   expertiseIds: [],
+  firstTopIsExternal: false,
+  firstTopEventId: '',
+  firstTopFamilyId: '',
+  firstTopExternalText: '',
+  firstTopNotes: '',
+  alreadyServedAsService: false,
+  serviceTopEventId: '',
+  serviceTeamId: '',
+  serviceRole: '',
+  serviceNotes: '',
 };
+
+const ADD_CHURCH_VALUE = '__add_church__';
 
 type Props = {
   legendario?: Legendary;
@@ -49,28 +65,80 @@ export function LegendarioForm({ legendario }: Props) {
           status: legendario.status,
           socialActionInterest: legendario.socialActionInterest,
           notes: legendario.notes ?? '',
+          needsReview: legendario.needsReview,
           expertiseIds: legendario.expertises.map((expertise) => expertise.id),
+          firstTopIsExternal: legendario.firstTopIsExternal ?? false,
+          firstTopEventId: legendario.firstTopEventId ?? '',
+          firstTopFamilyId: legendario.firstTopFamilyId ?? '',
+          firstTopExternalText: legendario.firstTopExternalText ?? '',
+          firstTopNotes: legendario.firstTopNotes ?? '',
+          alreadyServedAsService: (legendario.topServants && legendario.topServants.length > 0) ?? false,
+          serviceTopEventId: legendario.topServants?.[0]?.topEventId ?? '',
+          serviceTeamId: legendario.topServants?.[0]?.teamId ?? '',
+          serviceRole: legendario.topServants?.[0]?.role ?? '',
+          serviceNotes: legendario.topServants?.[0]?.notes ?? '',
         }
       : emptyPayload,
   );
   const [churches, setChurches] = useState<Church[]>([]);
   const [professions, setProfessions] = useState<Profession[]>([]);
   const [expertises, setExpertises] = useState<Expertise[]>([]);
+  const [topOptions, setTopOptions] = useState<OptionItem[]>([]);
+  const [teamOptions, setTeamOptions] = useState<OptionItem[]>([]);
+  const [firstTopFamilyOptions, setFirstTopFamilyOptions] = useState<OptionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showChurchForm, setShowChurchForm] = useState(false);
+  const [churchForm, setChurchForm] = useState({ name: '', city: '', notes: '' });
 
   useEffect(() => {
-    Promise.all([getChurches(), getProfessions(), getExpertises()])
-      .then(([churchResponse, professionResponse, expertiseResponse]) => {
+    Promise.all([getChurches(), getProfessions(), getExpertises(), getTopOptions(), getTeamsOptionsList()])
+      .then(([churchResponse, professionResponse, expertiseResponse, topResponse, teamResponse]) => {
         setChurches(churchResponse.data);
         setProfessions(professionResponse.data);
         setExpertises(expertiseResponse.data);
+        setTopOptions(topResponse.data);
+        setTeamOptions(teamResponse.data);
       })
-      .catch(() => setError('Nao foi possivel carregar os cadastros auxiliares.'));
+      .catch(() => setError('Não foi possível carregar os cadastros auxiliares.'));
   }, []);
+
+  useEffect(() => {
+    if (payload.firstTopEventId) {
+      getTopFamilyOptions(payload.firstTopEventId)
+        .then((response) => setFirstTopFamilyOptions(response.data))
+        .catch(console.error);
+    } else {
+      setFirstTopFamilyOptions([]);
+    }
+  }, [payload.firstTopEventId]);
 
   function updateField<T extends keyof LegendarioPayload>(field: T, value: LegendarioPayload[T]) {
     setPayload((current) => ({ ...current, [field]: value }));
+  }
+
+  async function saveChurch() {
+    if (!churchForm.name.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await createChurch({
+        name: churchForm.name,
+        city: churchForm.city || undefined,
+        notes: churchForm.notes || undefined,
+      });
+      setChurches((current) => {
+        const exists = current.some((church) => church.id === response.data.id);
+        return exists ? current : [...current, response.data].sort((a, b) => a.name.localeCompare(b.name));
+      });
+      updateField('churchId', response.data.id);
+      setChurchForm({ name: '', city: '', notes: '' });
+      setShowChurchForm(false);
+    } catch {
+      setError('Não foi possível cadastrar a igreja.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   function toggleExpertise(id: string) {
@@ -87,6 +155,40 @@ export function LegendarioForm({ legendario }: Props) {
     setLoading(true);
     setError(null);
 
+    if (payload.firstTopIsExternal) {
+      if (!payload.firstTopExternalText?.trim()) {
+        setError('Informe a rota/TOP de origem para o TOP externo.');
+        setLoading(false);
+        return;
+      }
+    } else {
+      if (!legendario) {
+        if (!payload.firstTopEventId) {
+          setError('Primeiro TOP que subiu é obrigatório.');
+          setLoading(false);
+          return;
+        }
+        if (!payload.firstTopFamilyId) {
+          setError('Família no primeiro TOP é obrigatória.');
+          setLoading(false);
+          return;
+        }
+      }
+    }
+
+    if (payload.alreadyServedAsService) {
+      if (!payload.serviceTopEventId) {
+        setError('TOP em que serviu é obrigatório.');
+        setLoading(false);
+        return;
+      }
+      if (!payload.serviceTeamId) {
+        setError('Equipe em que serviu é obrigatória.');
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       const cleanedPayload = {
         ...payload,
@@ -97,6 +199,17 @@ export function LegendarioForm({ legendario }: Props) {
         churchRole: payload.churchRole || undefined,
         professionId: payload.professionId || undefined,
         notes: payload.notes || undefined,
+        needsReview: payload.needsReview,
+        firstTopIsExternal: payload.firstTopIsExternal,
+        firstTopEventId: !payload.firstTopIsExternal && payload.firstTopEventId ? payload.firstTopEventId : undefined,
+        firstTopFamilyId: !payload.firstTopIsExternal && payload.firstTopFamilyId ? payload.firstTopFamilyId : undefined,
+        firstTopExternalText: payload.firstTopIsExternal && payload.firstTopExternalText ? payload.firstTopExternalText : undefined,
+        firstTopNotes: payload.firstTopNotes || undefined,
+        alreadyServedAsService: payload.alreadyServedAsService,
+        serviceTopEventId: payload.alreadyServedAsService && payload.serviceTopEventId ? payload.serviceTopEventId : undefined,
+        serviceTeamId: payload.alreadyServedAsService && payload.serviceTeamId ? payload.serviceTeamId : undefined,
+        serviceRole: payload.alreadyServedAsService && payload.serviceRole ? payload.serviceRole : undefined,
+        serviceNotes: payload.alreadyServedAsService && payload.serviceNotes ? payload.serviceNotes : undefined,
       };
 
       const response = legendario
@@ -105,7 +218,7 @@ export function LegendarioForm({ legendario }: Props) {
 
       router.push(`/dashboard/legendarios/${response.data.id}`);
     } catch {
-      setError('Nao foi possivel salvar o Legendario. Verifique os dados informados.');
+      setError('Não foi possível salvar o Legendário. Verifique os dados informados.');
     } finally {
       setLoading(false);
     }
@@ -142,8 +255,19 @@ export function LegendarioForm({ legendario }: Props) {
           </select>
         </Field>
         <Field label="Igreja">
-          <select className="input" value={payload.churchId} onChange={(event) => updateField('churchId', event.target.value)}>
+          <select
+            className="input"
+            value={payload.churchId}
+            onChange={(event) => {
+              if (event.target.value === ADD_CHURCH_VALUE) {
+                setShowChurchForm(true);
+                return;
+              }
+              updateField('churchId', event.target.value);
+            }}
+          >
             <option value="">Não informada</option>
+            <option value={ADD_CHURCH_VALUE}>+ Adicionar nova igreja</option>
             {churches.map((church) => (
               <option key={church.id} value={church.id}>{church.name}</option>
             ))}
@@ -162,10 +286,200 @@ export function LegendarioForm({ legendario }: Props) {
         </Field>
       </section>
 
-      <section className="grid gap-3 rounded-xl border border-zinc-800 bg-zinc-900/10 p-5 md:grid-cols-3">
+      <section className="grid gap-3 rounded-xl border border-zinc-800 bg-zinc-900/10 p-5 md:grid-cols-4">
         <Checkbox label="Faz parte da Rota do Cerrado" checked={payload.isFromRotaDoCerrado} onChange={(checked) => updateField('isFromRotaDoCerrado', checked)} />
         <Checkbox label="Serve na igreja" checked={payload.servesInChurch} onChange={(checked) => updateField('servesInChurch', checked)} />
         <Checkbox label="Interesse em ações sociais" checked={payload.socialActionInterest} onChange={(checked) => updateField('socialActionInterest', checked)} />
+        <Checkbox label="Precisa de revisão" checked={Boolean(payload.needsReview)} onChange={(checked) => updateField('needsReview', checked)} />
+      </section>
+
+      {showChurchForm ? (
+        <section className="grid gap-3 rounded-xl border border-orange-500/30 bg-orange-500/5 p-5 md:grid-cols-3">
+          <Field label="Nova igreja">
+            <input className="input" value={churchForm.name} onChange={(event) => setChurchForm((current) => ({ ...current, name: event.target.value }))} placeholder="Sem igreja, A confirmar..." />
+          </Field>
+          <Field label="Cidade opcional">
+            <input className="input" value={churchForm.city} onChange={(event) => setChurchForm((current) => ({ ...current, city: event.target.value }))} />
+          </Field>
+          <Field label="Observação opcional">
+            <input className="input" value={churchForm.notes} onChange={(event) => setChurchForm((current) => ({ ...current, notes: event.target.value }))} />
+          </Field>
+          <div className="flex gap-2 md:col-span-3">
+            <button type="button" disabled={loading || !churchForm.name.trim()} onClick={saveChurch} className="h-9 rounded-lg bg-orange-600 px-4 text-xs font-bold uppercase tracking-wider text-white hover:bg-orange-500 disabled:opacity-50">
+              Salvar igreja
+            </button>
+            <button type="button" onClick={() => setShowChurchForm(false)} className="h-9 rounded-lg border border-zinc-800 px-4 text-xs font-bold uppercase tracking-wider text-zinc-400 hover:bg-zinc-900">
+              Cancelar
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {/* Primeira Montanha Section */}
+      <section className="rounded-xl border border-zinc-800 bg-[#111113] p-5 space-y-4 shadow-lg">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Primeira Montanha</h2>
+
+        <Checkbox
+          label="Subiu o primeiro TOP em outra rota?"
+          checked={payload.firstTopIsExternal}
+          onChange={(checked) => {
+            updateField('firstTopIsExternal', checked);
+            if (checked) {
+              updateField('firstTopEventId', '');
+              updateField('firstTopFamilyId', '');
+            } else {
+              updateField('firstTopExternalText', '');
+            }
+          }}
+        />
+
+        {payload.firstTopIsExternal ? (
+          <div className="grid gap-4 md:grid-cols-2 animate-in fade-in duration-200">
+            <Field label="Informe a rota/TOP de origem">
+              <input
+                className="input"
+                placeholder="Ex: Rota do Sol - TOP #3"
+                value={payload.firstTopExternalText}
+                onChange={(event) => updateField('firstTopExternalText', event.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Observações do TOP Externo (Opcional)">
+              <input
+                className="input"
+                placeholder="Ex: Detalhes da subida..."
+                value={payload.firstTopNotes}
+                onChange={(event) => updateField('firstTopNotes', event.target.value)}
+              />
+            </Field>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3 animate-in fade-in duration-200">
+            <Field label="Primeiro TOP que subiu">
+              <select
+                className="input"
+                value={payload.firstTopEventId}
+                onChange={(event) => {
+                  updateField('firstTopEventId', event.target.value);
+                  updateField('firstTopFamilyId', '');
+                }}
+                required={!legendario}
+              >
+                <option value="">{legendario && !payload.firstTopEventId ? 'Pendente de revisão' : 'Selecione o TOP'}</option>
+                {topOptions.map((top) => (
+                  <option key={top.id} value={top.id}>
+                    {top.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Família no primeiro TOP">
+              <select
+                className="input"
+                value={payload.firstTopFamilyId}
+                onChange={(event) => updateField('firstTopFamilyId', event.target.value)}
+                required={!legendario}
+                disabled={!payload.firstTopEventId}
+              >
+                <option value="">
+                  {!payload.firstTopEventId
+                    ? 'Selecione primeiro o TOP'
+                    : legendario && !payload.firstTopFamilyId
+                    ? 'Pendente de revisão'
+                    : 'Selecione a Família'}
+                </option>
+                {firstTopFamilyOptions.map((fam) => (
+                  <option key={fam.id} value={fam.id}>
+                    {fam.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Observações da subida (Opcional)">
+              <input
+                className="input"
+                placeholder="Observações..."
+                value={payload.firstTopNotes}
+                onChange={(event) => updateField('firstTopNotes', event.target.value)}
+              />
+            </Field>
+          </div>
+        )}
+      </section>
+
+      {/* Serviço / Service Section */}
+      <section className="rounded-xl border border-zinc-800 bg-[#111113] p-5 space-y-4 shadow-lg">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Serviço / Service</h2>
+
+        <Checkbox
+          label="Já serviu como service?"
+          checked={payload.alreadyServedAsService}
+          onChange={(checked) => {
+            updateField('alreadyServedAsService', checked);
+            if (!checked) {
+              updateField('serviceTopEventId', '');
+              updateField('serviceTeamId', '');
+              updateField('serviceRole', '');
+              updateField('serviceNotes', '');
+            }
+          }}
+        />
+
+        {payload.alreadyServedAsService && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 animate-in fade-in duration-200">
+            <Field label="TOP em que serviu">
+              <select
+                className="input"
+                value={payload.serviceTopEventId}
+                onChange={(event) => updateField('serviceTopEventId', event.target.value)}
+                required
+              >
+                <option value="">Selecione o TOP</option>
+                {topOptions.map((top) => (
+                  <option key={top.id} value={top.id}>
+                    {top.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Equipe em que serviu">
+              <select
+                className="input"
+                value={payload.serviceTeamId}
+                onChange={(event) => updateField('serviceTeamId', event.target.value)}
+                required
+              >
+                <option value="">Selecione a equipe</option>
+                {teamOptions.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Função (Opcional)">
+              <input
+                className="input"
+                placeholder="Ex: Cozinheiro, Apoio..."
+                value={payload.serviceRole}
+                onChange={(event) => updateField('serviceRole', event.target.value)}
+              />
+            </Field>
+
+            <Field label="Observações (Opcional)">
+              <input
+                className="input"
+                placeholder="Observações..."
+                value={payload.serviceNotes}
+                onChange={(event) => updateField('serviceNotes', event.target.value)}
+              />
+            </Field>
+          </div>
+        )}
       </section>
 
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/10 p-5">
@@ -192,7 +506,7 @@ export function LegendarioForm({ legendario }: Props) {
         <button
           type="submit"
           disabled={loading}
-          className="flex h-10 items-center justify-center rounded-lg bg-orange-600 px-6 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500 disabled:opacity-50"
+          className="flex h-10 items-center justify-center rounded-lg bg-orange-600 px-6 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500 disabled:opacity-50 shadow-lg shadow-orange-950/20"
         >
           {loading ? 'Salvando...' : 'Salvar Cadastro'}
         </button>
@@ -230,4 +544,3 @@ function Checkbox({ label, checked, onChange }: { label: string; checked: boolea
     </label>
   );
 }
-

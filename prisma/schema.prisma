@@ -71,6 +71,9 @@ enum LegendaryHistoryType {
   TOP_SERVICE_CANCELLED
   TOP_REPRESENTATIVE_ASSIGNED
   TOP_DEPUTY_ASSIGNED
+  TOP_FAMILY_COORDINATOR_ASSIGNED
+  TOP_FAMILY_DEPUTY_COORDINATOR_ASSIGNED
+  TOP_FAMILY_GENERAL_COORDINATOR_ASSIGNED
   FAMILY_JOINED
   FAMILY_LEFT
   FAMILY_TRANSFERRED
@@ -231,6 +234,7 @@ model Legendary {
   status                LegendaryStatus      @default(UNKNOWN)
   socialActionInterest  Boolean              @default(false)
   notes                 String?
+  needsReview           Boolean              @default(false)
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   deletedAt             DateTime?
@@ -242,6 +246,9 @@ model Legendary {
   representedTops       TopEvent[]           @relation("TopRepresentative")
   deputyRepresentedTops TopEvent[]           @relation("TopDeputyRepresentative")
   coordinatedTops       TopEvent[]           @relation("TopGeneralCoordinator")
+  familyCoordinatedTops TopEvent[]           @relation("TopFamilyCoordinator")
+  familyDeputyCoordinatedTops TopEvent[]     @relation("TopFamilyDeputyCoordinator")
+  familyGeneralCoordinatedTops TopEvent[]    @relation("TopFamilyGeneralCoordinator")
   topParticipants       TopParticipant[]
   topServants           TopServant[]
   coordinatedTopTeams   TopTeam[]            @relation("TopTeamCoordinator")
@@ -252,6 +259,14 @@ model Legendary {
   messageRecipients    MessageRecipient[]
   responsibleSocialActions SocialAction[]     @relation("SocialActionResponsible")
   socialActionParticipants SocialActionParticipant[]
+
+  firstTopIsExternal    Boolean              @default(false)
+  firstTopEventId       String?              @db.Uuid
+  firstTopEvent         TopEvent?            @relation("LegendaryFirstTopEvent", fields: [firstTopEventId], references: [id])
+  firstTopFamilyId      String?              @db.Uuid
+  firstTopFamily        TopFamily?           @relation("LegendaryFirstTopFamily", fields: [firstTopFamilyId], references: [id])
+  firstTopExternalText  String?
+  firstTopNotes         String?
 
   @@index([fullName])
   @@index([lgndNumber])
@@ -370,7 +385,14 @@ model TopEvent {
   deputyRepresentative          Legendary?           @relation("TopDeputyRepresentative", fields: [deputyRepresentativeLegendaryId], references: [id])
   generalCoordinatorLegendaryId String?              @db.Uuid
   generalCoordinator            Legendary?           @relation("TopGeneralCoordinator", fields: [generalCoordinatorLegendaryId], references: [id])
+  familyCoordinatorLegendaryId String?                @db.Uuid
+  familyCoordinator            Legendary?             @relation("TopFamilyCoordinator", fields: [familyCoordinatorLegendaryId], references: [id])
+  familyDeputyCoordinatorLegendaryId String?          @db.Uuid
+  familyDeputyCoordinator      Legendary?             @relation("TopFamilyDeputyCoordinator", fields: [familyDeputyCoordinatorLegendaryId], references: [id])
+  familyGeneralCoordinatorLegendaryId String?         @db.Uuid
+  familyGeneralCoordinator     Legendary?             @relation("TopFamilyGeneralCoordinator", fields: [familyGeneralCoordinatorLegendaryId], references: [id])
   notes                         String?
+  needsReview                   Boolean              @default(false)
   createdAt                     DateTime             @default(now())
   updatedAt                     DateTime             @updatedAt
   deletedAt                     DateTime?
@@ -381,12 +403,15 @@ model TopEvent {
   familyMembers                 TopFamilyMember[]
   legendaryHistory              LegendaryHistory[]
   internalMessages              InternalMessage[]
+  firstTopLegendaries           Legendary[]          @relation("LegendaryFirstTopEvent")
 
   @@index([number])
   @@index([name])
   @@index([city])
   @@index([status])
   @@index([startDate])
+  @@index([familyCoordinatorLegendaryId])
+  @@index([needsReview])
 }
 
 model TopFamily {
@@ -394,21 +419,26 @@ model TopFamily {
   topEventId                      String            @db.Uuid
   topEvent                        TopEvent          @relation(fields: [topEventId], references: [id])
   name                            String
-  representativeLegendaryId       String            @db.Uuid
-  representative                  Legendary         @relation("TopFamilyRepresentative", fields: [representativeLegendaryId], references: [id])
+  representativeLegendaryId       String?           @db.Uuid
+  representative                  Legendary?        @relation("TopFamilyRepresentative", fields: [representativeLegendaryId], references: [id])
+  representativeRole              String?
   deputyRepresentativeLegendaryId String?           @db.Uuid
   deputyRepresentative            Legendary?        @relation("TopFamilyDeputyRepresentative", fields: [deputyRepresentativeLegendaryId], references: [id])
+  deputyRepresentativeRole        String?
   notes                           String?
+  needsReview                     Boolean           @default(false)
   createdAt                       DateTime          @default(now())
   updatedAt                       DateTime          @updatedAt
   deletedAt                       DateTime?
   members                         TopFamilyMember[]
   legendaryHistory                LegendaryHistory[]
+  firstTopLegendaries             Legendary[]          @relation("LegendaryFirstTopFamily")
 
   @@index([topEventId])
   @@index([name])
   @@index([representativeLegendaryId])
   @@index([deputyRepresentativeLegendaryId])
+  @@index([needsReview])
 }
 
 model TopFamilyMember {
@@ -421,6 +451,8 @@ model TopFamilyMember {
   topParticipant   TopParticipant        @relation(fields: [topParticipantId], references: [id])
   status           TopFamilyMemberStatus @default(ACTIVE)
   notes            String?
+  sourceNotes      String?
+  needsReview      Boolean               @default(false)
   startedAt        DateTime              @default(now())
   endedAt          DateTime?
   createdAt        DateTime              @default(now())
@@ -431,6 +463,7 @@ model TopFamilyMember {
   @@index([topFamilyId])
   @@index([topParticipantId])
   @@index([status])
+  @@index([needsReview])
 }
 
 model TopParticipant {

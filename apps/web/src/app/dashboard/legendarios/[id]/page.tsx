@@ -71,6 +71,52 @@ export default function LegendarioDetalhePage() {
             ['Profissão', legendario.profession?.name || '-'],
           ]}
         />
+        <Info
+          title="Primeira Montanha"
+          rows={
+            legendario.firstTopIsExternal
+              ? [
+                  ['Subiu em Outra Rota', 'Sim'],
+                  ['Rota/TOP de Origem', legendario.firstTopExternalText || '-'],
+                  ['Observações', legendario.firstTopNotes || '-'],
+                ]
+              : [
+                  ['Subiu em Outra Rota', 'Não'],
+                  ['Primeiro TOP que subiu', legendario.firstTopEvent ? `TOP #${legendario.firstTopEvent.number} - ${legendario.firstTopEvent.name}` : <span className="text-amber-500 font-bold">Pendente de revisão</span>],
+                  ['Família no primeiro TOP', legendario.firstTopFamily ? legendario.firstTopFamily.name : <span className="text-amber-500 font-bold">Pendente de revisão</span>],
+                  ['Observações', legendario.firstTopNotes || '-'],
+                ]
+          }
+        />
+        <Info
+          title="Serviço / Service"
+          rows={[
+            ['Já serviu como service?', legendario.topServants && legendario.topServants.length > 0 ? 'Sim' : 'Não'],
+            ...(legendario.topServants && legendario.topServants.length > 0
+              ? legendario.topServants.map((s, idx) => [
+                  `Serviço #${idx + 1}`,
+                  <div key={s.id} className="space-y-1">
+                    <p className="font-bold text-zinc-200">
+                      {s.topEvent ? `TOP #${s.topEvent.number} - ${s.topEvent.name}` : 'TOP não especificado'}
+                    </p>
+                    <p className="text-xs text-zinc-400 font-medium">
+                      Equipe: <span className="text-zinc-300 font-semibold">{s.team?.name || '-'}</span>
+                    </p>
+                    {s.role && (
+                      <p className="text-xs text-zinc-400 font-medium">
+                        Função: <span className="text-zinc-300 font-semibold">{s.role}</span>
+                      </p>
+                    )}
+                    {s.notes && (
+                      <p className="text-xs text-zinc-400 font-medium">
+                        Obs: <span className="text-zinc-300 font-semibold">{s.notes}</span>
+                      </p>
+                    )}
+                  </div>,
+                ] as [string, React.ReactNode])
+              : []),
+          ]}
+        />
       </div>
 
       {/* Expertises Card */}

@@ -13,12 +13,18 @@ export function TopParticipantsTable({ topId }: { topId: string }) {
   const [form, setForm] = useState(false);
   const [editing, setEditing] = useState<TopParticipant | undefined>();
   const [refresh, setRefresh] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   // Custom dialog state
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
-    getTopParticipants(topId, { page: 1, perPage: 50 }).then((r) => setItems(r.data));
+    getTopParticipants(topId, { page: 1, perPage: 50 })
+      .then((r) => {
+        setItems(r.data);
+        setError(null);
+      })
+      .catch(() => setError('Nao foi possivel carregar participantes do TOP.'));
   }, [topId, refresh]);
 
   function done() {
@@ -32,6 +38,8 @@ export function TopParticipantsTable({ topId }: { topId: string }) {
     try {
       await cancelTopParticipant(topId, cancellingId);
       done();
+    } catch {
+      setError('Nao foi possivel cancelar o participante.');
     } finally {
       setCancellingId(null);
     }
@@ -67,6 +75,8 @@ export function TopParticipantsTable({ topId }: { topId: string }) {
         </div>
       )}
 
+      {error ? <ErrorMessage message={error} /> : null}
+
       <Rows items={items} onEdit={setEditing} onCancel={setCancellingId} />
 
       <ConfirmDialog
@@ -81,6 +91,10 @@ export function TopParticipantsTable({ topId }: { topId: string }) {
       />
     </section>
   );
+}
+
+function ErrorMessage({ message }: { message: string }) {
+  return <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-xs font-semibold text-rose-400">{message}</div>;
 }
 
 function Rows({

@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { LegendaryHistoryType, TeamMembershipStatus, TeamStatus } from '@central-da-manada/shared';
+import { AccessPolicyService } from '../../common/access/access-policy.service';
+import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { PrismaService } from '../../database/prisma.service';
@@ -36,9 +38,10 @@ export class TeamsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly accessPolicy: AccessPolicyService,
   ) {}
 
-  async findAll(query: TeamQueryDto) {
+  async findAll(query: TeamQueryDto, user: AuthenticatedUser) {
     const { page, perPage, skip, take } = getPagination(query);
     const where: any = {
       deletedAt: null,
@@ -50,6 +53,11 @@ export class TeamsService {
       where.name = { contains: query.search, mode: 'insensitive' };
     }
 
+    const scope = await this.accessPolicy.resolveScope(user);
+    if (!scope.isAdmin) {
+      where.AND = [...(where.AND ?? []), this.accessPolicy.buildTeamWhere(scope)];
+    }
+
     const orderBy = { [query.orderBy ?? 'name']: query.orderDirection ?? 'asc' };
     const [items, total] = await Promise.all([
       this.prisma.team.findMany({ where, include: includeTeam, orderBy, skip, take }),
@@ -59,9 +67,15 @@ export class TeamsService {
     return toPaginatedResponse(items.map((item: any) => this.toTeamResponse(item)), total, page, perPage);
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    const where: any = { id, deletedAt: null };
+    if (!scope.isAdmin) {
+      where.AND = [this.accessPolicy.buildTeamWhere(scope)];
+    }
+
     const team = await this.prisma.team.findFirst({
-      where: { id, deletedAt: null },
+      where,
       include: {
         ...includeTeam,
         memberships: {
@@ -179,7 +193,11 @@ export class TeamsService {
     return this.toTeamResponse(after);
   }
 
-  async findMembers(teamId: string, query: TeamMembersQueryDto) {
+  async findMembers(teamId: string, query: TeamMembersQueryDto, user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    if (!scope.isAdmin && !scope.teamIds.includes(teamId)) {
+      throw new NotFoundException('Team not found.');
+    }
     await this.findExistingTeam(teamId);
     const { page, perPage, skip, take } = getPagination(query);
     const where: any = {

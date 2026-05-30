@@ -7,6 +7,7 @@ import { getTeam } from '@/features/teams/api';
 import { TeamForm } from '@/features/teams/team-form';
 import type { Team } from '@/features/teams/types';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { formatTeamName } from '@/lib/teams';
 
 export default function EditTeamPage() {
   const params = useParams<{ id: string }>();
@@ -36,7 +37,7 @@ export default function EditTeamPage() {
           ← Voltar para detalhes
         </Link>
         <h1 className="mt-3 text-2xl font-black tracking-wide text-white uppercase">Editar Equipe</h1>
-        <p className="text-sm text-zinc-400">Atualize os detalhes da equipe {team.name}.</p>
+        <p className="text-sm text-zinc-400">Atualize os detalhes da equipe {formatTeamName(team.name)}.</p>
       </div>
 
       <div className="rounded-xl border border-zinc-800 bg-[#111113] p-6 shadow-lg">

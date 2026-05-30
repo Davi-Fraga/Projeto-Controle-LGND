@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsLatitude, IsLongitude, IsNumber, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CreateChurchDto {
   @IsString()
@@ -8,6 +8,28 @@ export class CreateChurchDto {
   @IsOptional()
   @IsString()
   city?: string;
+
+  @IsOptional()
+  @IsString()
+  spiritualLeaderName?: string;
+
+  @IsOptional()
+  @IsString()
+  spiritualLeaderPhone?: string;
+
+  @IsOptional()
+  @IsUUID()
+  spiritualLeaderUserId?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @IsLatitude()
+  latitude?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @IsLongitude()
+  longitude?: number;
 
   @IsOptional()
   @IsString()

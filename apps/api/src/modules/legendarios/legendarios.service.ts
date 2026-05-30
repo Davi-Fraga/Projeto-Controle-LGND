@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { LegendaryHistoryType, LegendaryStatus } from '@central-da-manada/shared';
+import { AccessPolicyService } from '../../common/access/access-policy.service';
+import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { PrismaService } from '../../database/prisma.service';
@@ -33,9 +35,10 @@ export class LegendariosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly accessPolicy: AccessPolicyService,
   ) {}
 
-  async findAll(query: LegendarioQueryDto) {
+  async findAll(query: LegendarioQueryDto, user: AuthenticatedUser) {
     const { page, perPage, skip, take } = getPagination(query);
     const where: any = {
       deletedAt: null,
@@ -60,6 +63,11 @@ export class LegendariosService {
       ];
     }
 
+    const scope = await this.accessPolicy.resolveScope(user);
+    if (!scope.isAdmin) {
+      where.AND = [...(where.AND ?? []), this.accessPolicy.buildLegendaryWhere(scope)];
+    }
+
     const orderBy = { [query.orderBy ?? 'fullName']: query.orderDirection ?? 'asc' };
     const [items, total] = await Promise.all([
       this.prisma.legendary.findMany({ where, include: includeLegendario, orderBy, skip, take }),
@@ -69,9 +77,15 @@ export class LegendariosService {
     return toPaginatedResponse(items.map((item: any) => this.toResponse(item)), total, page, perPage);
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    const where: any = { id, deletedAt: null };
+    if (!scope.isAdmin) {
+      where.AND = [this.accessPolicy.buildLegendaryWhere(scope)];
+    }
+
     const legendario = await this.prisma.legendary.findFirst({
-      where: { id, deletedAt: null },
+      where,
       include: includeLegendario,
     });
 
@@ -82,7 +96,7 @@ export class LegendariosService {
     return this.toResponse(legendario);
   }
 
-  async options(query: OptionsQueryDto) {
+  async options(query: OptionsQueryDto, user: AuthenticatedUser) {
     const where: any = { deletedAt: null };
     if (query.activeOnly !== false) where.status = { not: LegendaryStatus.INACTIVE };
     if (query.search) {
@@ -91,6 +105,11 @@ export class LegendariosService {
         { lgndNumber: { contains: query.search, mode: 'insensitive' } },
         { phone: { contains: this.normalizePhone(query.search), mode: 'insensitive' } },
       ];
+    }
+
+    const scope = await this.accessPolicy.resolveScope(user);
+    if (!scope.isAdmin) {
+      where.AND = [...(where.AND ?? []), this.accessPolicy.buildLegendaryWhere(scope)];
     }
 
     const items = await this.prisma.legendary.findMany({
@@ -228,7 +247,7 @@ export class LegendariosService {
   }
 
   async findHistory(id: string, query: LegendaryHistoryQueryDto) {
-    await this.findOne(id);
+    await this.assertExists(id);
     return this.prisma.legendaryHistory.findMany({
       where: { legendaryId: id, type: query.type },
       include: {
@@ -242,7 +261,7 @@ export class LegendariosService {
   }
 
   async addHistoryNote(id: string, dto: CreateLegendaryHistoryNoteDto, actorUserId?: string) {
-    await this.findOne(id);
+    await this.assertExists(id);
     return this.prisma.legendaryHistory.create({
       data: {
         legendaryId: id,
@@ -298,6 +317,11 @@ export class LegendariosService {
     });
 
     return this.toResponse(after);
+  }
+
+  private async assertExists(id: string) {
+    const exists = await this.prisma.legendary.findFirst({ where: { id, deletedAt: null } });
+    if (!exists) throw new NotFoundException('Legendario not found.');
   }
 
   private async validateRelations(dto: Partial<CreateLegendarioDto>) {

@@ -3,6 +3,7 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 export type AuthenticatedUser = {
   sub: string;
   email: string;
+  legendaryId?: string | null;
   roles: string[];
   permissions: string[];
 };

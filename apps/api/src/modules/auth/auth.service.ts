@@ -131,6 +131,7 @@ export class AuthService {
     return this.jwt.signAsync({
       sub: user.id,
       email: user.email,
+      legendaryId: user.legendaryId,
       roles: safeUser.roles,
       permissions: safeUser.permissions,
     });

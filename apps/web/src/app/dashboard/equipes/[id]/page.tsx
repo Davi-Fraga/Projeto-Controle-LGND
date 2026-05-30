@@ -8,6 +8,7 @@ import { TeamMembersTable } from '@/features/teams/team-members-table';
 import type { Team } from '@/features/teams/types';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { formatTeamName } from '@/lib/teams';
 
 export default function TeamDetailPage() {
   const params = useParams<{ id: string }>();
@@ -38,7 +39,7 @@ export default function TeamDetailPage() {
           >
             ← Voltar para listagem
           </Link>
-          <h1 className="mt-3 text-2xl font-black tracking-wide text-white uppercase">{team.name}</h1>
+          <h1 className="mt-3 text-2xl font-black tracking-wide text-white uppercase">{formatTeamName(team.name)}</h1>
           <p className="text-sm font-semibold text-zinc-400 mt-1">{team.description || 'Sem descrição cadastrada'}</p>
         </div>
         <Link

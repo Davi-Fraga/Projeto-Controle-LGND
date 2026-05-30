@@ -7,27 +7,61 @@ import {
   Users,
   Shield,
   MapPin,
+  Map,
   HeartHandshake,
   MessageSquare,
   FileText,
+  Building2,
   Menu,
-  X
+  X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { getCurrentUser } from '@/features/auth/actions';
+import { hasPermission, hasRole } from '@/lib/permissions';
+import type { CurrentUser } from '@/features/auth/types';
+import type { LucideIcon } from 'lucide-react';
 
-const MENU_ITEMS = [
+type MenuItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  permission?: string;
+  roles?: string[];
+};
+
+const MENU_ITEMS: MenuItem[] = [
   { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
-  { href: '/dashboard/legendarios', label: 'Legendários', icon: Users },
-  { href: '/dashboard/equipes', label: 'Equipes', icon: Shield },
-  { href: '/dashboard/tops', label: 'TOPs', icon: MapPin },
-  { href: '/dashboard/acoes-sociais', label: 'Ações Sociais', icon: HeartHandshake },
-  { href: '/dashboard/comunicacao', label: 'Comunicação', icon: MessageSquare },
-  { href: '/dashboard/relatorios', label: 'Relatórios', icon: FileText },
+  { href: '/dashboard/legendarios', label: 'Legendários', icon: Users, permission: 'legendarios.read' },
+  { href: '/dashboard/equipes', label: 'Equipes', icon: Shield, permission: 'teams.read' },
+  {
+    href: '/dashboard/lideres-espirituais',
+    label: 'Líderes Espirituais',
+    icon: Building2,
+    roles: ['COORDINATION_ADMIN', 'COORDINATION_USER', 'SPIRITUAL_LEADER'],
+  },
+  { href: '/dashboard/mapa', label: 'Mapa', icon: Map, permission: 'map.read' },
+  { href: '/dashboard/tops', label: 'TOPs', icon: MapPin, permission: 'tops.read' },
+  { href: '/dashboard/acoes-sociais', label: 'Ações Sociais', icon: HeartHandshake, permission: 'tops.read' },
+  { href: '/dashboard/comunicacao', label: 'Comunicação', icon: MessageSquare, permission: 'communications.read' },
+  { href: '/dashboard/relatorios', label: 'Relatórios', icon: FileText, permission: 'reports.read' },
 ];
+
+function isVisible(item: MenuItem, user: CurrentUser | null): boolean {
+  if (item.permission && !hasPermission(user, item.permission)) return false;
+  if (item.roles && !hasRole(user, ...item.roles)) return false;
+  return true;
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [user, setUser] = useState<CurrentUser | null>(null);
+
+  useEffect(() => {
+    getCurrentUser().then(setUser).catch(() => {});
+  }, []);
+
+  const visibleItems = MENU_ITEMS.filter((item) => isVisible(item, user));
 
   return (
     <>
@@ -70,7 +104,7 @@ export function Sidebar() {
 
         {/* Navigation Links */}
         <nav className="flex-1 space-y-1 px-3 py-6 overflow-y-auto">
-          {MENU_ITEMS.map((item) => {
+          {visibleItems.map((item) => {
             const Icon = item.icon;
             const isActive =
               item.href === '/dashboard'
@@ -95,7 +129,7 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Spiritual Quote/Footer */}
+        {/* Footer */}
         <div className="border-t border-zinc-800 p-4 bg-[#080808]">
           <div className="rounded-lg bg-zinc-900/40 p-3 border border-zinc-800/40">
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">

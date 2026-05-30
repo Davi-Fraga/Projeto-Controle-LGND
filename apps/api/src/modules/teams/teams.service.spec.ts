@@ -1,11 +1,15 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { TeamMembershipStatus, TeamStatus } from '@central-da-manada/shared';
 import { TeamsService } from './teams.service';
+
+const adminUser = { sub: 'admin-id', email: 'admin@example.com', roles: ['COORDINATION_ADMIN'], permissions: [] };
+const coordinatorUser = { sub: 'coord-id', email: 'coord@example.com', legendaryId: 'legendary-1', roles: ['TEAM_COORDINATOR'], permissions: [] };
 
 describe('TeamsService', () => {
   let service: TeamsService;
   let prisma: any;
   let audit: any;
+  let accessPolicy: any;
 
   beforeEach(() => {
     prisma = {
@@ -28,7 +32,76 @@ describe('TeamsService', () => {
       },
     };
     audit = { create: jest.fn() };
-    service = new TeamsService(prisma, audit);
+    accessPolicy = {
+      resolveScope: jest.fn(),
+      buildTeamWhere: jest.fn(),
+    };
+    service = new TeamsService(prisma, audit, accessPolicy);
+  });
+
+  it('findAll admin sees all without scope filter', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] });
+    prisma.team.findMany.mockResolvedValueOnce([{ id: 'team-1', name: 'Midia', _count: { memberships: 0 } }]);
+    prisma.team.count.mockResolvedValueOnce(1);
+
+    const result = await service.findAll({ page: 1, perPage: 10 }, adminUser);
+
+    expect(result.meta.total).toBe(1);
+    expect(accessPolicy.buildTeamWhere).not.toHaveBeenCalled();
+    const [findManyCall] = prisma.team.findMany.mock.calls;
+    expect(findManyCall[0].where.AND).toBeUndefined();
+  });
+
+  it('findAll scopes teams for coordinator via AND filter', async () => {
+    const scopeFilter = { id: { in: ['team-1'] } };
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: ['team-1'], legendaryIds: [] });
+    accessPolicy.buildTeamWhere.mockReturnValueOnce(scopeFilter);
+    prisma.team.findMany.mockResolvedValueOnce([]);
+    prisma.team.count.mockResolvedValueOnce(0);
+
+    await service.findAll({ page: 1, perPage: 10 }, coordinatorUser);
+
+    const [findManyCall] = prisma.team.findMany.mock.calls;
+    expect(findManyCall[0].where.AND).toContainEqual(scopeFilter);
+  });
+
+  it('findOne returns 404 when team is outside scope', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: ['other-team'], legendaryIds: [] });
+    accessPolicy.buildTeamWhere.mockReturnValueOnce({ id: { in: ['other-team'] } });
+    prisma.team.findFirst.mockResolvedValueOnce(null);
+
+    await expect(service.findOne('team-1', coordinatorUser)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('findOne succeeds for admin regardless of scope', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] });
+    prisma.team.findFirst.mockResolvedValueOnce({ id: 'team-1', name: 'Midia', _count: { memberships: 0 } });
+
+    const result = await service.findOne('team-1', adminUser);
+
+    expect(result.name).toBe('Midia');
+    expect(accessPolicy.buildTeamWhere).not.toHaveBeenCalled();
+  });
+
+  it('findMembers returns 404 when teamId is outside scope', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: ['other-team'], legendaryIds: [] });
+
+    await expect(
+      service.findMembers('team-1', { page: 1, perPage: 10 }, coordinatorUser),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.team.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('findMembers succeeds for admin for any team', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] });
+    prisma.team.findFirst.mockResolvedValueOnce({ id: 'team-1', name: 'Midia', _count: { memberships: 0 } });
+    prisma.teamMembership.findMany.mockResolvedValueOnce([]);
+    prisma.teamMembership.count.mockResolvedValueOnce(0);
+
+    const result = await service.findMembers('team-1', { page: 1, perPage: 10 }, adminUser);
+
+    expect(result.data).toEqual([]);
   });
 
   it('creates a team', async () => {

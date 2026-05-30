@@ -11,6 +11,7 @@ const roles = [
   'FAMILY_REPRESENTATIVE',
   'FAMILY_DEPUTY_REPRESENTATIVE',
   'TEAM_COORDINATOR',
+  'SPIRITUAL_LEADER',
   'MEMBER',
 ];
 
@@ -75,6 +76,7 @@ const permissions = [
   'legendarios.history.read',
   'legendarios.history.create',
   'dashboard.read',
+  'map.read',
   'communications.read',
   'communications.create',
   'communications.update',
@@ -141,6 +143,22 @@ async function main() {
     });
   }
 
+  await assignPermissions('TEAM_COORDINATOR', [
+    'dashboard.read',
+    'legendarios.read',
+    'churches.read',
+    'teams.read',
+    'teams.members.read',
+    'map.read',
+  ]);
+
+  await assignPermissions('SPIRITUAL_LEADER', [
+    'dashboard.read',
+    'legendarios.read',
+    'churches.read',
+    'map.read',
+  ]);
+
   const passwordHash = await bcrypt.hash(adminPassword, 12);
   const admin = await prisma.user.upsert({
     where: { email: adminEmail.toLowerCase() },
@@ -200,22 +218,61 @@ async function main() {
     });
   }
 
-  for (const name of [
-    'Midia',
-    'Docs / Palavra',
-    'Logistica',
-    'Seguranca',
-    'ADM',
-    'Eventos',
-    'Acoes Sociais',
-    'Alimentacao',
-    'Saude / Apoio',
-    'Intercessao',
-  ]) {
-    const existingTeam = await prisma.team.findFirst({ where: { name, deletedAt: null } });
-    if (!existingTeam) {
+  await seedTop1910Teams();
+}
+
+const TOP_1910_TEAMS = [
+  'TOP #1910 | Coordenação',
+  'TOP #1910 | Liderança',
+  'TOP #1910 | Mídia',
+  'TOP #1910 | Logística',
+  'TOP #1910 | Hakunas',
+  'TOP #1910 | ADM',
+  'TOP #1910 | Eventos',
+  'TOP #1910 | Segurança',
+  'TOP #1910 | QAP',
+  'TOP #1910 | Ministrações',
+];
+
+function normalizeTeamName(value: string) {
+  return value.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+async function seedTop1910Teams() {
+  const existing = await prisma.team.findMany({ select: { id: true, name: true } });
+  const existingNormalized = new Set(existing.map((t) => normalizeTeamName(t.name)));
+
+  for (const name of TOP_1910_TEAMS) {
+    if (!existingNormalized.has(normalizeTeamName(name))) {
       await prisma.team.create({ data: { name, status: 'ACTIVE' } });
     }
+  }
+}
+
+async function assignPermissions(roleName: string, permissionKeys: string[]) {
+  const role = await prisma.role.findUniqueOrThrow({ where: { name: roleName } });
+  const permissions = await prisma.permission.findMany({ where: { key: { in: permissionKeys } } });
+
+  if (permissions.length !== permissionKeys.length) {
+    const found = new Set(permissions.map((permission) => permission.key));
+    const missing = permissionKeys.filter((permission) => !found.has(permission));
+    throw new Error(`Missing permissions for ${roleName}: ${missing.join(', ')}`);
+  }
+
+  for (const permission of permissions) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: role.id,
+          permissionId: permission.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: role.id,
+        permissionId: permission.id,
+      },
+    });
   }
 }
 

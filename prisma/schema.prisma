@@ -140,6 +140,7 @@ model User {
   legendaryHistory LegendaryHistory[] @relation("LegendaryHistoryActor")
   internalMessages InternalMessage[] @relation("InternalMessageCreator")
   messageRecipients MessageRecipient[]
+  spiritualLeaderChurches Church[] @relation("ChurchSpiritualLeader")
 }
 
 model Role {
@@ -282,6 +283,12 @@ model Church {
   id          String      @id @default(uuid()) @db.Uuid
   name        String
   city        String?
+  spiritualLeaderName String?
+  spiritualLeaderPhone String?
+  spiritualLeaderUserId String? @db.Uuid
+  spiritualLeader User? @relation("ChurchSpiritualLeader", fields: [spiritualLeaderUserId], references: [id])
+  latitude    Float?
+  longitude   Float?
   notes       String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -290,6 +297,7 @@ model Church {
 
   @@index([name])
   @@index([city])
+  @@index([spiritualLeaderUserId])
 }
 
 model Profession {

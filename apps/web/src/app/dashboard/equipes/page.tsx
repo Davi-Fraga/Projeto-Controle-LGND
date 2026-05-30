@@ -11,6 +11,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ActionMenu } from '@/components/ui/ActionMenu';
 import { Search, Eye, Edit2, ShieldAlert, Shield } from 'lucide-react';
+import { formatTeamName } from '@/lib/teams';
 
 export default function TeamsPage() {
   const { loading: authLoading } = useRequireAuth();
@@ -151,7 +152,7 @@ export default function TeamsPage() {
                     <td className="px-6 py-4.5 font-bold text-white">
                       <div className="flex items-center gap-2">
                         <Shield className="h-4 w-4 text-orange-500" />
-                        <span>{team.name}</span>
+                        <span>{formatTeamName(team.name)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4.5">

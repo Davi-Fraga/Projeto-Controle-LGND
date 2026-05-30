@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
@@ -19,8 +19,8 @@ export class TeamsController {
 
   @Get()
   @Permissions('teams.read')
-  findAll(@Query() query: TeamQueryDto) {
-    return this.teamsService.findAll(query);
+  findAll(@Query() query: TeamQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.teamsService.findAll(query, user);
   }
 
   @Get('options')
@@ -31,8 +31,8 @@ export class TeamsController {
 
   @Get(':id')
   @Permissions('teams.read')
-  async findOne(@Param('id') id: string) {
-    return { data: await this.teamsService.findOne(id) };
+  async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.teamsService.findOne(id, user) };
   }
 
   @Post()
@@ -67,8 +67,8 @@ export class TeamsController {
 
   @Get(':id/members')
   @Permissions('teams.members.read')
-  findMembers(@Param('id') id: string, @Query() query: TeamMembersQueryDto) {
-    return this.teamsService.findMembers(id, query);
+  findMembers(@Param('id') id: string, @Query() query: TeamMembersQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.teamsService.findMembers(id, query, user);
   }
 
   @Post(':id/members')

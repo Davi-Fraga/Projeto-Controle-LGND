@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { PaginationDto } from '../../common/pagination/pagination.dto';
@@ -12,20 +12,20 @@ import { ReportsService } from './reports.service';
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
 
-  @Get('legendarios') @Permissions('reports.read') legendarios(@Query() query: PaginationDto) { return this.reports.legendarios(query); }
-  @Get('legendarios/by-city') @Permissions('reports.read') async byCity() { return { data: await this.reports.byCity() }; }
-  @Get('legendarios/by-church') @Permissions('reports.read') async byChurch() { return { data: await this.reports.byChurch() }; }
-  @Get('legendarios/by-team') @Permissions('reports.read') async byTeam() { return { data: await this.reports.byTeam() }; }
+  @Get('legendarios') @Permissions('reports.read') legendarios(@Query() query: PaginationDto, @CurrentUser() user: AuthenticatedUser) { return this.reports.legendarios(query, user); }
+  @Get('legendarios/by-city') @Permissions('reports.read') async byCity(@CurrentUser() user: AuthenticatedUser) { return { data: await this.reports.byCity(user) }; }
+  @Get('legendarios/by-church') @Permissions('reports.read') async byChurch(@CurrentUser() user: AuthenticatedUser) { return { data: await this.reports.byChurch(user) }; }
+  @Get('legendarios/by-team') @Permissions('reports.read') async byTeam(@CurrentUser() user: AuthenticatedUser) { return { data: await this.reports.byTeam(user) }; }
   @Get('legendarios/by-profession') @Permissions('reports.read') async byProfession() { return { data: await this.reports.byProfession() }; }
   @Get('legendarios/by-expertise') @Permissions('reports.read') async byExpertise() { return { data: await this.reports.byExpertise() }; }
-  @Get('legendarios/social-interested') @Permissions('reports.read') async socialInterested() { return { data: await this.reports.socialInterested() }; }
+  @Get('legendarios/social-interested') @Permissions('reports.read') async socialInterested(@CurrentUser() user: AuthenticatedUser) { return { data: await this.reports.socialInterested(user) }; }
   @Get('pending-review') @Permissions('reports.read') async pendingReview() { return { data: await this.reports.pendingReview() }; }
   @Get('tops/:topId/participants') @Permissions('reports.read') async topParticipants(@Param('topId') topId: string) { return { data: await this.reports.topParticipants(topId) }; }
   @Get('tops/:topId/servants') @Permissions('reports.read') async topServants(@Param('topId') topId: string) { return { data: await this.reports.topServants(topId) }; }
   @Get('tops/:topId/families') @Permissions('reports.read') async topFamilies(@Param('topId') topId: string) { return { data: await this.reports.topFamilies(topId) }; }
   @Get('social-actions/:id/participants') @Permissions('reports.read') async socialActionParticipants(@Param('id') id: string) { return { data: await this.reports.socialActionParticipants(id) }; }
 
-  @Get('legendarios/export') @Permissions('reports.export') async exportLegendarios(@Query('format') format: string, @CurrentUser() user: { sub: string }, @Res() res: Response) { this.reports.ensureCsv(format); this.sendCsv(res, 'legendarios.csv', await this.reports.exportLegendarios(user.sub)); }
+  @Get('legendarios/export') @Permissions('reports.export') async exportLegendarios(@Query('format') format: string, @CurrentUser() user: AuthenticatedUser, @Res() res: Response) { this.reports.ensureCsv(format); this.sendCsv(res, 'legendarios.csv', await this.reports.exportLegendarios(user, user.sub)); }
   @Get('tops/:topId/participants/export') @Permissions('reports.export') async exportTopParticipants(@Param('topId') topId: string, @Query('format') format: string, @CurrentUser() user: { sub: string }, @Res() res: Response) { this.reports.ensureCsv(format); this.sendCsv(res, 'top-participantes.csv', await this.reports.exportTopParticipants(topId, user.sub)); }
   @Get('tops/:topId/servants/export') @Permissions('reports.export') async exportTopServants(@Param('topId') topId: string, @Query('format') format: string, @CurrentUser() user: { sub: string }, @Res() res: Response) { this.reports.ensureCsv(format); this.sendCsv(res, 'top-servos.csv', await this.reports.exportTopServants(topId, user.sub)); }
   @Get('tops/:topId/families/export') @Permissions('reports.export') async exportTopFamilies(@Param('topId') topId: string, @Query('format') format: string, @CurrentUser() user: { sub: string }, @Res() res: Response) { this.reports.ensureCsv(format); this.sendCsv(res, 'top-familias.csv', await this.reports.exportTopFamilies(topId, user.sub)); }

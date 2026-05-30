@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
@@ -17,20 +17,20 @@ export class LegendariosController {
 
   @Get()
   @Permissions('legendarios.read')
-  findAll(@Query() query: LegendarioQueryDto) {
-    return this.legendariosService.findAll(query);
+  findAll(@Query() query: LegendarioQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.legendariosService.findAll(query, user);
   }
 
   @Get('options')
   @Permissions('legendarios.read')
-  async options(@Query() query: OptionsQueryDto) {
-    return { data: await this.legendariosService.options(query) };
+  async options(@Query() query: OptionsQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.legendariosService.options(query, user) };
   }
 
   @Get(':id')
   @Permissions('legendarios.read')
-  async findOne(@Param('id') id: string) {
-    return { data: await this.legendariosService.findOne(id) };
+  async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.legendariosService.findOne(id, user) };
   }
 
   @Get(':id/history')

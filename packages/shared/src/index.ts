@@ -14,6 +14,7 @@ export enum SystemRole {
   FAMILY_REPRESENTATIVE = 'FAMILY_REPRESENTATIVE',
   FAMILY_DEPUTY_REPRESENTATIVE = 'FAMILY_DEPUTY_REPRESENTATIVE',
   TEAM_COORDINATOR = 'TEAM_COORDINATOR',
+  SPIRITUAL_LEADER = 'SPIRITUAL_LEADER',
   MEMBER = 'MEMBER',
 }
 
@@ -148,6 +149,11 @@ export type Church = {
   id: string;
   name: string;
   city?: string | null;
+  spiritualLeaderName?: string | null;
+  spiritualLeaderPhone?: string | null;
+  spiritualLeaderUserId?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   notes?: string | null;
 };
 

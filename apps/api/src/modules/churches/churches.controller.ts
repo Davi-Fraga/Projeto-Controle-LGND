@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -16,6 +16,12 @@ export class ChurchesController {
   @Permissions('churches.read')
   async findAll() {
     return { data: await this.churchesService.findAll() };
+  }
+
+  @Get('spiritual-leaders')
+  @Permissions('churches.read')
+  async spiritualLeaders(@CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.churchesService.spiritualLeadersView(user) };
   }
 
   @Post()

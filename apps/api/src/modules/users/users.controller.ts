@@ -25,6 +25,12 @@ export class UsersController {
     return this.usersService.findAll(query);
   }
 
+  @Get(':id')
+  @Roles(SystemRole.COORDINATION_ADMIN)
+  async findOne(@Param('id') id: string) {
+    return { data: await this.usersService.findOne(id) };
+  }
+
   @Post()
   @Roles(SystemRole.COORDINATION_ADMIN)
   async create(@Body() dto: CreateUserDto) {

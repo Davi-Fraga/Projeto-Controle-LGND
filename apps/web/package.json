@@ -12,14 +12,17 @@
   "dependencies": {
     "@central-da-manada/shared": "workspace:*",
     "clsx": "^2.1.1",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.468.0",
     "next": "^15.0.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-leaflet": "^5.0.0",
     "tailwind-merge": "^2.5.4",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.12",
     "@types/node": "^22.8.6",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",

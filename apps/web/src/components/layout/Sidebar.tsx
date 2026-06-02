@@ -12,6 +12,8 @@ import {
   MessageSquare,
   FileText,
   Building2,
+  Church,
+  UserCog,
   Menu,
   X,
 } from 'lucide-react';
@@ -44,6 +46,8 @@ const MENU_ITEMS: MenuItem[] = [
   { href: '/dashboard/acoes-sociais', label: 'Ações Sociais', icon: HeartHandshake, permission: 'tops.read' },
   { href: '/dashboard/comunicacao', label: 'Comunicação', icon: MessageSquare, permission: 'communications.read' },
   { href: '/dashboard/relatorios', label: 'Relatórios', icon: FileText, permission: 'reports.read' },
+  { href: '/dashboard/igrejas', label: 'Igrejas', icon: Church, roles: ['COORDINATION_ADMIN'] },
+  { href: '/dashboard/usuarios', label: 'Usuários', icon: UserCog, roles: ['COORDINATION_ADMIN'] },
 ];
 
 function isVisible(item: MenuItem, user: CurrentUser | null): boolean {

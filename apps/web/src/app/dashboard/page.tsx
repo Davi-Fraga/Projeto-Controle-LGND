@@ -131,23 +131,19 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Metrics Grid */}
-      <section className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {summary ? (
-          cardConfig.map((card) => (
+      {/* Metrics Grid — only renders when summary is available */}
+      {summary && (
+        <section className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {cardConfig.map((card) => (
             <DashboardCard
               key={card.label}
               label={card.label}
               value={card.value}
               icon={card.icon}
             />
-          ))
-        ) : (
-          <div className="col-span-full rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-medium text-rose-400">
-            Não foi possível carregar as métricas do painel no momento. O restante do sistema continua operacional.
-          </div>
-        )}
-      </section>
+          ))}
+        </section>
+      )}
 
       {/* Featured TOP Highlight */}
       {summary && (

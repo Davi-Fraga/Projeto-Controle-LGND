@@ -45,13 +45,13 @@ export default function LegendariosPage() {
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getChurches(), getProfessions(), getExpertises()])
-      .then(([churchResponse, professionResponse, expertiseResponse]) => {
-        setChurches(churchResponse.data);
-        setProfessions(professionResponse.data);
-        setExpertises(expertiseResponse.data);
-      })
-      .catch(() => setError('Não foi possível carregar filtros.'));
+    // Cada catálogo é carregado de forma independente: usuários restritos
+    // (ex.: líder espiritual, coordenador) podem não ter permissão para ler
+    // professions/expertises. Nesse caso o filtro apenas não popula, sem
+    // quebrar a página nem bloquear a listagem de legendários.
+    getChurches().then((r) => setChurches(r.data)).catch(() => setChurches([]));
+    getProfessions().then((r) => setProfessions(r.data)).catch(() => setProfessions([]));
+    getExpertises().then((r) => setExpertises(r.data)).catch(() => setExpertises([]));
   }, []);
 
   useEffect(() => {

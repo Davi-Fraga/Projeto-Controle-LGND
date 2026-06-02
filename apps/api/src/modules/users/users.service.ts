@@ -61,6 +61,19 @@ export class UsersService {
     );
   }
 
+  async findOne(id: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
+      include: includeUserAccess,
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    return this.toSafeUser(user);
+  }
+
   async create(dto: CreateUserDto) {
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
@@ -91,6 +104,15 @@ export class UsersService {
 
   async update(id: string, dto: UpdateUserDto) {
     await this.ensureUserExists(id);
+
+    if (dto.email) {
+      const existing = await this.prisma.user.findUnique({
+        where: { email: dto.email.toLowerCase() },
+      });
+      if (existing && existing.id !== id) {
+        throw new BadRequestException('Email already in use.');
+      }
+    }
 
     const roles = dto.roles ? await this.resolveRoles(dto.roles) : undefined;
     const passwordHash = dto.password ? await bcrypt.hash(dto.password, 12) : undefined;

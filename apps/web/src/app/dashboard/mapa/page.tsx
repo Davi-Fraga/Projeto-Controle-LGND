@@ -1,10 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { MapPin, Building2, Users, Globe } from 'lucide-react';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { getMapData } from '@/features/map/api';
 import type { MapData } from '@/features/map/api';
+
+const RotaMap = dynamic(() => import('@/features/map/rota-map'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[480px] items-center justify-center rounded-xl border border-zinc-800 bg-[#111113]">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
+    </div>
+  ),
+});
 
 export default function MapaPage() {
   const { loading: authLoading } = useRequireAuth();
@@ -54,6 +64,18 @@ export default function MapaPage() {
         <SummaryCard icon={<Users className="h-5 w-5 text-orange-500" />} label="Total de Legendários" value={data.summary.total} />
         <SummaryCard icon={<Globe className="h-5 w-5 text-orange-500" />} label="Cidades" value={data.summary.cities} />
         <SummaryCard icon={<Building2 className="h-5 w-5 text-orange-500" />} label="Igrejas" value={data.summary.churches} />
+      </div>
+
+      {/* Interactive Map */}
+      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-[#111113] shadow-lg">
+        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-300">Mapa da Manada</h2>
+          <span className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-500">
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-orange-500/70" />
+            Tamanho do ponto = nº de legendários na igreja
+          </span>
+        </div>
+        <RotaMap churches={data.churches} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

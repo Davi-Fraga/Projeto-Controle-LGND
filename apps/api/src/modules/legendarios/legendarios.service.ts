@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { LegendaryHistoryType, LegendaryStatus } from '@central-da-manada/shared';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
@@ -127,11 +128,11 @@ export class LegendariosService {
     }));
   }
 
-  async create(dto: CreateLegendarioDto, actorUserId?: string) {
+  async create(dto: CreateLegendarioDto, actorUserId?: string, db: Prisma.TransactionClient = this.prisma) {
     await this.validateRelations(dto);
     await this.ensureLgndIsAvailable(dto.lgndNumber);
 
-    const legendario = await this.prisma.legendary.create({
+    const legendario = await db.legendary.create({
       data: {
         ...this.toData(dto),
         expertises: {
@@ -141,7 +142,7 @@ export class LegendariosService {
       include: includeLegendario,
     });
 
-    await this.handleServiceInfo(legendario.id, dto, actorUserId);
+    await this.handleServiceInfo(legendario.id, dto, actorUserId, db);
 
     await this.audit.create({
       actorUserId,
@@ -149,8 +150,8 @@ export class LegendariosService {
       entityId: legendario.id,
       action: 'create',
       after: this.toResponse(legendario),
-    });
-    await this.createHistory(legendario.id, LegendaryHistoryType.LEGENDARY_CREATED, 'Legendario criado', 'Cadastro do Legendario criado.', actorUserId);
+    }, db);
+    await this.createHistory(legendario.id, LegendaryHistoryType.LEGENDARY_CREATED, 'Legendario criado', 'Cadastro do Legendario criado.', actorUserId, undefined, db);
 
     if (dto.firstTopIsExternal) {
       await this.createHistory(
@@ -158,18 +159,21 @@ export class LegendariosService {
         LegendaryHistoryType.MANUAL_NOTE,
         'Primeira Montanha (Outra Rota)',
         `Subiu a primeira montanha em outra rota/TOP de origem: ${dto.firstTopExternalText}.${dto.firstTopNotes ? ` Obs: ${dto.firstTopNotes}` : ''}`,
-        actorUserId
+        actorUserId,
+        undefined,
+        db
       );
     } else if (dto.firstTopEventId) {
-      const topEvent = await this.prisma.topEvent.findUnique({ where: { id: dto.firstTopEventId } });
-      const family = dto.firstTopFamilyId ? await this.prisma.topFamily.findUnique({ where: { id: dto.firstTopFamilyId } }) : null;
+      const topEvent = await db.topEvent.findUnique({ where: { id: dto.firstTopEventId } });
+      const family = dto.firstTopFamilyId ? await db.topFamily.findUnique({ where: { id: dto.firstTopFamilyId } }) : null;
       await this.createHistory(
         legendario.id,
         LegendaryHistoryType.TOP_PARTICIPATED,
         'Primeira Montanha',
         `Subiu a primeira montanha no TOP #${topEvent?.number} - ${topEvent?.name} na Família ${family?.name || ''}.${dto.firstTopNotes ? ` Obs: ${dto.firstTopNotes}` : ''}`,
         actorUserId,
-        { topEventId: dto.firstTopEventId, topFamilyId: dto.firstTopFamilyId }
+        { topEventId: dto.firstTopEventId, topFamilyId: dto.firstTopFamilyId },
+        db
       );
     }
 
@@ -424,10 +428,11 @@ export class LegendariosService {
     title: string,
     description: string,
     actorUserId?: string,
-    context?: { topEventId?: string | null; teamId?: string | null; topFamilyId?: string | null }
+    context?: { topEventId?: string | null; teamId?: string | null; topFamilyId?: string | null },
+    db: Prisma.TransactionClient = this.prisma
   ) {
-    if (!this.prisma.legendaryHistory) return;
-    await this.prisma.legendaryHistory.create({
+    if (!db.legendaryHistory) return;
+    await db.legendaryHistory.create({
       data: {
         legendaryId,
         type,
@@ -441,13 +446,13 @@ export class LegendariosService {
     });
   }
 
-  private async handleServiceInfo(legendaryId: string, dto: Partial<CreateLegendarioDto>, actorUserId?: string) {
+  private async handleServiceInfo(legendaryId: string, dto: Partial<CreateLegendarioDto>, actorUserId?: string, db: Prisma.TransactionClient = this.prisma) {
     if (dto.alreadyServedAsService && dto.serviceTopEventId && dto.serviceTeamId) {
-      const topTeamExists = await this.prisma.topTeam.findFirst({
+      const topTeamExists = await db.topTeam.findFirst({
         where: { topEventId: dto.serviceTopEventId, teamId: dto.serviceTeamId, deletedAt: null }
       });
       if (!topTeamExists) {
-        await this.prisma.topTeam.create({
+        await db.topTeam.create({
           data: {
             topEventId: dto.serviceTopEventId,
             teamId: dto.serviceTeamId
@@ -455,7 +460,7 @@ export class LegendariosService {
         });
       }
 
-      const existingServant = await this.prisma.topServant.findFirst({
+      const existingServant = await db.topServant.findFirst({
         where: {
           topEventId: dto.serviceTopEventId,
           legendaryId,
@@ -466,7 +471,7 @@ export class LegendariosService {
       });
 
       if (!existingServant) {
-        const topServant = await this.prisma.topServant.create({
+        const topServant = await db.topServant.create({
           data: {
             topEventId: dto.serviceTopEventId,
             legendaryId,
@@ -484,10 +489,11 @@ export class LegendariosService {
           'Serviu em TOP',
           `Adicionado como servo do TOP${topServant.team?.name ? ` na equipe ${topServant.team.name}` : ''}.`,
           actorUserId,
-          { topEventId: dto.serviceTopEventId, teamId: dto.serviceTeamId }
+          { topEventId: dto.serviceTopEventId, teamId: dto.serviceTeamId },
+          db
         );
       } else {
-        await this.prisma.topServant.update({
+        await db.topServant.update({
           where: { id: existingServant.id },
           data: {
             role: dto.serviceRole?.trim() || null,

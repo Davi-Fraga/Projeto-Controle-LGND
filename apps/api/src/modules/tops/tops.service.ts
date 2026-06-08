@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { LegendaryHistoryType, TopEventStatus, TopFamilyMemberStatus, TopParticipantStatus, TopServantStatus } from '@central-da-manada/shared';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
@@ -308,14 +309,14 @@ export class TopsService {
     return toPaginatedResponse(items, total, page, perPage);
   }
 
-  async addParticipant(topEventId: string, dto: CreateTopParticipantDto, actorUserId?: string) {
-    await this.findExistingTop(topEventId);
-    await this.ensureLegendaryExists(dto.legendaryId);
-    await this.ensureParticipantAvailable(topEventId, dto.legendaryId);
-    await this.ensureNotActiveServant(topEventId, dto.legendaryId);
-    const item = await this.prisma.topParticipant.create({ data: { topEventId, ...dto, notes: dto.notes?.trim() || null }, include: includeParticipant });
-    await this.audit.create({ actorUserId, entityType: 'TopParticipant', entityId: item.id, action: 'add_participant', after: item });
-    await this.createHistory(item.legendaryId, LegendaryHistoryType.TOP_PARTICIPATED, 'Participou de TOP', `Adicionado como participante do TOP.`, actorUserId, { topEventId });
+  async addParticipant(topEventId: string, dto: CreateTopParticipantDto, actorUserId?: string, db: Prisma.TransactionClient = this.prisma) {
+    await this.findExistingTop(topEventId, db);
+    await this.ensureLegendaryExists(dto.legendaryId, db);
+    await this.ensureParticipantAvailable(topEventId, dto.legendaryId, db);
+    await this.ensureNotActiveServant(topEventId, dto.legendaryId, db);
+    const item = await db.topParticipant.create({ data: { topEventId, ...dto, notes: dto.notes?.trim() || null }, include: includeParticipant });
+    await this.audit.create({ actorUserId, entityType: 'TopParticipant', entityId: item.id, action: 'add_participant', after: item }, db);
+    await this.createHistory(item.legendaryId, LegendaryHistoryType.TOP_PARTICIPATED, 'Participou de TOP', `Adicionado como participante do TOP.`, actorUserId, { topEventId }, db);
     return item;
   }
 
@@ -389,16 +390,16 @@ export class TopsService {
     if (dto.coordinatorLegendaryId) await this.ensureLegendaryExists(dto.coordinatorLegendaryId);
     if (dto.deputyCoordinatorLegendaryId) await this.ensureLegendaryExists(dto.deputyCoordinatorLegendaryId);
   }
-  private async ensureLegendaryExists(id: string) { if (!(await this.prisma.legendary.findFirst({ where: { id, deletedAt: null } }))) throw new BadRequestException('Legendary does not exist.'); }
+  private async ensureLegendaryExists(id: string, db: Prisma.TransactionClient = this.prisma) { if (!(await db.legendary.findFirst({ where: { id, deletedAt: null } }))) throw new BadRequestException('Legendary does not exist.'); }
   private async ensureTeamExists(id: string) { if (!(await this.prisma.team.findFirst({ where: { id, deletedAt: null } }))) throw new BadRequestException('Team does not exist.'); }
   private async ensureNumberAvailable(number: number, currentId?: string) { const e = await this.prisma.topEvent.findFirst({ where: { number, deletedAt: null } }); if (e && e.id !== currentId) throw new BadRequestException('TOP number already exists.'); }
   private async ensureTopTeamAvailable(topEventId: string, teamId: string) { if (await this.prisma.topTeam.findFirst({ where: { topEventId, teamId, deletedAt: null } })) throw new BadRequestException('Team already linked to TOP.'); }
-  private async ensureParticipantAvailable(topEventId: string, legendaryId: string) { if (await this.prisma.topParticipant.findFirst({ where: { topEventId, legendaryId, deletedAt: null, status: { not: TopParticipantStatus.CANCELLED } } })) throw new BadRequestException('Legendary already is participant in this TOP.'); }
+  private async ensureParticipantAvailable(topEventId: string, legendaryId: string, db: Prisma.TransactionClient = this.prisma) { if (await db.topParticipant.findFirst({ where: { topEventId, legendaryId, deletedAt: null, status: { not: TopParticipantStatus.CANCELLED } } })) throw new BadRequestException('Legendary already is participant in this TOP.'); }
   private async ensureServantAvailable(topEventId: string, legendaryId: string) { if (await this.prisma.topServant.findFirst({ where: { topEventId, legendaryId, deletedAt: null, status: { not: TopServantStatus.CANCELLED } } })) throw new BadRequestException('Legendary already is servant in this TOP.'); }
   private async ensureNotActiveParticipant(topEventId: string, legendaryId: string) { if (await this.prisma.topParticipant.findFirst({ where: { topEventId, legendaryId, deletedAt: null, status: { not: TopParticipantStatus.CANCELLED } } })) throw new BadRequestException('Legendary cannot be participant and servant in same TOP.'); }
-  private async ensureNotActiveServant(topEventId: string, legendaryId: string) { if (await this.prisma.topServant.findFirst({ where: { topEventId, legendaryId, deletedAt: null, status: { not: TopServantStatus.CANCELLED } } })) throw new BadRequestException('Legendary cannot be participant and servant in same TOP.'); }
+  private async ensureNotActiveServant(topEventId: string, legendaryId: string, db: Prisma.TransactionClient = this.prisma) { if (await db.topServant.findFirst({ where: { topEventId, legendaryId, deletedAt: null, status: { not: TopServantStatus.CANCELLED } } })) throw new BadRequestException('Legendary cannot be participant and servant in same TOP.'); }
   private async ensureTeamLinkedToTop(topEventId: string, teamId: string) { if (!(await this.prisma.topTeam.findFirst({ where: { topEventId, teamId, deletedAt: null } }))) throw new BadRequestException('Team must be linked to TOP before assigning servants.'); }
-  private async findExistingTop(id: string) { const top = await this.prisma.topEvent.findFirst({ where: { id, deletedAt: null }, include: includeTop }); if (!top) throw new NotFoundException('TOP not found.'); return top; }
+  private async findExistingTop(id: string, db: Prisma.TransactionClient = this.prisma) { const top = await db.topEvent.findFirst({ where: { id, deletedAt: null }, include: includeTop }); if (!top) throw new NotFoundException('TOP not found.'); return top; }
   private async findExistingTopWithDeleted(id: string) { const top = await this.prisma.topEvent.findUnique({ where: { id }, include: includeTop }); if (!top) throw new NotFoundException('TOP not found.'); return top; }
   private async findExistingTopTeam(topEventId: string, id: string) { const item = await this.prisma.topTeam.findFirst({ where: { id, topEventId, deletedAt: null }, include: includeTopTeam }); if (!item) throw new NotFoundException('TOP team not found.'); return item; }
   private async findExistingParticipant(topEventId: string, id: string) { const item = await this.prisma.topParticipant.findFirst({ where: { id, topEventId, deletedAt: null }, include: includeParticipant }); if (!item) throw new NotFoundException('TOP participant not found.'); return item; }
@@ -451,8 +452,8 @@ export class TopsService {
   private async ensureParticipantNotInActiveFamily(topEventId: string, topParticipantId: string) {
     if (await this.prisma.topFamilyMember.findFirst({ where: { topEventId, topParticipantId, status: TopFamilyMemberStatus.ACTIVE, deletedAt: null } })) throw new BadRequestException('Participant already belongs to an active family in this TOP.');
   }
-  private async createHistory(legendaryId: string, type: LegendaryHistoryType, title: string, description: string, actorUserId: string | undefined, context: { topEventId?: string | null; teamId?: string | null; topFamilyId?: string | null; metadata?: any }) {
-    if (!this.prisma.legendaryHistory) return;
-    await this.prisma.legendaryHistory.create({ data: { legendaryId, type, title, description, actorUserId, topEventId: context.topEventId, teamId: context.teamId, topFamilyId: context.topFamilyId, metadata: context.metadata } });
+  private async createHistory(legendaryId: string, type: LegendaryHistoryType, title: string, description: string, actorUserId: string | undefined, context: { topEventId?: string | null; teamId?: string | null; topFamilyId?: string | null; metadata?: any }, db: Prisma.TransactionClient = this.prisma) {
+    if (!db.legendaryHistory) return;
+    await db.legendaryHistory.create({ data: { legendaryId, type, title, description, actorUserId, topEventId: context.topEventId, teamId: context.teamId, topFamilyId: context.topFamilyId, metadata: context.metadata } });
   }
 }

@@ -101,7 +101,7 @@ describe('LegendariosService', () => {
 
     expect(prisma.legendary.create).toHaveBeenCalled();
     expect(result.phone).toBe('61999999999');
-    expect(audit.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'create' }));
+    expect(audit.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'create' }), expect.anything());
   });
 
   it('blocks duplicated LGND number', async () => {

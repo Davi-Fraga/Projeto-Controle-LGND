@@ -12,6 +12,8 @@ describe('PreRegistrationsService', () => {
 
   beforeEach(() => {
     prisma = {
+      // $transaction roda o callback com o próprio mock como cliente da transação (tx).
+      $transaction: jest.fn((cb: any) => cb(prisma)),
       topEvent: { findFirst: jest.fn(), findMany: jest.fn() },
       topPreRegistration: {
         findFirst: jest.fn(),
@@ -105,9 +107,9 @@ describe('PreRegistrationsService', () => {
       await service.approve('top-1', 'pre-1', { legendaryId: 'leg-existing' }, ACTOR);
 
       expect(legendarios.create).not.toHaveBeenCalled();
-      expect(tops.addParticipant).toHaveBeenCalledWith('top-1', expect.objectContaining({ legendaryId: 'leg-existing', type: 'NEW_PARTICIPANT', status: 'REGISTERED' }), ACTOR);
+      expect(tops.addParticipant).toHaveBeenCalledWith('top-1', expect.objectContaining({ legendaryId: 'leg-existing', type: 'NEW_PARTICIPANT', status: 'REGISTERED' }), ACTOR, expect.anything());
       expect(prisma.topPreRegistration.update.mock.calls[0][0].data).toMatchObject({ status: 'APPROVED', legendaryId: 'leg-existing', reviewedByUserId: ACTOR });
-      expect(audit.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'approve' }));
+      expect(audit.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'approve' }), expect.anything());
     });
 
     it('throws BadRequest when provided legendaryId does not exist', async () => {
@@ -127,7 +129,7 @@ describe('PreRegistrationsService', () => {
 
       const createdDto = legendarios.create.mock.calls[0][0];
       expect(createdDto).toMatchObject({ fullName: 'Joao', churchId: 'church-1', needsReview: true });
-      expect(tops.addParticipant).toHaveBeenCalledWith('top-1', expect.objectContaining({ legendaryId: 'leg-new' }), ACTOR);
+      expect(tops.addParticipant).toHaveBeenCalledWith('top-1', expect.objectContaining({ legendaryId: 'leg-new' }), ACTOR, expect.anything());
     });
 
     it('leaves churchId undefined and keeps churchName in notes when no church matches', async () => {
@@ -153,6 +155,27 @@ describe('PreRegistrationsService', () => {
       await service.approve('top-1', 'pre-1', { legendaryId: 'leg-1' }, ACTOR);
 
       expect(tops.addParticipant).not.toHaveBeenCalled();
+    });
+
+    it('wraps Legendary + participant + update in a single transaction', async () => {
+      prisma.topPreRegistration.findFirst.mockResolvedValueOnce({ id: 'pre-1', topEventId: 'top-1', status: 'PENDING', notes: null });
+      prisma.legendary.findFirst.mockResolvedValueOnce({ id: 'leg-1' });
+      prisma.topParticipant.findFirst.mockResolvedValueOnce(null);
+      prisma.topPreRegistration.update.mockResolvedValueOnce({ id: 'pre-1', status: 'APPROVED' });
+
+      await service.approve('top-1', 'pre-1', { legendaryId: 'leg-1' }, ACTOR);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('rolls back (does not update the pre-registration) when enrolling the participant fails', async () => {
+      prisma.topPreRegistration.findFirst.mockResolvedValueOnce({ id: 'pre-1', topEventId: 'top-1', status: 'PENDING', notes: null });
+      prisma.legendary.findFirst.mockResolvedValueOnce({ id: 'leg-1' });
+      prisma.topParticipant.findFirst.mockResolvedValueOnce(null);
+      tops.addParticipant.mockRejectedValueOnce(new Error('TOP gone'));
+
+      await expect(service.approve('top-1', 'pre-1', { legendaryId: 'leg-1' }, ACTOR)).rejects.toThrow('TOP gone');
+      expect(prisma.topPreRegistration.update).not.toHaveBeenCalled();
     });
   });
 

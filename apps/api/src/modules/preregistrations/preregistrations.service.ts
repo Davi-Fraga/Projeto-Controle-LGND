@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { LegendaryStatus, TopEventStatus, TopParticipantStatus, TopParticipantType, TopPreRegistrationStatus } from '@central-da-manada/shared';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { PrismaService } from '../../database/prisma.service';
@@ -135,36 +136,48 @@ export class PreRegistrationsService {
       throw new BadRequestException('Pre-registration already reviewed.');
     }
 
-    // a) Cria/vincula Legendary (reuso legendarios.service; resolve igreja por nome)
-    let legendaryId: string;
+    // Validações/leituras fora da transação (não escrevem)
+    let providedLegendaryId: string | undefined;
+    let churchId: string | undefined;
     if (dto.legendaryId) {
       const legendary = await this.prisma.legendary.findFirst({ where: { id: dto.legendaryId, deletedAt: null } });
       if (!legendary) throw new BadRequestException('Legendary does not exist.');
-      legendaryId = legendary.id;
+      providedLegendaryId = legendary.id;
     } else {
-      const churchId = await this.resolveChurchByName(preReg.churchName);
-      const created = await this.legendarios.create(this.toLegendarioDto(preReg, churchId), actorUserId);
-      legendaryId = created.id;
+      churchId = await this.resolveChurchByName(preReg.churchName);
     }
 
-    // b) Inscreve como participante do TOP (reuso tops.service.addParticipant), idempotente
-    await this.ensureParticipant(topEventId, legendaryId, actorUserId);
+    // Tudo que escreve roda numa única transação: Legendary + participante + update.
+    // Se qualquer passo falhar, nada é persistido (sem Legendário órfão).
+    return this.prisma.$transaction(async (tx) => {
+      // a) Cria/vincula Legendary (reuso legendarios.service com o cliente da transação)
+      let legendaryId: string;
+      if (providedLegendaryId) {
+        legendaryId = providedLegendaryId;
+      } else {
+        const created = await this.legendarios.create(this.toLegendarioDto(preReg, churchId), actorUserId, tx);
+        legendaryId = created.id;
+      }
 
-    // c) Atualiza a pré-inscrição
-    const updated = await this.prisma.topPreRegistration.update({
-      where: { id },
-      data: {
-        status: TopPreRegistrationStatus.APPROVED,
-        legendaryId,
-        reviewedByUserId: actorUserId,
-        reviewedAt: new Date(),
-        notes: dto.notes?.trim() || preReg.notes,
-      },
-      include: includeTopEvent,
+      // b) Inscreve como participante do TOP (reuso tops.service.addParticipant), idempotente
+      await this.ensureParticipant(topEventId, legendaryId, actorUserId, tx);
+
+      // c) Atualiza a pré-inscrição
+      const updated = await tx.topPreRegistration.update({
+        where: { id },
+        data: {
+          status: TopPreRegistrationStatus.APPROVED,
+          legendaryId,
+          reviewedByUserId: actorUserId,
+          reviewedAt: new Date(),
+          notes: dto.notes?.trim() || preReg.notes,
+        },
+        include: includeTopEvent,
+      });
+
+      await this.audit.create({ actorUserId, entityType: 'TopPreRegistration', entityId: id, action: 'approve', before: preReg, after: updated }, tx);
+      return updated;
     });
-
-    await this.audit.create({ actorUserId, entityType: 'TopPreRegistration', entityId: id, action: 'approve', before: preReg, after: updated });
-    return updated;
   }
 
   async reject(topEventId: string, id: string, dto: RejectPreRegistrationDto, actorUserId: string) {
@@ -227,8 +240,8 @@ export class PreRegistrationsService {
     return churches.find((c) => normalize(c.name) === target)?.id;
   }
 
-  private async ensureParticipant(topEventId: string, legendaryId: string, actorUserId: string) {
-    const existing = await this.prisma.topParticipant.findFirst({
+  private async ensureParticipant(topEventId: string, legendaryId: string, actorUserId: string, db: Prisma.TransactionClient = this.prisma) {
+    const existing = await db.topParticipant.findFirst({
       where: { topEventId, legendaryId, deletedAt: null, status: { not: TopParticipantStatus.CANCELLED } },
     });
     if (existing) return existing;
@@ -236,6 +249,7 @@ export class PreRegistrationsService {
       topEventId,
       { legendaryId, type: TopParticipantType.NEW_PARTICIPANT, status: TopParticipantStatus.REGISTERED } as any,
       actorUserId,
+      db,
     );
   }
 

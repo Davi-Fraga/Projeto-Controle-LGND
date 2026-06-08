@@ -61,6 +61,10 @@ const permissions = [
   'tops.families.members.update',
   'tops.families.members.remove',
   'tops.families.members.transfer',
+  'tops.preregistrations.read',
+  'tops.preregistrations.approve',
+  'tops.preregistrations.reject',
+  'tops.preregistrations.delete',
   'teams.read',
   'teams.create',
   'teams.update',
@@ -188,6 +192,7 @@ async function main() {
     'tops.families.members.update',
     'tops.families.members.remove',
     'tops.families.members.transfer',
+    'tops.preregistrations.read',
     'teams.read',
     'teams.create',
     'teams.update',
@@ -418,6 +423,14 @@ async function assignPermissions(roleName: string, permissionKeys: string[]) {
       },
     });
   }
+
+  // Remove grants stale: garante que a role tenha EXATAMENTE as permissions da lista.
+  await prisma.rolePermission.deleteMany({
+    where: {
+      roleId: role.id,
+      permissionId: { notIn: permissions.map((permission) => permission.id) },
+    },
+  });
 }
 
 main()

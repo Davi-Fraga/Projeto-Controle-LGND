@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { LegendaryStatus, TopEventStatus } from '@central-da-manada/shared';
+import { LegendaryStatus, TopEventStatus, TopPreRegistrationStatus } from '@central-da-manada/shared';
 import { PrismaService } from '../../database/prisma.service';
 
 const EMPTY_UUID = '00000000-0000-0000-0000-000000000000';
@@ -26,6 +26,7 @@ export class DashboardService {
       highlightedServants,
       highlightedTeams,
       highlightedFamilies,
+      highlightedPreRegistrations,
       nextTop,
     ] = await Promise.all([
       this.prisma.legendary.count({ where: { deletedAt: null } }),
@@ -42,6 +43,7 @@ export class DashboardService {
       this.prisma.topServant.count({ where: { topEventId: topId ?? EMPTY_UUID, deletedAt: null, status: { not: 'CANCELLED' } } }),
       this.prisma.topTeam.count({ where: { topEventId: topId ?? EMPTY_UUID, deletedAt: null } }),
       this.prisma.topFamily.count({ where: { topEventId: topId ?? EMPTY_UUID, deletedAt: null } }),
+      this.prisma.topPreRegistration.count({ where: { topEventId: topId ?? EMPTY_UUID, status: TopPreRegistrationStatus.PENDING, deletedAt: null } }),
       this.findNextTop(),
     ]);
 
@@ -65,6 +67,8 @@ export class DashboardService {
         servants: highlightedServants,
         teams: highlightedTeams,
         families: highlightedFamilies,
+        preRegistrations: highlightedPreRegistrations,
+        totalEsperado: highlightedParticipants + highlightedPreRegistrations,
       },
     };
   }

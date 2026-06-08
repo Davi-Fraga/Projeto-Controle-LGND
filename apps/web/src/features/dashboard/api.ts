@@ -21,6 +21,8 @@ export type DashboardSummary = {
     servants: number;
     teams: number;
     families: number;
+    preRegistrations: number;
+    totalEsperado: number;
   };
 };
 

@@ -246,8 +246,8 @@ export class LegendariosService {
     return this.toResponse(after);
   }
 
-  async findHistory(id: string, query: LegendaryHistoryQueryDto) {
-    await this.assertExists(id);
+  async findHistory(id: string, query: LegendaryHistoryQueryDto, user: AuthenticatedUser) {
+    await this.assertAccessible(id, user);
     return this.prisma.legendaryHistory.findMany({
       where: { legendaryId: id, type: query.type },
       include: {
@@ -260,15 +260,15 @@ export class LegendariosService {
     });
   }
 
-  async addHistoryNote(id: string, dto: CreateLegendaryHistoryNoteDto, actorUserId?: string) {
-    await this.assertExists(id);
+  async addHistoryNote(id: string, dto: CreateLegendaryHistoryNoteDto, user: AuthenticatedUser) {
+    await this.assertAccessible(id, user);
     return this.prisma.legendaryHistory.create({
       data: {
         legendaryId: id,
         type: LegendaryHistoryType.MANUAL_NOTE,
         title: dto.title.trim(),
         description: dto.description?.trim() || null,
-        actorUserId,
+        actorUserId: user.sub,
       },
       include: {
         topEvent: true,
@@ -319,8 +319,13 @@ export class LegendariosService {
     return this.toResponse(after);
   }
 
-  private async assertExists(id: string) {
-    const exists = await this.prisma.legendary.findFirst({ where: { id, deletedAt: null } });
+  private async assertAccessible(id: string, user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    const where: any = { id, deletedAt: null };
+    if (!scope.isAdmin) {
+      where.AND = [this.accessPolicy.buildLegendaryWhere(scope)];
+    }
+    const exists = await this.prisma.legendary.findFirst({ where, select: { id: true } });
     if (!exists) throw new NotFoundException('Legendario not found.');
   }
 

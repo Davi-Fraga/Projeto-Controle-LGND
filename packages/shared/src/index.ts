@@ -125,6 +125,12 @@ export enum SocialActionParticipantStatus {
   COMPLETED = 'COMPLETED',
 }
 
+export enum TopPreRegistrationStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
+
 export type ApiResponse<T> = {
   data: T;
   message?: string;
@@ -458,4 +464,24 @@ export type TopFilters = PaginationParams & {
   missingFamilyCoordinator?: boolean;
   orderBy?: 'startDate' | 'name' | 'createdAt';
   orderDirection?: 'asc' | 'desc';
+};
+
+export type TopPreRegistration = {
+  id: string;
+  topEventId: string;
+  topEvent?: TopEvent | null;
+  fullName: string;
+  email?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  churchName?: string | null;
+  rawPayload: unknown;
+  status: TopPreRegistrationStatus;
+  legendaryId?: string | null;
+  reviewedByUserId?: string | null;
+  reviewedAt?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
 };

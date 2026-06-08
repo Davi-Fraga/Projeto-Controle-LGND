@@ -122,6 +122,12 @@ enum SocialActionParticipantStatus {
   COMPLETED
 }
 
+enum TopPreRegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id           String         @id @default(uuid()) @db.Uuid
   name         String
@@ -277,6 +283,9 @@ model Legendary {
   @@index([churchId])
   @@index([professionId])
   @@index([socialActionInterest])
+  @@index([needsReview])
+  @@index([firstTopEventId])
+  @@index([firstTopFamilyId])
 }
 
 model Church {
@@ -412,6 +421,7 @@ model TopEvent {
   legendaryHistory              LegendaryHistory[]
   internalMessages              InternalMessage[]
   firstTopLegendaries           Legendary[]          @relation("LegendaryFirstTopEvent")
+  preRegistrations              TopPreRegistration[]
 
   @@index([number])
   @@index([name])
@@ -666,4 +676,28 @@ model SocialActionParticipant {
   @@index([attended])
   @@index([socialActionId, status])
 
+}
+
+model TopPreRegistration {
+  id               String                   @id @default(uuid()) @db.Uuid
+  topEventId       String                   @db.Uuid
+  topEvent         TopEvent                 @relation(fields: [topEventId], references: [id])
+  fullName         String
+  email            String?
+  phone            String?
+  city             String?
+  churchName       String?
+  rawPayload       Json
+  status           TopPreRegistrationStatus @default(PENDING)
+  legendaryId      String?                  @db.Uuid
+  reviewedByUserId String?                  @db.Uuid
+  reviewedAt       DateTime?
+  notes            String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  deletedAt        DateTime?
+
+  @@index([topEventId, status])
+  @@index([status])
+  @@index([email])
 }

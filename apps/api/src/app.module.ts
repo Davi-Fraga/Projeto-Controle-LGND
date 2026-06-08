@@ -18,6 +18,7 @@ import { HealthModule } from './modules/health/health.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CommunicationsModule } from './modules/communications/communications.module';
 import { SocialActionsModule } from './modules/social-actions/social-actions.module';
+import { PreRegistrationsModule } from './modules/preregistrations/preregistrations.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { MapModule } from './modules/map/map.module';
 import { CacheModule } from './common/cache/cache.module';
@@ -50,6 +51,7 @@ import { RateLimitGuard } from './common/guards/rate-limit.guard';
     DashboardModule,
     CommunicationsModule,
     SocialActionsModule,
+    PreRegistrationsModule,
     ReportsModule,
     MapModule,
   ],

@@ -35,14 +35,14 @@ export class LegendariosController {
 
   @Get(':id/history')
   @Permissions('legendarios.history.read')
-  async history(@Param('id') id: string, @Query() query: LegendaryHistoryQueryDto) {
-    return { data: await this.legendariosService.findHistory(id, query) };
+  async history(@Param('id') id: string, @Query() query: LegendaryHistoryQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.legendariosService.findHistory(id, query, user) };
   }
 
   @Post(':id/history')
   @Permissions('legendarios.history.create')
-  async addHistoryNote(@Param('id') id: string, @Body() dto: CreateLegendaryHistoryNoteDto, @CurrentUser() user: { sub: string }) {
-    return { data: await this.legendariosService.addHistoryNote(id, dto, user.sub) };
+  async addHistoryNote(@Param('id') id: string, @Body() dto: CreateLegendaryHistoryNoteDto, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.legendariosService.addHistoryNote(id, dto, user) };
   }
 
   @Post()

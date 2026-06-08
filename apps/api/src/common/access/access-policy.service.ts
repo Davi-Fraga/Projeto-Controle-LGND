@@ -71,7 +71,10 @@ export class AccessPolicyService {
   }
 
   private isAdmin(user: AuthenticatedUser) {
-    return user.roles.includes('COORDINATION_ADMIN');
+    return (
+      user.roles.includes('COORDINATION_ADMIN') ||
+      user.roles.includes('COORDINATION_USER')
+    );
   }
 
   private unrestrictedScope(): AccessScope {

@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/features/auth/actions';
 import { getDashboardSummary, type DashboardSummary } from '@/features/dashboard/api';
 import type { CurrentUser } from '@/features/auth/types';
 import { DashboardCard } from '@/components/ui/DashboardCard';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
   Users,
   UserCheck,
@@ -20,7 +21,8 @@ import {
   Calendar,
   Plus,
   MessageSquarePlus,
-  FileSpreadsheet
+  FileSpreadsheet,
+  UserPlus
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -173,12 +175,28 @@ export default function DashboardPage() {
           </div>
 
           {summary.highlightedTop && (
-            <div className="grid gap-px bg-zinc-800 grid-cols-2 sm:grid-cols-4">
-              <Mini label="Participantes" value={summary.highlightedTopMetrics.participants} />
-              <Mini label="Servos" value={summary.highlightedTopMetrics.servants} />
-              <Mini label="Equipes" value={summary.highlightedTopMetrics.teams} />
-              <Mini label="Famílias" value={summary.highlightedTopMetrics.families} />
-            </div>
+            <>
+              <div className="grid gap-px bg-zinc-800 grid-cols-2 sm:grid-cols-4">
+                <Mini label="Participantes" value={summary.highlightedTopMetrics.participants} />
+                <Mini label="Servos" value={summary.highlightedTopMetrics.servants} />
+                <Mini label="Equipes" value={summary.highlightedTopMetrics.teams} />
+                <Mini label="Famílias" value={summary.highlightedTopMetrics.families} />
+              </div>
+              <div className="grid gap-4 border-t border-zinc-800 p-6 sm:grid-cols-2">
+                <DashboardCard
+                  label="Pré-inscritos pendentes"
+                  value={summary.highlightedTopMetrics.preRegistrations}
+                  icon={<StatusBadge status="PENDING" type="participant" />}
+                  description="Aguardando aprovação (Google Forms)"
+                />
+                <DashboardCard
+                  label="Projeção total"
+                  value={summary.highlightedTopMetrics.totalEsperado}
+                  icon={<UserPlus className="h-5 w-5" />}
+                  description="Participantes + pré-inscritos pendentes"
+                />
+              </div>
+            </>
           )}
         </section>
       )}

@@ -46,12 +46,20 @@ export default function TopDetailPage() {
             {top.city} | Período: {new Date(top.startDate).toLocaleDateString('pt-BR')} a {new Date(top.endDate).toLocaleDateString('pt-BR')}
           </p>
         </div>
-        <Link
-          href={`/dashboard/tops/${top.id}/editar`}
-          className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500 text-center"
-        >
-          Editar TOP
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/dashboard/tops/${top.id}/pre-inscricoes`}
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/80 px-5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100 text-center"
+          >
+            Pré-inscrições
+          </Link>
+          <Link
+            href={`/dashboard/tops/${top.id}/editar`}
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500 text-center"
+          >
+            Editar TOP
+          </Link>
+        </div>
       </div>
 
       {/* Stats Cards */}

@@ -5,7 +5,8 @@ const config: Config = {
   rootDir: '.',
   testRegex: '.*\\.spec\\.ts$',
   transform: {
-    '^.+\\.(t|j)s$': 'ts-jest',
+    // só .ts vai para o ts-jest; .js já compilado (ex.: @central-da-manada/shared/dist) é carregado nativamente
+    '^.+\\.ts$': 'ts-jest',
   },
   collectCoverageFrom: ['src/**/*.(t|j)s'],
   coverageDirectory: './coverage',

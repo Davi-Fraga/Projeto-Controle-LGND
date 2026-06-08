@@ -25,6 +25,7 @@ describe('LegendariosService', () => {
       church: { findFirst: jest.fn() },
       profession: { findFirst: jest.fn() },
       expertise: { count: jest.fn() },
+      legendaryHistory: { findMany: jest.fn(), create: jest.fn() },
     };
     audit = { create: jest.fn() };
     accessPolicy = {
@@ -144,6 +145,25 @@ describe('LegendariosService', () => {
     expect(result.fullName).toBe('Depois');
     expect(result.expertises).toHaveLength(1);
     expect(audit.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'update' }));
+  });
+
+  it('findHistory throws 404 when the legendary is outside the user scope (IDOR guard)', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: [], legendaryIds: [] });
+    accessPolicy.buildLegendaryWhere.mockReturnValueOnce({ id: { in: [] } });
+    prisma.legendary.findFirst.mockResolvedValueOnce(null);
+
+    await expect(service.findHistory('legendary-1', {}, restrictedUser)).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.legendaryHistory.findMany).not.toHaveBeenCalled();
+  });
+
+  it('findHistory returns history when the legendary is accessible', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] });
+    prisma.legendary.findFirst.mockResolvedValueOnce({ id: 'legendary-1' });
+    prisma.legendaryHistory.findMany.mockResolvedValueOnce([{ id: 'h1' }]);
+
+    const result = await service.findHistory('legendary-1', {}, adminUser);
+
+    expect(result).toHaveLength(1);
   });
 
   it('soft deletes and marks as inactive', async () => {

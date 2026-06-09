@@ -1,8 +1,10 @@
-import { Body, Controller, Headers, Param, Post, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Headers, Param, PayloadTooLargeException, Post, UnauthorizedException } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
 import { getFormsWebhookSecret } from '../../config/env';
 import { WebhookPreRegistrationDto } from './dto/webhook-pre-registration.dto';
 import { PreRegistrationsService } from './preregistrations.service';
+
+const MAX_WEBHOOK_PAYLOAD_BYTES = 50_000;
 
 /**
  * Controller PÚBLICO do webhook do Google Forms. Sem JwtAuthGuard (não há JWT global) —
@@ -19,7 +21,14 @@ export class PreRegistrationsWebhookController {
     @Body() payload: WebhookPreRegistrationDto,
   ) {
     this.assertWebhookSecret(secret);
+    this.assertPayloadSize(payload);
     return { data: await this.preRegistrations.ingestFromWebhook(topEventId, payload) };
+  }
+
+  private assertPayloadSize(payload: unknown) {
+    if (Buffer.byteLength(JSON.stringify(payload ?? {})) > MAX_WEBHOOK_PAYLOAD_BYTES) {
+      throw new PayloadTooLargeException('Webhook payload too large.');
+    }
   }
 
   private assertWebhookSecret(provided: string | undefined) {

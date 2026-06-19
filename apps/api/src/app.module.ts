@@ -21,6 +21,7 @@ import { SocialActionsModule } from './modules/social-actions/social-actions.mod
 import { PreRegistrationsModule } from './modules/preregistrations/preregistrations.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { MapModule } from './modules/map/map.module';
+import { OrgChartModule } from './modules/org-chart/org-chart.module';
 import { CacheModule } from './common/cache/cache.module';
 import { REDIS_CONFIG } from './config/env';
 import { RateLimitGuard } from './common/guards/rate-limit.guard';
@@ -54,6 +55,7 @@ import { RateLimitGuard } from './common/guards/rate-limit.guard';
     PreRegistrationsModule,
     ReportsModule,
     MapModule,
+    OrgChartModule,
   ],
   providers: [
     {

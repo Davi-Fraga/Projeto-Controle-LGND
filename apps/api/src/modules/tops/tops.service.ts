@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { LegendaryHistoryType, TopEventStatus, TopFamilyMemberStatus, TopParticipantStatus, TopServantStatus } from '@central-da-manada/shared';
+import { LegendaryHistoryType, TopEventStatus, TopFamilyMemberStatus, TopParticipantStatus, TopServantStatus, teamDisplayName } from '@central-da-manada/shared';
+import type { OrgChartNode, OrgChartView } from '@central-da-manada/shared';
+import { annotateCounts, normalizeCityKey, orgNode } from '../../common/org-chart/org-chart.util';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { PrismaService } from '../../database/prisma.service';
@@ -60,6 +62,117 @@ export class TopsService {
     const top = await this.prisma.topEvent.findFirst({ where: { id, deletedAt: null }, include: includeTop });
     if (!top) throw new NotFoundException('TOP not found.');
     return this.toTopResponse(top);
+  }
+
+  async getOrgChart(id: string, view: OrgChartView): Promise<OrgChartNode> {
+    const top = await this.findExistingTop(id);
+    let root: OrgChartNode;
+    if (view === 'teams') root = await this.buildTeamsChart(top);
+    else if (view === 'families') root = await this.buildFamiliesChart(top);
+    else root = await this.buildCitiesChart(top);
+    annotateCounts(root);
+    return root;
+  }
+
+  private async buildTeamsChart(top: any): Promise<OrgChartNode> {
+    const [teams, servants] = await Promise.all([
+      this.prisma.topTeam.findMany({ where: { topEventId: top.id, deletedAt: null }, include: { team: true, coordinator: true, deputyCoordinator: true }, orderBy: { createdAt: 'asc' } }),
+      this.prisma.topServant.findMany({ where: { topEventId: top.id, deletedAt: null, status: { not: TopServantStatus.CANCELLED } }, include: { legendary: true }, orderBy: { createdAt: 'asc' } }),
+    ]);
+    const root = orgNode(`top:${top.id}`, 'root', `TOP #${top.number} - ${top.name}`);
+    const coordination = orgNode('coordination:general', 'group', 'Coordenação Geral', { leaderId: top.generalCoordinatorLegendaryId ?? top.representativeLegendaryId ?? undefined });
+    const linkedTeamIds = new Set(teams.map((t: any) => t.teamId));
+    for (const topTeam of teams) {
+      // The whole team branch shares the coordinator's color.
+      const branchLeaderId = topTeam.coordinatorLegendaryId ?? undefined;
+      const teamNode = orgNode(`team:${topTeam.id}`, 'group', teamDisplayName(topTeam.team?.name ?? 'Equipe'), { subtitle: 'Equipe', leaderId: branchLeaderId });
+      const teamServants = servants.filter((s: any) => s.teamId === topTeam.teamId);
+      const servantNodes = teamServants.map((s: any) => orgNode(`servant:${s.id}`, 'person', s.legendary?.fullName ?? 'Sem nome', { subtitle: s.role ?? undefined }));
+      if (topTeam.coordinatorLegendaryId) {
+        // Coordinator is the leader node that holds the members.
+        const coordNode = orgNode(`leader:${topTeam.id}`, 'leader', topTeam.coordinator?.fullName ?? 'Coordenador', { subtitle: 'Coordenador', leaderId: branchLeaderId });
+        coordNode.children.push(...servantNodes);
+        teamNode.children.push(coordNode);
+        // Deputy is a sibling leader node without members.
+        if (topTeam.deputyCoordinatorLegendaryId) {
+          teamNode.children.push(orgNode(`deputy:${topTeam.id}`, 'leader', topTeam.deputyCoordinator?.fullName ?? 'Vice-coordenador', { subtitle: 'Vice-coordenador', leaderId: branchLeaderId }));
+        }
+      } else {
+        // No coordinator: members hang directly under the team group.
+        teamNode.children.push(...servantNodes);
+      }
+      coordination.children.push(teamNode);
+    }
+    const orphanServants = servants.filter((s: any) => !s.teamId || !linkedTeamIds.has(s.teamId));
+    if (orphanServants.length) {
+      const noTeam = orgNode('team:none', 'group', 'Sem equipe');
+      for (const servant of orphanServants) {
+        noTeam.children.push(orgNode(`servant:${servant.id}`, 'person', servant.legendary?.fullName ?? 'Sem nome', { subtitle: servant.role ?? undefined }));
+      }
+      coordination.children.push(noTeam);
+    }
+    if (coordination.children.length) root.children.push(coordination);
+    return root;
+  }
+
+  private async buildFamiliesChart(top: any): Promise<OrgChartNode> {
+    const families = await this.prisma.topFamily.findMany({
+      where: { topEventId: top.id, deletedAt: null },
+      include: { representative: true, deputyRepresentative: true, members: { where: { status: TopFamilyMemberStatus.ACTIVE, deletedAt: null }, include: { topParticipant: { include: { legendary: true } } } } },
+      orderBy: { name: 'asc' },
+    });
+    const root = orgNode(`top:${top.id}`, 'root', `TOP #${top.number} - ${top.name}`);
+    const coordination = orgNode('coordination:family', 'group', 'Coordenação de Famílias', { leaderId: top.familyCoordinatorLegendaryId ?? undefined });
+    for (const family of families) {
+      // The whole family branch shares the representative's color.
+      const branchLeaderId = family.representativeLegendaryId ?? undefined;
+      const familyNode = orgNode(`family:${family.id}`, 'group', family.name, { subtitle: 'Família', leaderId: branchLeaderId });
+      const memberNodes = family.members.map((m: any) => orgNode(`familyMember:${m.id}`, 'person', m.topParticipant?.legendary?.fullName ?? 'Sem nome'));
+      if (family.representativeLegendaryId) {
+        const repNode = orgNode(`leader:${family.id}`, 'leader', family.representative?.fullName ?? 'Representante', { subtitle: 'Chefe de família', leaderId: branchLeaderId });
+        repNode.children.push(...memberNodes);
+        familyNode.children.push(repNode);
+        if (family.deputyRepresentativeLegendaryId) {
+          familyNode.children.push(orgNode(`deputy:${family.id}`, 'leader', family.deputyRepresentative?.fullName ?? 'Vice-representante', { subtitle: 'Vice-representante', leaderId: branchLeaderId }));
+        }
+      } else {
+        familyNode.children.push(...memberNodes);
+      }
+      coordination.children.push(familyNode);
+    }
+    if (coordination.children.length) root.children.push(coordination);
+    return root;
+  }
+
+  private async buildCitiesChart(top: any): Promise<OrgChartNode> {
+    const participants = await this.prisma.topParticipant.findMany({
+      where: { topEventId: top.id, deletedAt: null, status: { not: TopParticipantStatus.CANCELLED } },
+      include: { legendary: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const root = orgNode(`top:${top.id}`, 'root', `TOP #${top.number} - ${top.name}`);
+    const groups = new Map<string, { label: string; node: OrgChartNode }>();
+    let noCity: OrgChartNode | null = null;
+    for (const participant of participants) {
+      const rawCity = participant.legendary?.city?.trim();
+      const personNode = orgNode(`participant:${participant.id}`, 'person', participant.legendary?.fullName ?? 'Sem nome');
+      if (!rawCity) {
+        noCity ??= orgNode('city:none', 'group', 'Sem cidade');
+        noCity.children.push(personNode);
+        continue;
+      }
+      const slug = normalizeCityKey(rawCity);
+      let group = groups.get(slug);
+      if (!group) {
+        group = { label: rawCity, node: orgNode(`city:${slug}`, 'city', rawCity) };
+        groups.set(slug, group);
+      }
+      group.node.children.push(personNode);
+    }
+    const cityNodes = [...groups.values()].map((g) => g.node).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+    root.children.push(...cityNodes);
+    if (noCity) root.children.push(noCity);
+    return root;
   }
 
   async options(query: OptionsQueryDto) {

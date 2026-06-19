@@ -86,3 +86,99 @@ describe('TopsService', () => {
     await expect(service.cancelServant('top-1', 's1')).resolves.toMatchObject({ status: TopServantStatus.CANCELLED });
   });
 });
+
+describe('TopsService org-chart', () => {
+  let service: TopsService;
+  let prisma: any;
+
+  const top = { id: 'top-1', number: 7, name: 'Rota do Cerrado', representativeLegendaryId: 'rep-1', generalCoordinatorLegendaryId: 'gc-1', familyCoordinatorLegendaryId: 'fc-1', _count: {} };
+
+  beforeEach(() => {
+    prisma = {
+      topEvent: { findFirst: jest.fn().mockResolvedValue(top) },
+      topTeam: { findMany: jest.fn().mockResolvedValue([]) },
+      topServant: { findMany: jest.fn().mockResolvedValue([]) },
+      topFamily: { findMany: jest.fn().mockResolvedValue([]) },
+      topParticipant: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    service = new TopsService(prisma, { create: jest.fn() } as any);
+  });
+
+  it('builds teams view with team, servants, "Sem equipe" group and aggregated count', async () => {
+    prisma.topTeam.findMany.mockResolvedValueOnce([{ id: 'tt1', teamId: 'team-a', team: { name: 'Equipe A' }, coordinatorLegendaryId: 'coord-1' }]);
+    prisma.topServant.findMany.mockResolvedValueOnce([
+      { id: 's1', teamId: 'team-a', legendary: { fullName: 'Servo 1' }, role: 'Cozinha' },
+      { id: 's2', teamId: 'team-a', legendary: { fullName: 'Servo 2' } },
+      { id: 's3', teamId: null, legendary: { fullName: 'Servo Solto' } },
+    ]);
+
+    const root = await service.getOrgChart('top-1', 'teams');
+
+    expect(root.kind).toBe('root');
+    expect(root.id).toBe('top:top-1');
+    expect(root.count).toBe(3);
+    const coordination = root.children[0];
+    expect(coordination.id).toBe('coordination:general');
+    expect(coordination.leaderId).toBe('gc-1');
+    expect(coordination.count).toBe(3);
+    const teamNode = coordination.children.find((n) => n.id === 'team:tt1')!;
+    expect(teamNode.label).toBe('Equipe A');
+    expect(teamNode.leaderId).toBe('coord-1');
+    expect(teamNode.count).toBe(2);
+    const noTeam = coordination.children.find((n) => n.id === 'team:none')!;
+    expect(noTeam.label).toBe('Sem equipe');
+    expect(noTeam.count).toBe(1);
+    expect(noTeam.leaderId).toBeUndefined();
+  });
+
+  it('builds families view with leader and family without chief (no leaderId)', async () => {
+    prisma.topFamily.findMany.mockResolvedValueOnce([
+      { id: 'f1', name: 'Familia Leao', representativeLegendaryId: 'rep-f1', members: [{ id: 'm1', topParticipant: { legendary: { fullName: 'Membro 1' } } }] },
+      { id: 'f2', name: 'Familia Aguia', representativeLegendaryId: null, members: [] },
+    ]);
+
+    const root = await service.getOrgChart('top-1', 'families');
+
+    const coordination = root.children[0];
+    expect(coordination.id).toBe('coordination:family');
+    expect(coordination.leaderId).toBe('fc-1');
+    const fam1 = coordination.children.find((n) => n.id === 'family:f1')!;
+    expect(fam1.leaderId).toBe('rep-f1');
+    expect(fam1.count).toBe(1);
+    const fam2 = coordination.children.find((n) => n.id === 'family:f2')!;
+    expect(fam2.leaderId).toBeUndefined();
+    expect(fam2.count).toBe(0);
+  });
+
+  it('builds cities view grouping equivalent city spellings and a "Sem cidade" group', async () => {
+    prisma.topParticipant.findMany.mockResolvedValueOnce([
+      { id: 'p1', legendary: { fullName: 'A', city: 'Goiânia' } },
+      { id: 'p2', legendary: { fullName: 'B', city: 'goiania ' } },
+      { id: 'p3', legendary: { fullName: 'C', city: null } },
+    ]);
+
+    const root = await service.getOrgChart('top-1', 'cities');
+
+    const cityNode = root.children.find((n) => n.kind === 'city')!;
+    expect(cityNode.count).toBe(2);
+    const noCity = root.children.find((n) => n.id === 'city:none')!;
+    expect(noCity.label).toBe('Sem cidade');
+    expect(noCity.count).toBe(1);
+    expect(root.count).toBe(3);
+  });
+
+  it('returns the same OrgChartNode shape across the three views (contract)', async () => {
+    const assertShape = (node: any) => {
+      expect(typeof node.id).toBe('string');
+      expect(['root', 'group', 'leader', 'person', 'city']).toContain(node.kind);
+      expect(typeof node.label).toBe('string');
+      expect(typeof node.count).toBe('number');
+      expect(Array.isArray(node.children)).toBe(true);
+      node.children.forEach(assertShape);
+    };
+    for (const view of ['teams', 'families', 'cities'] as const) {
+      const root = await service.getOrgChart('top-1', view);
+      assertShape(root);
+    }
+  });
+});

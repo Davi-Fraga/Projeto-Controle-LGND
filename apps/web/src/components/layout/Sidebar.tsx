@@ -14,6 +14,7 @@ import {
   Building2,
   Church,
   UserCog,
+  Network,
   Menu,
   X,
 } from 'lucide-react';
@@ -28,6 +29,7 @@ type MenuItem = {
   label: string;
   icon: LucideIcon;
   permission?: string;
+  anyPermission?: string[];
   roles?: string[];
 };
 
@@ -43,6 +45,7 @@ const MENU_ITEMS: MenuItem[] = [
   },
   { href: '/dashboard/mapa', label: 'Mapa', icon: Map, permission: 'map.read' },
   { href: '/dashboard/tops', label: 'TOPs', icon: MapPin, permission: 'tops.read' },
+  { href: '/dashboard/organograma', label: 'Organograma', icon: Network, anyPermission: ['teams.read', 'legendarios.read', 'tops.read'] },
   { href: '/dashboard/acoes-sociais', label: 'Ações Sociais', icon: HeartHandshake, permission: 'tops.read' },
   { href: '/dashboard/comunicacao', label: 'Comunicação', icon: MessageSquare, permission: 'communications.read' },
   { href: '/dashboard/relatorios', label: 'Relatórios', icon: FileText, permission: 'reports.read' },
@@ -52,6 +55,7 @@ const MENU_ITEMS: MenuItem[] = [
 
 function isVisible(item: MenuItem, user: CurrentUser | null): boolean {
   if (item.permission && !hasPermission(user, item.permission)) return false;
+  if (item.anyPermission && !item.anyPermission.some((p) => hasPermission(user, p))) return false;
   if (item.roles && !hasRole(user, ...item.roles)) return false;
   return true;
 }

@@ -466,6 +466,26 @@ export type TopFilters = PaginationParams & {
   orderDirection?: 'asc' | 'desc';
 };
 
+// Strips a "TOP #<n> | " prefix from a team name for display (e.g.
+// "TOP #1910 | Coordenação" -> "Coordenação"). Returns the original when there is no prefix.
+export function teamDisplayName(name: string): string {
+  return name.replace(/^\s*TOP\b[^|]*\|\s*/i, '').trim() || name;
+}
+
+export type OrgChartView = 'teams' | 'families' | 'cities';
+
+export type OrgChartNodeKind = 'root' | 'group' | 'leader' | 'person' | 'city';
+
+export type OrgChartNode = {
+  id: string;
+  kind: OrgChartNodeKind;
+  label: string;
+  subtitle?: string;
+  leaderId?: string;
+  count: number;
+  children: OrgChartNode[];
+};
+
 export type TopPreRegistration = {
   id: string;
   topEventId: string;

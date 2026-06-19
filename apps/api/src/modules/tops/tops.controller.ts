@@ -11,6 +11,7 @@ import { CreateTopTeamDto, UpdateTopTeamDto } from './dto/top-team.dto';
 import { CreateTopParticipantDto, TopParticipantsQueryDto, UpdateTopParticipantDto } from './dto/top-participant.dto';
 import { CreateTopServantDto, TopServantsQueryDto, UpdateTopServantDto } from './dto/top-servant.dto';
 import { CreateTopFamilyDto, CreateTopFamilyMemberDto, TransferTopFamilyMemberDto, UpdateTopFamilyDto, UpdateTopFamilyMemberDto } from './dto/top-family.dto';
+import { OrgChartQueryDto } from './dto/org-chart.dto';
 
 @Controller('tops')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -19,6 +20,7 @@ export class TopsController {
   @Get() @Permissions('tops.read') findAll(@Query() q: TopQueryDto) { return this.tops.findAll(q); }
   @Get('options') @Permissions('tops.read') async options(@Query() q: OptionsQueryDto) { return { data: await this.tops.options(q) }; }
   @Get(':id') @Permissions('tops.read') async findOne(@Param('id') id: string) { return { data: await this.tops.findOne(id) }; }
+  @Get(':id/org-chart') @Permissions('tops.read') async orgChart(@Param('id') id: string, @Query() q: OrgChartQueryDto) { return { data: await this.tops.getOrgChart(id, q.view) }; }
   @Post() @Permissions('tops.create') async create(@Body() dto: CreateTopDto, @CurrentUser() u: { sub: string }) { return { data: await this.tops.create(dto, u.sub) }; }
   @Patch(':id') @Permissions('tops.update') async update(@Param('id') id: string, @Body() dto: UpdateTopDto, @CurrentUser() u: { sub: string }) { return { data: await this.tops.update(id, dto, u.sub) }; }
   @Patch(':id/deactivate') @Permissions('tops.delete') async deactivate(@Param('id') id: string, @CurrentUser() u: { sub: string }) { return { data: await this.tops.deactivate(id, u.sub) }; }

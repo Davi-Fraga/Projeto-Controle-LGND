@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import path from 'path';
 
 const securityHeaders = [
   // Anti-clickjacking (as páginas não devem ser embutidas em iframes)
@@ -15,6 +16,11 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@central-da-manada/shared'],
+  // Build standalone: gera um servidor mínimo (.next/standalone) com só as deps
+  // realmente usadas — imagem Docker enxuta. outputFileTracingRoot aponta para a
+  // raiz do monorepo para o tracing de dependências funcionar com pnpm workspaces.
+  output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

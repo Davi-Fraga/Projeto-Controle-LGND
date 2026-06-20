@@ -1,0 +1,30 @@
+# Dependências e builds (são reinstalados/recompilados dentro da imagem)
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+*.tsbuildinfo
+coverage
+.turbo
+
+# Git e metadados
+.git
+.gitignore
+
+# Segredos — NUNCA entram na imagem (passados via env_file em runtime)
+.env
+.env.*
+!.env.production.example
+
+# Logs e temporários
+*.log
+prisma/dev.db
+
+# Camada local de IA / docs (não precisa na imagem)
+.claude
+.codex
+.agent
+openspec
+docs

@@ -1,0 +1,31 @@
+# Caddyfile — reverse proxy com HTTPS automático (Let's Encrypt).
+# As variáveis {$DOMAIN} / {$API_DOMAIN} vêm do .env.production via docker-compose.
+#
+# Pré-requisito do HTTPS: o domínio precisa estar com registro DNS A apontando
+# para o IP da VPS e já propagado. Enquanto não propaga, use o bloco "MODO IP"
+# mais abaixo (HTTP puro) para testar.
+
+# ----- MODO DOMÍNIO (produção) ------------------------------------------------
+# Site (Next.js)
+{$DOMAIN} {
+	encode gzip zstd
+	reverse_proxy web:3000
+}
+
+# API (NestJS) — mantém o path; a API tem prefixo global /api
+{$API_DOMAIN} {
+	encode gzip zstd
+	reverse_proxy api:3333
+}
+
+# ----- MODO IP (teste inicial, sem domínio) -----------------------------------
+# Comente os dois blocos acima e descomente este enquanto o DNS não propaga.
+# Acesse o site por http://SEU_IP  — a API fica exposta só internamente, então
+# para testar a API via IP descomente também o handle_path.
+#
+# :80 {
+# 	encode gzip zstd
+# 	# A API tem prefixo /api, então NÃO removemos o prefixo (sem handle_path):
+# 	reverse_proxy /api/* api:3333
+# 	reverse_proxy web:3000
+# }

@@ -35,7 +35,9 @@ echo ">> Subindo banco e cache..."
 compose up -d postgres redis
 
 echo ">> Aplicando migrations (prisma migrate deploy)..."
-compose run --rm -w /app api pnpm prisma migrate deploy
+# Usa o Prisma já instalado na imagem (sem baixar/reinstalar nada).
+# Roda como 'node', que é dono de node_modules (COPY --chown no Dockerfile).
+compose run --rm -w /app api pnpm exec prisma migrate deploy
 
 echo ">> Subindo aplicação (api, web, caddy)..."
 compose up -d

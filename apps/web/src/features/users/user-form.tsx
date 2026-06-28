@@ -3,9 +3,9 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SystemRole } from '@central-da-manada/shared';
-import type { Legendary } from '@central-da-manada/shared';
 import { createUser, updateUser, type UserSummary } from './api';
-import { getLegendarios } from '@/features/legendarios/api';
+import { getLegendario, getLegendarioOptions } from '@/features/legendarios/api';
+import { AsyncCombobox, type ComboboxOption } from '@/components/ui/AsyncCombobox';
 
 type Props = { user?: UserSummary };
 
@@ -26,20 +26,37 @@ const ROLE_ORDER = Object.values(SystemRole);
 export function UserForm({ user }: Props) {
   const router = useRouter();
   const isEdit = Boolean(user);
-  const [legendarios, setLegendarios] = useState<Legendary[]>([]);
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [password, setPassword] = useState('');
   const [legendaryId, setLegendaryId] = useState(user?.legendaryId ?? '');
+  const [legendaryLabel, setLegendaryLabel] = useState('');
   const [roles, setRoles] = useState<string[]>(user?.roles ?? []);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // No edit, carrega o rótulo do legendário já vinculado para exibir no combobox.
   useEffect(() => {
-    getLegendarios({ page: 1, perPage: 200, orderBy: 'fullName' })
-      .then((response) => setLegendarios(response.data))
-      .catch(() => setError('Não foi possível carregar a lista de legendários.'));
-  }, []);
+    if (!user?.legendaryId) return;
+    getLegendario(user.legendaryId)
+      .then((response) => {
+        const l = response.data;
+        setLegendaryLabel(l.lgndNumber ? `${l.fullName} - LGND ${l.lgndNumber}` : l.fullName);
+      })
+      .catch(() => setLegendaryLabel('(legendário vinculado)'));
+  }, [user?.legendaryId]);
+
+  async function fetchLegendarioOptions(search: string): Promise<ComboboxOption[]> {
+    const response = await getLegendarioOptions(search, 20);
+    return response.data.map((option) => {
+      const fullName = option.metadata?.fullName ?? option.label;
+      const parts = [
+        option.metadata?.city ?? undefined,
+        option.metadata?.lgndNumber ? `LGND ${option.metadata.lgndNumber}` : undefined,
+      ].filter(Boolean) as string[];
+      return { value: option.value, label: fullName, sublabel: parts.join(' · ') || undefined };
+    });
+  }
 
   function toggleRole(role: string) {
     setRoles((current) => (current.includes(role) ? current.filter((r) => r !== role) : [...current, role]));
@@ -123,14 +140,17 @@ export function UserForm({ user }: Props) {
         </label>
         <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Legendário vinculado</span>
-          <select className="input" value={legendaryId} onChange={(e) => setLegendaryId(e.target.value)}>
-            <option value="">Nenhum</option>
-            {legendarios.map((legendario) => (
-              <option key={legendario.id} value={legendario.id}>
-                {legendario.lgndNumber ? `${legendario.fullName} - LGND ${legendario.lgndNumber}` : legendario.fullName}
-              </option>
-            ))}
-          </select>
+          <AsyncCombobox
+            value={legendaryId}
+            selectedLabel={legendaryLabel}
+            onChange={(value, label) => {
+              setLegendaryId(value);
+              setLegendaryLabel(value ? label : '');
+            }}
+            fetchOptions={fetchLegendarioOptions}
+            placeholder="Buscar por nome, cidade ou LGND..."
+            noneLabel="Nenhum"
+          />
           <span className="text-[11px] text-zinc-500">
             Necessário para coordenadores/subcoordenadores: o escopo de equipe usa o legendário vinculado.
           </span>

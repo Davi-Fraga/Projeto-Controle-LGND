@@ -33,6 +33,20 @@ export function getLegendario(id: string) {
   return api<LegendarioResponse>(`/legendarios/${id}`);
 }
 
+export type LegendarioOption = {
+  id: string;
+  label: string;
+  value: string;
+  metadata?: { fullName?: string; lgndNumber?: string | null; city?: string | null; church?: string | null };
+};
+
+export function getLegendarioOptions(search: string, limit = 20) {
+  const params = new URLSearchParams();
+  if (search.trim()) params.set('search', search.trim());
+  params.set('limit', String(limit));
+  return api<{ data: LegendarioOption[] }>(`/legendarios/options?${params.toString()}`);
+}
+
 export function getLegendarioHistory(id: string, type?: string) {
   return api<LegendaryHistoryResponse>(`/legendarios/${id}/history${type ? `?type=${type}` : ''}`);
 }

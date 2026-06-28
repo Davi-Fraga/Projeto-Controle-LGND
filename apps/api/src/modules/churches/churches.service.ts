@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
@@ -25,6 +25,36 @@ export class ChurchesService {
 
   geocode(name: string | undefined, city: string) {
     return this.geocoding.geocode(name, city);
+  }
+
+  async findOne(id: string) {
+    const church = await this.prisma.church.findFirst({
+      where: { id, deletedAt: null },
+      include: {
+        legendarios: {
+          where: { deletedAt: null },
+          select: { id: true, fullName: true, lgndNumber: true, city: true, phone: true, status: true },
+          orderBy: { fullName: 'asc' },
+        },
+      },
+    });
+    if (!church) throw new NotFoundException('Church not found.');
+    return church;
+  }
+
+  async remove(id: string, actorUserId?: string) {
+    const church = await this.prisma.church.findFirst({ where: { id, deletedAt: null } });
+    if (!church) throw new NotFoundException('Church not found.');
+
+    // Barreira no backend: só exclui igreja vazia; nunca remove Legendários em cascata.
+    const linked = await this.prisma.legendary.count({ where: { churchId: id, deletedAt: null } });
+    if (linked > 0) {
+      throw new ConflictException('A igreja possui Legendários vinculados e não pode ser excluída.');
+    }
+
+    const deleted = await this.prisma.church.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.audit.create({ actorUserId, entityType: 'Church', entityId: id, action: 'delete', before: church });
+    return deleted;
   }
 
   async spiritualLeadersView(user: AuthenticatedUser) {

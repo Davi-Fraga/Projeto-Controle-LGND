@@ -29,6 +29,25 @@ export function updateChurch(id: string, payload: ChurchPayload) {
   return api<ChurchResponse>(`/churches/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
 }
 
+export type ChurchMember = {
+  id: string;
+  fullName: string;
+  lgndNumber: string | null;
+  city: string | null;
+  phone: string | null;
+  status: string;
+};
+
+export type ChurchDetail = Church & { legendarios: ChurchMember[] };
+
+export function getChurch(id: string) {
+  return api<{ data: ChurchDetail }>(`/churches/${id}`);
+}
+
+export function deleteChurch(id: string) {
+  return api<{ data: Church }>(`/churches/${id}`, { method: 'DELETE' });
+}
+
 export type GeocodeResult = { lat: number; lng: number; displayName: string };
 export type GeocodeResponse = { data: GeocodeResult | null };
 

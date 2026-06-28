@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChurchesService } from './churches.service';
 import { CreateChurchDto } from './dto/create-church.dto';
+import { GeocodeQueryDto } from './dto/geocode-query.dto';
 import { UpdateChurchDto } from './dto/update-church.dto';
 
 @Controller('churches')
@@ -22,6 +23,13 @@ export class ChurchesController {
   @Permissions('churches.read')
   async spiritualLeaders(@CurrentUser() user: AuthenticatedUser) {
     return { data: await this.churchesService.spiritualLeadersView(user) };
+  }
+
+  // Rota estática declarada antes de qualquer rota parametrizada (`:id`).
+  @Get('geocode')
+  @Permissions('churches.read')
+  async geocode(@Query() query: GeocodeQueryDto) {
+    return { data: await this.churchesService.geocode(query.name, query.city) };
   }
 
   @Post()

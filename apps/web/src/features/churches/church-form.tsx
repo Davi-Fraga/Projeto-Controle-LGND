@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Church } from '@central-da-manada/shared';
-import { createChurch, updateChurch, type ChurchPayload } from './api';
+import { createChurch, geocodeChurch, updateChurch, type ChurchPayload } from './api';
 import { getUsers, type UserSummary } from '@/features/users/api';
 
 type Props = { church?: Church };
@@ -34,6 +34,30 @@ export function ChurchForm({ church }: Props) {
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoFeedback, setGeoFeedback] = useState<
+    { kind: 'found'; displayName: string } | { kind: 'not-found' } | { kind: 'error' } | null
+  >(null);
+
+  async function handleGeocode() {
+    if (!form.city.trim()) return;
+    setGeoLoading(true);
+    setGeoFeedback(null);
+    try {
+      const response = await geocodeChurch({ city: form.city, name: form.name });
+      const result = response.data;
+      if (result) {
+        setForm((current) => ({ ...current, latitude: String(result.lat), longitude: String(result.lng) }));
+        setGeoFeedback({ kind: 'found', displayName: result.displayName });
+      } else {
+        setGeoFeedback({ kind: 'not-found' });
+      }
+    } catch {
+      setGeoFeedback({ kind: 'error' });
+    } finally {
+      setGeoLoading(false);
+    }
+  }
 
   useEffect(() => {
     getUsers({ perPage: 200 })
@@ -132,9 +156,32 @@ export function ChurchForm({ church }: Props) {
       </section>
 
       <section className="grid gap-4 rounded-xl border border-zinc-800 bg-zinc-900/10 p-5 md:grid-cols-2">
-        <div className="md:col-span-2">
+        <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3">
           <span className="text-xs font-bold uppercase tracking-widest text-orange-500">Localização (Mapa)</span>
+          <button
+            type="button"
+            onClick={handleGeocode}
+            disabled={geoLoading || !form.city.trim()}
+            className="flex h-9 items-center justify-center rounded-lg border border-orange-600/40 bg-orange-600/10 px-4 text-[11px] font-bold uppercase tracking-wider text-orange-400 transition-all hover:bg-orange-600/20 disabled:opacity-40"
+          >
+            {geoLoading ? 'Buscando...' : 'Buscar localização automaticamente'}
+          </button>
         </div>
+        <p className="md:col-span-2 text-[11px] text-zinc-500">
+          A localização pode ser preenchida automaticamente usando o nome e a cidade. Ajuste latitude e longitude
+          manualmente apenas se o resultado estiver incorreto.
+        </p>
+        {geoFeedback ? (
+          <div className="md:col-span-2 text-[11px] font-semibold">
+            {geoFeedback.kind === 'found' ? (
+              <span className="text-emerald-400">Endereço encontrado: {geoFeedback.displayName}</span>
+            ) : geoFeedback.kind === 'not-found' ? (
+              <span className="text-amber-400">Nenhuma localização encontrada. Informe latitude e longitude manualmente.</span>
+            ) : (
+              <span className="text-rose-400">Não foi possível buscar a localização agora. Tente novamente ou preencha manualmente.</span>
+            )}
+          </div>
+        ) : null}
         <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Latitude</span>
           <input className="input" type="number" step="any" value={form.latitude} onChange={(e) => setField('latitude', e.target.value)} placeholder="-15.7942" />

@@ -5,6 +5,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateChurchDto } from './dto/create-church.dto';
 import { UpdateChurchDto } from './dto/update-church.dto';
+import { GeocodingService } from './geocoding.service';
 
 @Injectable()
 export class ChurchesService {
@@ -12,6 +13,7 @@ export class ChurchesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly accessPolicy: AccessPolicyService,
+    private readonly geocoding: GeocodingService,
   ) {}
 
   findAll() {
@@ -19,6 +21,10 @@ export class ChurchesService {
       where: { deletedAt: null },
       orderBy: [{ name: 'asc' }, { city: 'asc' }],
     });
+  }
+
+  geocode(name: string | undefined, city: string) {
+    return this.geocoding.geocode(name, city);
   }
 
   async spiritualLeadersView(user: AuthenticatedUser) {
@@ -56,6 +62,17 @@ export class ChurchesService {
       await this.validateSpiritualLeaderUser(dto.spiritualLeaderUserId);
     }
 
+    let latitude = dto.latitude ?? null;
+    let longitude = dto.longitude ?? null;
+    // Geocoda apenas quando o usuário não informou coordenadas manualmente.
+    if (dto.latitude == null && dto.longitude == null) {
+      const geo = await this.geocoding.geocode(dto.name, dto.city);
+      if (geo) {
+        latitude = geo.lat;
+        longitude = geo.lng;
+      }
+    }
+
     const church = await this.prisma.church.create({
       data: {
         name: dto.name.trim(),
@@ -63,8 +80,8 @@ export class ChurchesService {
         spiritualLeaderName: dto.spiritualLeaderName?.trim() || null,
         spiritualLeaderPhone: dto.spiritualLeaderPhone?.trim() || null,
         spiritualLeaderUserId: dto.spiritualLeaderUserId || null,
-        latitude: dto.latitude ?? null,
-        longitude: dto.longitude ?? null,
+        latitude,
+        longitude,
         notes: dto.notes?.trim() || null,
       },
     });
@@ -80,6 +97,23 @@ export class ChurchesService {
       await this.validateSpiritualLeaderUser(dto.spiritualLeaderUserId);
     }
 
+    let latitude = dto.latitude !== undefined ? (dto.latitude ?? null) : undefined;
+    let longitude = dto.longitude !== undefined ? (dto.longitude ?? null) : undefined;
+
+    // Coordenadas manuais no payload têm prioridade e nunca são sobrescritas pelo geocoding.
+    const hasManualCoords = dto.latitude !== undefined || dto.longitude !== undefined;
+    const newName = dto.name !== undefined ? dto.name.trim() : before.name;
+    const newCity = dto.city === null ? null : (dto.city !== undefined ? dto.city.trim() : before.city);
+    const nameOrCityChanged = newName !== before.name || newCity !== before.city;
+
+    if (!hasManualCoords && nameOrCityChanged) {
+      const geo = await this.geocoding.geocode(newName, newCity);
+      if (geo) {
+        latitude = geo.lat;
+        longitude = geo.lng;
+      }
+    }
+
     const after = await this.prisma.church.update({
       where: { id },
       data: {
@@ -88,8 +122,8 @@ export class ChurchesService {
         spiritualLeaderName: dto.spiritualLeaderName === null ? null : (dto.spiritualLeaderName !== undefined ? dto.spiritualLeaderName.trim() : undefined),
         spiritualLeaderPhone: dto.spiritualLeaderPhone === null ? null : (dto.spiritualLeaderPhone !== undefined ? dto.spiritualLeaderPhone.trim() : undefined),
         spiritualLeaderUserId: dto.spiritualLeaderUserId !== undefined ? (dto.spiritualLeaderUserId ?? null) : undefined,
-        latitude: dto.latitude !== undefined ? (dto.latitude ?? null) : undefined,
-        longitude: dto.longitude !== undefined ? (dto.longitude ?? null) : undefined,
+        latitude,
+        longitude,
         notes: dto.notes === null ? null : (dto.notes !== undefined ? dto.notes.trim() : undefined),
       },
     });

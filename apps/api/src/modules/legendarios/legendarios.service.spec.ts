@@ -62,6 +62,49 @@ describe('LegendariosService', () => {
     expect(findManyCall[0].where.AND).toContainEqual(scopeFilter);
   });
 
+  it('busca textual filtra por searchText normalizado e NÃO inclui clause de phone (regressão do bug "retorna todos")', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] });
+    prisma.legendary.findMany.mockResolvedValueOnce([]);
+    prisma.legendary.count.mockResolvedValueOnce(0);
+
+    await service.findAll({ page: 1, perPage: 10, search: 'João' }, adminUser);
+
+    const or = prisma.legendary.findMany.mock.calls[0][0].where.OR;
+    expect(or).toContainEqual({ searchText: { contains: 'joao' } });
+    // termo sem dígitos não pode gerar clause de phone (era `contains: ''`, que casava todos)
+    expect(or.some((clause: any) => 'phone' in clause)).toBe(false);
+  });
+
+  it('busca numérica filtra por phone usando apenas os dígitos', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] });
+    prisma.legendary.findMany.mockResolvedValueOnce([]);
+    prisma.legendary.count.mockResolvedValueOnce(0);
+
+    await service.findAll({ page: 1, perPage: 10, search: '(61) 99999' }, adminUser);
+
+    const or = prisma.legendary.findMany.mock.calls[0][0].where.OR;
+    expect(or).toContainEqual({ phone: { contains: '6199999' } });
+  });
+
+  it('define searchText normalizado (sem acento/caixa) ao criar', async () => {
+    prisma.legendary.findUnique.mockResolvedValueOnce(null);
+    prisma.legendary.create.mockResolvedValueOnce({ id: '1', fullName: 'João Silva', expertises: [] });
+
+    await service.create({
+      fullName: 'João Silva',
+      city: 'Goiânia',
+      lgndNumber: 'A12',
+      isFromRotaDoCerrado: true,
+      servesInChurch: false,
+      status: LegendaryStatus.ACTIVE,
+      socialActionInterest: false,
+      expertiseIds: [],
+    });
+
+    const createData = prisma.legendary.create.mock.calls[0][0].data;
+    expect(createData.searchText).toBe('joao silva goiania a12');
+  });
+
   it('findOne returns 404 when legendary is outside scope', async () => {
     accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: [], legendaryIds: [] });
     accessPolicy.buildLegendaryWhere.mockReturnValueOnce({ id: { in: [] } });

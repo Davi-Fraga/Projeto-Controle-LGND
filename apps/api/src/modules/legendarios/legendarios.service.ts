@@ -55,14 +55,8 @@ export class LegendariosService {
         : undefined,
     };
 
-    if (query.search) {
-      where.OR = [
-        { fullName: { contains: query.search, mode: 'insensitive' } },
-        { lgndNumber: { contains: query.search, mode: 'insensitive' } },
-        { phone: { contains: this.normalizePhone(query.search), mode: 'insensitive' } },
-        { city: { contains: query.search, mode: 'insensitive' } },
-      ];
-    }
+    const searchOr = this.buildSearchOr(query.search);
+    if (searchOr) where.OR = searchOr;
 
     const scope = await this.accessPolicy.resolveScope(user);
     if (!scope.isAdmin) {
@@ -100,13 +94,8 @@ export class LegendariosService {
   async options(query: OptionsQueryDto, user: AuthenticatedUser) {
     const where: any = { deletedAt: null };
     if (query.activeOnly !== false) where.status = { not: LegendaryStatus.INACTIVE };
-    if (query.search) {
-      where.OR = [
-        { fullName: { contains: query.search, mode: 'insensitive' } },
-        { lgndNumber: { contains: query.search, mode: 'insensitive' } },
-        { phone: { contains: this.normalizePhone(query.search), mode: 'insensitive' } },
-      ];
-    }
+    const searchOr = this.buildSearchOr(query.search);
+    if (searchOr) where.OR = searchOr;
 
     const scope = await this.accessPolicy.resolveScope(user);
     if (!scope.isAdmin) {
@@ -201,7 +190,7 @@ export class LegendariosService {
       const updated = await tx.legendary.update({
         where: { id },
         data: {
-          ...this.toData(dto),
+          ...this.toData(dto, { fullName: before.fullName, city: before.city, lgndNumber: before.lgndNumber }),
           expertises: dto.expertiseIds
             ? {
                 create: dto.expertiseIds.map((expertiseId) => ({ expertiseId })),
@@ -387,12 +376,23 @@ export class LegendariosService {
     return legendario;
   }
 
-  private toData(dto: Partial<CreateLegendarioDto>) {
+  private toData(
+    dto: Partial<CreateLegendarioDto>,
+    current?: { fullName?: string | null; city?: string | null; lgndNumber?: string | null },
+  ) {
     const data: any = {};
     if ('fullName' in dto) data.fullName = dto.fullName?.trim();
     if ('lgndNumber' in dto) data.lgndNumber = dto.lgndNumber?.trim() || null;
     if ('phone' in dto) data.phone = dto.phone ? this.normalizePhone(dto.phone) : null;
     if ('city' in dto) data.city = dto.city?.trim() || null;
+
+    // Recalcula searchText quando algum campo buscável muda, mesclando com os valores atuais.
+    if ('fullName' in dto || 'city' in dto || 'lgndNumber' in dto) {
+      const fullName = 'fullName' in dto ? data.fullName : current?.fullName;
+      const city = 'city' in dto ? data.city : current?.city;
+      const lgndNumber = 'lgndNumber' in dto ? data.lgndNumber : current?.lgndNumber;
+      data.searchText = this.buildSearchText(fullName, city, lgndNumber);
+    }
     if ('isFromRotaDoCerrado' in dto) data.isFromRotaDoCerrado = dto.isFromRotaDoCerrado;
     if ('churchId' in dto) data.churchId = dto.churchId || null;
     if ('servesInChurch' in dto) data.servesInChurch = dto.servesInChurch;
@@ -413,6 +413,36 @@ export class LegendariosService {
 
   private normalizePhone(phone: string) {
     return phone.replace(/\D/g, '');
+  }
+
+  /** Normaliza texto para busca/armazenamento: sem acento, minúsculo, espaços colapsados. */
+  private normalizeSearch(value: string) {
+    return value
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /** Monta o valor de `searchText` a partir dos campos textuais buscáveis. */
+  private buildSearchText(...parts: (string | null | undefined)[]) {
+    return this.normalizeSearch(parts.filter(Boolean).join(' '));
+  }
+
+  /**
+   * Constrói o `OR` de busca. Termos textuais batem no `searchText` (acento/caixa
+   * insensível); termos numéricos batem no `phone`. Só inclui clauses não-vazias —
+   * evita o bug de `contains: ''`, que casava todos os registros.
+   */
+  private buildSearchOr(search?: string): any[] | undefined {
+    if (!search) return undefined;
+    const term = this.normalizeSearch(search);
+    const digits = this.normalizePhone(search);
+    const or: any[] = [];
+    if (term) or.push({ searchText: { contains: term } });
+    if (digits) or.push({ phone: { contains: digits } });
+    return or.length ? or : undefined;
   }
 
   private toResponse(legendario: any) {

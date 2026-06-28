@@ -233,6 +233,9 @@ model Legendary {
   lgndNumber            String?              @unique
   phone                 String?
   city                  String?
+  // Texto de busca normalizado (sem acento, minúsculo): fullName + city + lgndNumber.
+  // Mantido no create/update; permite busca acento/caixa-insensível via `contains`.
+  searchText            String?
   isFromRotaDoCerrado   Boolean              @default(false)
   churchId              String?              @db.Uuid
   church                Church?              @relation(fields: [churchId], references: [id])

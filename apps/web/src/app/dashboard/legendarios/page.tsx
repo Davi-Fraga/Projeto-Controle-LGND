@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LegendaryStatus } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -40,7 +40,9 @@ export default function LegendariosPage() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+  // Guarda anti-race: só a resposta da requisição mais recente é aplicada.
+  const requestIdRef = useRef(0);
+
   // Custom dialog state
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
 
@@ -57,6 +59,7 @@ export default function LegendariosPage() {
   useEffect(() => {
     if (authLoading) return;
 
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     getLegendarios({
       page,
@@ -74,11 +77,18 @@ export default function LegendariosPage() {
       orderDirection: 'asc',
     })
       .then((response) => {
+        if (requestId !== requestIdRef.current) return; // resposta obsoleta: descarta
         setItems(response.data);
         setTotalPages(response.meta.totalPages || 1);
       })
-      .catch(() => setError('Não foi possível carregar Legendários.'))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (requestId !== requestIdRef.current) return;
+        setError('Não foi possível carregar Legendários.');
+      })
+      .finally(() => {
+        if (requestId !== requestIdRef.current) return;
+        setLoading(false);
+      });
   }, [authLoading, debouncedSearch, filters, page]);
 
   function updateFilter(key: keyof typeof filters, value: string) {

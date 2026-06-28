@@ -28,3 +28,12 @@ export function createChurch(payload: ChurchPayload) {
 export function updateChurch(id: string, payload: ChurchPayload) {
   return api<ChurchResponse>(`/churches/${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
 }
+
+export type GeocodeResult = { lat: number; lng: number; displayName: string };
+export type GeocodeResponse = { data: GeocodeResult | null };
+
+export function geocodeChurch(params: { city: string; name?: string }) {
+  const query = new URLSearchParams({ city: params.city });
+  if (params.name?.trim()) query.set('name', params.name.trim());
+  return api<GeocodeResponse>(`/churches/geocode?${query.toString()}`);
+}

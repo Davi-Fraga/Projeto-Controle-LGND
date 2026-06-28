@@ -2,17 +2,23 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Building2, Edit2, MapPin, Phone, User } from 'lucide-react';
+import { Building2, Edit2, Eye, MapPin, Phone, Trash2, User } from 'lucide-react';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { getChurches } from '@/features/churches/api';
+import { deleteChurch, getChurches } from '@/features/churches/api';
 import type { Church } from '@/features/churches/api';
 import { ActionMenu } from '@/components/ui/ActionMenu';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ChurchDetailModal } from '@/features/churches/church-detail-modal';
+import { ApiError } from '@/lib/api';
 
 export default function IgrejasPage() {
   const { loading: authLoading } = useRequireAuth();
   const [churches, setChurches] = useState<Church[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const [deletingChurch, setDeletingChurch] = useState<Church | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -21,6 +27,26 @@ export default function IgrejasPage() {
       .catch(() => setError('Não foi possível carregar as igrejas.'))
       .finally(() => setLoading(false));
   }, [authLoading]);
+
+  async function handleConfirmDelete() {
+    if (!deletingChurch) return;
+    setDeleteBusy(true);
+    setError(null);
+    try {
+      await deleteChurch(deletingChurch.id);
+      setChurches((current) => current.filter((c) => c.id !== deletingChurch.id));
+      setDeletingChurch(null);
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.status === 409
+          ? `A igreja "${deletingChurch.name}" não pode ser excluída porque possui Legendários vinculados.`
+          : 'Não foi possível excluir a igreja.',
+      );
+      setDeletingChurch(null);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
 
   if (authLoading) {
     return (
@@ -111,7 +137,9 @@ export default function IgrejasPage() {
                       <div className="flex justify-end">
                         <ActionMenu
                           items={[
+                            { label: 'Ver', onClick: () => setViewingId(church.id), icon: <Eye className="h-3.5 w-3.5" /> },
                             { label: 'Editar', href: `/dashboard/igrejas/${church.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> },
+                            { label: 'Excluir', onClick: () => setDeletingChurch(church), icon: <Trash2 className="h-3.5 w-3.5" />, destructive: true },
                           ]}
                         />
                       </div>
@@ -123,6 +151,19 @@ export default function IgrejasPage() {
           </table>
         </div>
       </div>
+
+      <ChurchDetailModal churchId={viewingId} onClose={() => setViewingId(null)} />
+
+      <ConfirmDialog
+        isOpen={deletingChurch !== null}
+        title="Excluir Igreja"
+        description={`Tem certeza que deseja excluir "${deletingChurch?.name ?? ''}"? Só é possível excluir igrejas sem Legendários vinculados.`}
+        confirmLabel={deleteBusy ? 'Excluindo...' : 'Excluir'}
+        cancelLabel="Cancelar"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingChurch(null)}
+        variant="danger"
+      />
     </div>
   );
 }

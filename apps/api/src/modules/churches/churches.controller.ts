@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -32,6 +32,13 @@ export class ChurchesController {
     return { data: await this.churchesService.geocode(query.name, query.city) };
   }
 
+  // Rota parametrizada declarada após as estáticas (spiritual-leaders, geocode).
+  @Get(':id')
+  @Permissions('churches.read')
+  async findOne(@Param('id') id: string) {
+    return { data: await this.churchesService.findOne(id) };
+  }
+
   @Post()
   @Permissions('churches.create')
   async create(@Body() dto: CreateChurchDto, @CurrentUser() user: { sub: string }) {
@@ -42,5 +49,11 @@ export class ChurchesController {
   @Permissions('churches.update')
   async update(@Param('id') id: string, @Body() dto: UpdateChurchDto, @CurrentUser() user: { sub: string }) {
     return { data: await this.churchesService.update(id, dto, user.sub) };
+  }
+
+  @Delete(':id')
+  @Permissions('churches.delete')
+  async remove(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
+    return { data: await this.churchesService.remove(id, user.sub) };
   }
 }

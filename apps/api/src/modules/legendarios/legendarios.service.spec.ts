@@ -105,6 +105,25 @@ describe('LegendariosService', () => {
     expect(createData.searchText).toBe('joao silva goiania a12');
   });
 
+  it('options filtra no backend por searchText, respeita o limite e retorna metadata de desambiguação', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] });
+    prisma.legendary.findMany.mockResolvedValueOnce([
+      { id: '1', fullName: 'João Silva', lgndNumber: '123', city: 'Goiânia', church: { name: 'Igreja X' } },
+    ]);
+
+    const result = await service.options({ search: 'joão', limit: 5, activeOnly: true } as any, adminUser);
+
+    const call = prisma.legendary.findMany.mock.calls[0][0];
+    expect(call.where.OR).toContainEqual({ searchText: { contains: 'joao' } });
+    expect(call.take).toBe(5);
+    expect(result[0]).toEqual(
+      expect.objectContaining({
+        value: '1',
+        metadata: expect.objectContaining({ city: 'Goiânia', lgndNumber: '123', church: 'Igreja X' }),
+      }),
+    );
+  });
+
   it('findOne returns 404 when legendary is outside scope', async () => {
     accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: [], legendaryIds: [] });
     accessPolicy.buildLegendaryWhere.mockReturnValueOnce({ id: { in: [] } });

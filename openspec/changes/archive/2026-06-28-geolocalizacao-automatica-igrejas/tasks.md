@@ -46,4 +46,4 @@
 
 - [x] 7.1 Rodar testes focados do módulo de Igrejas — churches: 17/17 ✓
 - [x] 7.2 Rodar `pnpm -r lint`, `pnpm -r test` e `pnpm -r build` — lint ✓; test ✓ (api 108, web 11); build: api ✓, **web `next build` falha em `EPERM symlink` ao copiar o standalone output (limitação de symlink do Windows, sem relação com esta mudança; compilação/type-check da web passaram)**
-- [ ] 7.3 Conferência manual: criar Igreja sem coordenadas (preenche), criar com coordenadas (preserva), editar sem mudar nome/cidade (não busca), simular falha do Nominatim (não quebra) — pendente (requer stack rodando + Nominatim real)
+- [x] 7.3 Conferência manual validada na tela em 2026-06-28 (criar sem/com coordenadas, editar, falha do Nominatim)

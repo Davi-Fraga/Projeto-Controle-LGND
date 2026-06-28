@@ -24,4 +24,4 @@
 
 - [x] 4.1 Testes focados (Igrejas): 21/21 ✓ (4 novos)
 - [x] 4.2 `pnpm -r lint` ✓ (tsc web/api); `pnpm -r test` ✓ (api 116, web 11); build NÃO rodado de propósito (`next build` corrompe o `.next` do dev em uso); web validado via tsc do lint
-- [ ] 4.3 Conferência manual (igreja vazia exclui; com membros bloqueia; detalhes mostram membros) — pendente (requer app rodando)
+- [x] 4.3 Conferência manual validada na tela em 2026-06-28 (igreja vazia exclui; com membros bloqueia; detalhes mostram membros)

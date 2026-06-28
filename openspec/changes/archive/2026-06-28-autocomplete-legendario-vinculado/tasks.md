@@ -28,4 +28,4 @@
 
 - [x] 5.1 Testes focados (Legendários): 14/14 ✓ (1 novo do `options`)
 - [x] 5.2 `pnpm -r lint` ✓ (incl. tsc web/api); `pnpm -r test` ✓ (api 112, web 11); build: api ✓, web `✓ Compiled successfully` + 25/25 páginas (falha só no `EPERM symlink` do standalone, ambiental Windows)
-- [ ] 5.3 Conferência manual com os 227 (digitar filtra; cidade/LGND; "Nenhum"; sem travar) — pendente (requer app rodando)
+- [x] 5.3 Conferência manual validada na tela em 2026-06-28 (digitar filtra; cidade/LGND; "Nenhum"; sem travar)

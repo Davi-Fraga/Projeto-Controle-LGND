@@ -18,4 +18,12 @@ export type UserWithAccess = {
       }>;
     };
   }>;
+  // Opcional: nem todo carregador inclui overrides (ex.: listagem de usuários).
+  // Quando ausente, toSafeUser trata como conjunto vazio.
+  permissionOverrides?: Array<{
+    effect: string;
+    permission: {
+      key: string;
+    };
+  }>;
 };

@@ -67,7 +67,7 @@ export function UserForm({ user }: Props) {
     setError(null);
 
     if (roles.length === 0) {
-      setError('Selecione ao menos um perfil de acesso.');
+      setError('Selecione ao menos uma função na manada.');
       return;
     }
     if (!isEdit && password.length < 8) {
@@ -158,7 +158,11 @@ export function UserForm({ user }: Props) {
       </section>
 
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/10 p-5">
-        <span className="text-xs font-bold uppercase tracking-widest text-orange-500">Perfis de Acesso</span>
+        <span className="text-xs font-bold uppercase tracking-widest text-orange-500">Função na Manada</span>
+        <p className="mt-1 text-[11px] text-zinc-500">
+          Papel organizacional do usuário — <strong className="text-zinc-400">não define o acesso</strong>.
+          O acesso a telas e dados é configurado em <strong className="text-zinc-400">Controle de Acessos</strong>.
+        </p>
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           {ROLE_ORDER.map((role) => (
             <label key={role} className="flex items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/30 px-3 py-2.5 cursor-pointer hover:border-zinc-700">

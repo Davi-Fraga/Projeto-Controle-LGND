@@ -6,6 +6,8 @@ import { annotateCounts, normalizeCityKey, orgNode } from '../../common/org-char
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { PrismaService } from '../../database/prisma.service';
+import { AccessPolicyService } from '../../common/access/access-policy.service';
+import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { AuditService } from '../audit/audit.service';
 import { CreateTopDto, TopQueryDto } from './dto/top-query.dto';
 import { UpdateTopDto } from './dto/update-top.dto';
@@ -31,10 +33,15 @@ const includeFamilyMember = { topParticipant: { include: { legendary: true } }, 
 
 @Injectable()
 export class TopsService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly accessPolicy: AccessPolicyService,
+  ) {}
 
-  async findAll(query: TopQueryDto) {
+  async findAll(query: TopQueryDto, user: AuthenticatedUser) {
     const { page, perPage, skip, take } = getPagination(query);
+    const scope = await this.accessPolicy.resolveScope(user);
     const where: any = {
       deletedAt: null,
       status: query.status,
@@ -42,6 +49,7 @@ export class TopsService {
       startDate: query.startDateFrom || query.startDateTo ? { gte: query.startDateFrom, lte: query.startDateTo } : undefined,
       needsReview: query.needsReview,
       familyCoordinatorLegendaryId: query.missingFamilyCoordinator ? null : undefined,
+      AND: [this.accessPolicy.buildTopWhere(scope)],
     };
     if (query.search) {
       where.OR = [

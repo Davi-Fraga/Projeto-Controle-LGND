@@ -1,38 +1,68 @@
 ## 1. Inspeção e plano
 
-- [ ] 1.1 Inspecionar `common/access` (`AccessPolicyService`), `PermissionsGuard`, `RolesGuard`, modelos RBAC no Prisma e o seed
-- [ ] 1.2 Mapear telas → tipos de escopo aplicáveis (cidade/equipe/igreja)
-- [ ] 1.3 Apresentar diffs/modelo de dados e aguardar aprovação antes de aplicar
+- [x] 1.1 Inspecionar `common/access` (`AccessPolicyService`), `PermissionsGuard`, `RolesGuard`, modelos RBAC no Prisma e o seed
+- [x] 1.2 Mapear telas → tipos de escopo aplicáveis (cidade/equipe/igreja)
+- [x] 1.3 Apresentar diffs/modelo de dados e aguardar aprovação antes de aplicar
 
 ## 2. Modelo de dados
 
-- [ ] 2.1 Migration: override de permission por usuário (GRANT/REVOKE) e escopo por usuário (1-N, tipo + valor)
-- [ ] 2.2 Atualizar seed idempotente se novas permissions forem necessárias
+- [x] 2.1 Migration: override de permission por usuário (GRANT/REVOKE) e escopo por usuário (1-N, tipo + valor)
+- [x] 2.2 Atualizar seed idempotente se novas permissions forem necessárias (nenhuma permission nova necessária; seed mantido idempotente)
 
 ## 3. Backend — permissions efetivas e escopo
 
-- [ ] 3.1 Calcular permissions efetivas (papel + concessões − revogações)
-- [ ] 3.2 `PermissionsGuard` usa as efetivas, reavaliadas por requisição (revogação reflete sem relogar)
-- [ ] 3.3 `AccessPolicyService` aplica o conjunto de escopos (cidade/equipe/igreja) em consultas e mutações
-- [ ] 3.4 Validar combinação permission×escopo; recusar inválidas
-- [ ] 3.5 Endpoints da tela de Controle de Acessos (ler/alterar overrides e escopos de um usuário)
+- [x] 3.1 Calcular permissions efetivas (papel + concessões − revogações)
+- [x] 3.2 `PermissionsGuard` usa as efetivas, reavaliadas por requisição (revogação reflete sem relogar)
+- [x] 3.3 `AccessPolicyService` aplica o conjunto de escopos (cidade/equipe/igreja) em consultas e mutações
+- [x] 3.4 Validar combinação permission×escopo; recusar inválidas
+- [x] 3.5 Endpoints da tela de Controle de Acessos (ler/alterar overrides e escopos de um usuário)
 
 ## 4. Frontend — Controle de Acessos
 
-- [ ] 4.1 Tela por usuário: lista permissions com origem (herdada/concedida/revogada) e toggle
-- [ ] 4.2 Gestão de escopos (adicionar/remover, múltiplos)
-- [ ] 4.3 Adaptar menus/navegação às permissions efetivas (sem ser barreira de segurança)
+- [x] 4.1 Tela por usuário: lista permissions com origem (herdada/concedida/revogada) e toggle
+- [x] 4.2 Gestão de escopos (adicionar/remover, múltiplos)
+- [x] 4.3 Adaptar menus/navegação às permissions efetivas (sem ser barreira de segurança)
 
 ## 5. Testes (regra crítica)
 
-- [ ] 5.1 Permissions efetivas seguem a fórmula; concessão e revogação individuais
-- [ ] 5.2 403 logo após revogação em sessão ativa (sem relogar)
-- [ ] 5.3 IDOR por URL direta e acesso fora do escopo por cidade negados
-- [ ] 5.4 Usuário com múltiplos escopos vê os seus e não um terceiro
-- [ ] 5.5 Revalidar login/acessos dos perfis existentes (sem regressão)
+- [x] 5.1 Permissions efetivas seguem a fórmula; concessão e revogação individuais
+- [x] 5.2 403 logo após revogação em sessão ativa (sem relogar)
+- [x] 5.3 IDOR por URL direta e acesso fora do escopo por cidade negados
+- [x] 5.4 Usuário com múltiplos escopos vê os seus e não um terceiro
+- [x] 5.5 Revalidar login/acessos dos perfis existentes (sem regressão) — suíte completa (139) sem regressão
 
 ## 6. Verificação
 
-- [ ] 6.1 Testes focados (access/guard/policy)
-- [ ] 6.2 `pnpm -r lint`, `pnpm -r test`, `pnpm -r build`; regenerar Prisma client (dev parado) após a migration
-- [ ] 6.3 Conferência manual: Gestor de Piracanjuba só vê Piracanjuba; revogação reflete sem relogar
+- [x] 6.1 Testes focados (access/guard/policy) — 135 testes, 17 suites verdes
+- [x] 6.2 `pnpm -r lint` ✓, `pnpm --filter api test` ✓ (135), Prisma client regenerado, `api build` ✓. `web build`: type-check/lint ✓, mas `next build` (output standalone) falha só ao criar symlinks no Windows (EPERM) — limitação de ambiente (precisa Modo Desenvolvedor/admin), não do código.
+- [ ] 6.3 Conferência manual (Gestor de Piracanjuba só vê Piracanjuba; revogação reflete sem relogar) — coberto por testes automatizados; conferência manual no app rodando ainda pendente
+
+## 7. Reformulação: controle por TELA + ESCOPO (substitui UI por permission)
+
+- [x] 7.1 `screen-catalog.ts`: mapa canônico Tela→{view, edit} + `scopeTypes` (12 telas)
+- [x] 7.2 Migration: `UserScopeType` += `TOP` (`20260629140000_user_scope_type_add_top`)
+- [x] 7.3 `AccessControlService`: endpoints por tela (GET estado tela+nível+escopos; PUT nível por tela; POST/DELETE escopo) traduzindo p/ overrides/escopos por baixo
+- [x] 7.4 `AccessPolicyService`: + escopo TOP e asserts equipe/igreja/TOP; `TopScopeGuard` (IDOR em todas as rotas :id de tops) + filtro em tops.findAll; org-chart team aplica assert. teams/churches já filtravam via resolveScope (TEAM/CHURCH mesclados). NOTA: lista de igrejas mantida GLOBAL (decisão existente do projeto) — escopo CHURCH age nos dados vinculados, não no diretório.
+- [x] 7.5 Frontend: ~80 toggles → lista de TELAS com nível (NONE/VER/VER+EDITAR) + escopo com `AsyncCombobox` (mesmo padrão do "legendário vinculado")
+- [x] 7.6 `packages/shared`: `ScreenAccessLevel`, `ScreenAccessEntry`, `UserScreenAccessControl`, `UserScopeType += TOP`
+- [x] 7.7 Testes: acesso/nível por tela (VIEW/EDIT/NONE), validação tela×escopo (incl. TOP), IDOR de TOP (guard) e de equipe (org-chart), múltiplos escopos (cidade/TOP) — 142 testes verdes
+- [x] 7.8 Verificação: `pnpm -r lint` ✓, API build ✓, API tests ✓ (142), Prisma client regenerado (dev parado). `web build` standalone segue com EPERM de symlink (ambiente). Conferência manual (Coordenador da Segurança só vê a Segurança) ainda pendente no app rodando.
+
+## 8. Correção dos seletores de escopo (consistência + validação real)
+
+- [x] 8.1 Frontend: seletor único reutilizável (`AsyncCombobox`) para os 4 tipos — busca a lista REAL do backend, filtro tolerante a acento/caixa (`stripAccents`), subtítulo (igreja/TOP → cidade), múltiplos (chips). Input de texto livre de cidade REMOVIDO.
+- [x] 8.2 Backend: `normalizeScopeValue` agora valida que a CIDADE existe entre os Legendários (`cityExists`); rejeita inexistente. Equipe/Igreja/TOP já validavam referência.
+- [x] 8.3 Backend: opções reais reusadas (`/teams/options`, `/tops/options`, `/churches`, `/org-chart/cities/options`); tolerância a acento feita no filtro client-side (listas pequenas ≤33).
+- [x] 8.4 Limpeza de dados: `CITY="londres"` removido do banco (script guardado). Validação nova impede recriação.
+- [x] 8.5 Testes: rejeita cidade inexistente (unit + live 400) e aceita real (live 201); validação TOP/equipe/igreja; IDOR já coberto. 143 testes verdes.
+- [x] 8.6 Verificação: `pnpm -r lint` ✓, API tests ✓ (143), smoke live (validação cidade + página 200). Conferência manual visual dos dropdowns pendente no app.
+
+## 9. Função na Manada (papéis desacoplados do acesso)
+
+- [x] 9.1 `common/access/access.constants.ts`: `ADMIN_ROLE = 'COORDINATION_ADMIN'` + `roleContributesBase`/`hasAdminRole` (fonte única).
+- [x] 9.2 Efetivas: base do papel só conta para admin — `EffectivePermissionsService`, `auth.service.toSafeUser`, `users.service.toSafeUser`, `AccessControlService.roleKeys`.
+- [x] 9.3 `AccessPolicyService.isAdmin` = só `COORDINATION_ADMIN` (Coordenação-usuário vira função comum). Escopo por função (líder/coordenador) mantido.
+- [x] 9.4 Migração: acesso atual (via papel) de cada usuário NÃO-admin convertido em GRANTs explícitos (idempotente; admins pulados). 1 usuário migrado (+13 GRANTs); ninguém perdeu acesso.
+- [x] 9.5 Front `user-form.tsx`: "Perfis de Acesso" → "Função na Manada" + texto de que não define acesso.
+- [x] 9.6 Testes: função não-admin não concede; admin total; efetivas não-admin = concessões − revogações. 146 testes verdes.
+- [x] 9.7 Verificação: `pnpm -r lint` ✓, API tests ✓ (146), smoke live (admin=86 total; não-admin=concessões; boot OK).

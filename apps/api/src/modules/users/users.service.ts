@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import bcrypt from 'bcryptjs';
 import { getPagination, PaginationDto, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { UserWithAccess } from '../../common/types/safe-user';
+import { roleContributesBase } from '../../common/access/access.constants';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -18,6 +19,11 @@ const includeUserAccess = {
           },
         },
       },
+    },
+  },
+  permissionOverrides: {
+    include: {
+      permission: true,
     },
   },
 };
@@ -180,13 +186,17 @@ export class UsersService {
 
   private toSafeUser(user: UserWithAccess) {
     const roles = user.roles.map((item) => item.role.name);
-    const permissions = Array.from(
-      new Set(
-        user.roles.flatMap((item) =>
-          item.role.permissions.map((rolePermission) => rolePermission.permission.key),
-        ),
-      ),
-    );
+    // Base do papel só conta para o Administrador; funções não concedem acesso.
+    const effective = new Set<string>();
+    for (const item of user.roles) {
+      if (!roleContributesBase(item.role.name)) continue;
+      for (const rolePermission of item.role.permissions) effective.add(rolePermission.permission.key);
+    }
+    for (const override of user.permissionOverrides ?? []) {
+      if (override.effect === 'GRANT') effective.add(override.permission.key);
+      else effective.delete(override.permission.key);
+    }
+    const permissions = Array.from(effective);
 
     return {
       id: user.id,

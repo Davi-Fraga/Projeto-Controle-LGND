@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { UserCog, Edit2, ShieldAlert, Link2 } from 'lucide-react';
+import { UserCog, Edit2, ShieldAlert, Link2, ShieldCheck } from 'lucide-react';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { deactivateUser, getUsers } from '@/features/users/api';
 import type { UserSummary } from '@/features/users/api';
@@ -143,6 +143,7 @@ export default function UsuariosPage() {
                         <ActionMenu
                           items={[
                             { label: 'Editar', href: `/dashboard/usuarios/${user.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> },
+                            { label: 'Controle de Acessos', href: `/dashboard/usuarios/${user.id}/acessos`, icon: <ShieldCheck className="h-3.5 w-3.5" /> },
                             ...(user.isActive
                               ? [{ label: 'Inativar', onClick: () => setDeactivatingId(user.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true }]
                               : []),

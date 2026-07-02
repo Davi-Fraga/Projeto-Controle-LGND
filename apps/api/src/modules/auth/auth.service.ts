@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
 import { UserWithAccess } from '../../common/types/safe-user';
+import { roleContributesBase } from '../../common/access/access.constants';
 import { PrismaService } from '../../database/prisma.service';
 
 const userInclude = {
@@ -18,6 +19,11 @@ const userInclude = {
           },
         },
       },
+    },
+  },
+  permissionOverrides: {
+    include: {
+      permission: true,
     },
   },
 };
@@ -155,13 +161,18 @@ export class AuthService {
 
   private toSafeUser(user: UserWithAccess) {
     const roles = user.roles.map((item) => item.role.name);
-    const permissions = Array.from(
-      new Set(
-        user.roles.flatMap((item) =>
-          item.role.permissions.map((rolePermission) => rolePermission.permission.key),
-        ),
-      ),
-    );
+    // Efetivas coerentes com o PermissionsGuard (para os menus refletirem):
+    // base do papel só conta para o Administrador; demais funções não concedem.
+    const effective = new Set<string>();
+    for (const item of user.roles) {
+      if (!roleContributesBase(item.role.name)) continue;
+      for (const rolePermission of item.role.permissions) effective.add(rolePermission.permission.key);
+    }
+    for (const override of user.permissionOverrides ?? []) {
+      if (override.effect === 'GRANT') effective.add(override.permission.key);
+      else effective.delete(override.permission.key);
+    }
+    const permissions = Array.from(effective);
 
     return {
       id: user.id,

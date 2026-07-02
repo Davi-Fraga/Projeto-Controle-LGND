@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { AccessPolicyService } from './access-policy.service';
 
 describe('AccessPolicyService', () => {
@@ -6,12 +7,11 @@ describe('AccessPolicyService', () => {
 
   beforeEach(() => {
     prisma = {
-      church: {
-        findMany: jest.fn(),
-      },
-      team: {
-        findMany: jest.fn(),
-      },
+      church: { findMany: jest.fn() },
+      team: { findMany: jest.fn() },
+      user: { findFirst: jest.fn() },
+      userScope: { findMany: jest.fn().mockResolvedValue([]) },
+      legendary: { findMany: jest.fn().mockResolvedValue([]) },
     };
     service = new AccessPolicyService(prisma);
   });
@@ -29,9 +29,13 @@ describe('AccessPolicyService', () => {
       churchIds: [],
       teamIds: [],
       legendaryIds: [],
+      cityKeys: [],
+      legendaryCities: [],
+      topIds: [],
     });
     expect(prisma.church.findMany).not.toHaveBeenCalled();
     expect(prisma.team.findMany).not.toHaveBeenCalled();
+    expect(prisma.userScope.findMany).not.toHaveBeenCalled();
   });
 
   it('resolves spiritual leader churches from the linked user', async () => {
@@ -113,6 +117,9 @@ describe('AccessPolicyService', () => {
       churchIds: ['church-1'],
       teamIds: ['team-1'],
       legendaryIds: [],
+      cityKeys: [],
+      legendaryCities: [],
+      topIds: [],
     });
 
     expect(where).toEqual({
@@ -128,6 +135,104 @@ describe('AccessPolicyService', () => {
           },
         },
       ],
+    });
+  });
+
+  describe('city scope', () => {
+    it('resolves multiple city scopes into concrete legendary cities', async () => {
+      prisma.church.findMany.mockResolvedValueOnce([]);
+      prisma.userScope.findMany.mockResolvedValueOnce([
+        { type: 'CITY', value: 'piracanjuba' },
+        { type: 'CITY', value: 'morrinhos' },
+      ]);
+      // Distinct cities in DB include a third one that must NOT leak.
+      prisma.legendary.findMany.mockResolvedValueOnce([
+        { city: 'Piracanjuba' },
+        { city: 'Morrinhos' },
+        { city: 'Goiânia' },
+      ]);
+
+      const scope = await service.resolveScope({
+        sub: 'gestor-cidade',
+        email: 'gestor@example.com',
+        roles: ['MEMBER'],
+        permissions: [],
+      });
+
+      expect(scope.cityKeys).toEqual(['piracanjuba', 'morrinhos']);
+      expect(scope.legendaryCities).toEqual(['Piracanjuba', 'Morrinhos']);
+      expect(service.buildLegendaryWhere(scope)).toEqual({
+        OR: [{ city: { in: ['Piracanjuba', 'Morrinhos'] } }],
+      });
+    });
+
+    it('allows a city in scope and denies one out of scope (IDOR)', () => {
+      const scope = {
+        isAdmin: false,
+        churchIds: [],
+        teamIds: [],
+        legendaryIds: [],
+        cityKeys: ['piracanjuba'],
+        legendaryCities: ['Piracanjuba'],
+        topIds: [],
+      };
+
+      expect(service.isCityRestricted(scope)).toBe(true);
+      expect(() => service.assertCityAllowed(scope, 'piracanjuba')).not.toThrow();
+      expect(() => service.assertCityAllowed(scope, 'goiania')).toThrow(ForbiddenException);
+    });
+
+    it('resolves multiple TOP scopes and builds a scoped TOP filter', async () => {
+      prisma.church.findMany.mockResolvedValueOnce([]);
+      prisma.userScope.findMany.mockResolvedValueOnce([
+        { type: 'TOP', value: 'top-1' },
+        { type: 'TOP', value: 'top-2' },
+      ]);
+
+      const scope = await service.resolveScope({
+        sub: 'rep-top',
+        email: 'rep@example.com',
+        roles: ['MEMBER'],
+        permissions: [],
+      });
+
+      expect(scope.topIds).toEqual(['top-1', 'top-2']);
+      expect(service.buildTopWhere(scope)).toEqual({ id: { in: ['top-1', 'top-2'] } });
+      expect(service.isTopRestricted(scope)).toBe(true);
+      expect(() => service.assertTopAllowed(scope, 'top-1')).not.toThrow();
+      expect(() => service.assertTopAllowed(scope, 'top-9')).toThrow(ForbiddenException);
+    });
+
+    it('denies a team out of scope (IDOR) and allows one in scope', async () => {
+      prisma.church.findMany.mockResolvedValueOnce([]);
+      prisma.userScope.findMany.mockResolvedValueOnce([{ type: 'TEAM', value: 'team-seg' }]);
+
+      const scope = await service.resolveScope({
+        sub: 'coord-seg',
+        email: 'coord@example.com',
+        roles: ['MEMBER'],
+        permissions: [],
+      });
+
+      expect(scope.teamIds).toEqual(['team-seg']);
+      expect(service.isTeamRestricted(scope)).toBe(true);
+      expect(() => service.assertTeamAllowed(scope, 'team-seg')).not.toThrow();
+      expect(() => service.assertTeamAllowed(scope, 'team-x')).toThrow(ForbiddenException);
+    });
+
+    it('does not restrict cities for an admin', () => {
+      const scope = {
+        isAdmin: true,
+        churchIds: [],
+        teamIds: [],
+        legendaryIds: [],
+        cityKeys: [],
+        legendaryCities: [],
+        topIds: [],
+      };
+
+      expect(service.isCityRestricted(scope)).toBe(false);
+      expect(() => service.assertCityAllowed(scope, 'qualquer')).not.toThrow();
     });
   });
 });

@@ -2,6 +2,7 @@ import { Reflector } from '@nestjs/core';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { EffectivePermissionsService } from '../../common/access/effective-permissions.service';
 import { OrgChartQueryDto } from './dto/org-chart.dto';
 
 describe('org-chart endpoint guards', () => {
@@ -9,20 +10,24 @@ describe('org-chart endpoint guards', () => {
     return {
       getHandler: jest.fn(),
       getClass: jest.fn(),
-      switchToHttp: () => ({ getRequest: () => ({ user: { permissions } }) }),
+      switchToHttp: () => ({ getRequest: () => ({ user: { sub: 'u1', permissions } }) }),
     } as any;
   }
 
-  it('blocks a user without tops.read (403)', () => {
-    const reflector = { getAllAndOverride: jest.fn().mockReturnValue(['tops.read']) } as unknown as Reflector;
-    const guard = new PermissionsGuard(reflector);
-    expect(guard.canActivate(contextWith(['tops.create']))).toBe(false);
+  function guardFor(required: string[], effectivePermissions: string[]) {
+    const reflector = { getAllAndOverride: jest.fn().mockReturnValue(required) } as unknown as Reflector;
+    const effective = { resolveKeys: jest.fn().mockResolvedValue(effectivePermissions) } as unknown as EffectivePermissionsService;
+    return new PermissionsGuard(reflector, effective);
+  }
+
+  it('blocks a user without tops.read (403)', async () => {
+    const guard = guardFor(['tops.read'], ['tops.create']);
+    expect(await guard.canActivate(contextWith(['tops.create']))).toBe(false);
   });
 
-  it('allows a user with tops.read', () => {
-    const reflector = { getAllAndOverride: jest.fn().mockReturnValue(['tops.read']) } as unknown as Reflector;
-    const guard = new PermissionsGuard(reflector);
-    expect(guard.canActivate(contextWith(['tops.read']))).toBe(true);
+  it('allows a user with tops.read', async () => {
+    const guard = guardFor(['tops.read'], ['tops.read']);
+    expect(await guard.canActivate(contextWith(['tops.read']))).toBe(true);
   });
 
   it('rejects an invalid view (400)', async () => {

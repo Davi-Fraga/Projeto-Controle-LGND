@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { TopEventStatus } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { hasPermission } from '@/lib/permissions';
 import { useDebounce } from '@/hooks/use-debounce';
 import { deactivateTop, getTops } from '@/features/tops/api';
 import type { TopEvent } from '@/features/tops/types';
@@ -13,7 +14,7 @@ import { ActionMenu } from '@/components/ui/ActionMenu';
 import { Search, MapPin, Eye, Edit2, ShieldAlert, Calendar } from 'lucide-react';
 
 export default function TopsPage() {
-  const { loading: authLoading } = useRequireAuth();
+  const { user, loading: authLoading } = useRequireAuth();
   const [tops, setTops] = useState<TopEvent[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -91,9 +92,11 @@ export default function TopsPage() {
           <h1 className="text-2xl font-black tracking-wide text-white uppercase">TOPs</h1>
           <p className="text-sm text-zinc-400">Eventos de acampamento principal do Legendários.</p>
         </div>
-        <Link href="/dashboard/tops/novo" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
-          Novo TOP
-        </Link>
+        {hasPermission(user, 'tops.create') && (
+          <Link href="/dashboard/tops/novo" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
+            Novo TOP
+          </Link>
+        )}
       </div>
 
       {/* Filters Panel */}

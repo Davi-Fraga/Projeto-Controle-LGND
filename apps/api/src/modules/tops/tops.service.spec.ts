@@ -23,7 +23,8 @@ describe('TopsService', () => {
       topServant: { findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn(), create: jest.fn(), update: jest.fn() },
     };
     audit = { create: jest.fn() };
-    service = new TopsService(prisma, audit);
+    const accessPolicy = { resolveScope: jest.fn().mockResolvedValue({ isAdmin: true }), buildTopWhere: jest.fn().mockReturnValue({}) } as any;
+    service = new TopsService(prisma, audit, accessPolicy);
   });
 
   it('creates TOP', async () => {
@@ -101,7 +102,7 @@ describe('TopsService org-chart', () => {
       topFamily: { findMany: jest.fn().mockResolvedValue([]) },
       topParticipant: { findMany: jest.fn().mockResolvedValue([]) },
     };
-    service = new TopsService(prisma, { create: jest.fn() } as any);
+    service = new TopsService(prisma, { create: jest.fn() } as any, { resolveScope: jest.fn().mockResolvedValue({ isAdmin: true }), buildTopWhere: jest.fn().mockReturnValue({}) } as any);
   });
 
   it('builds teams view with team, servants, "Sem equipe" group and aggregated count', async () => {

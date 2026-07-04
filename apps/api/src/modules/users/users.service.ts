@@ -1,9 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import bcrypt from 'bcryptjs';
 import { getPagination, PaginationDto, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { UserWithAccess } from '../../common/types/safe-user';
+import { roleContributesBase } from '../../common/access/access.constants';
 import { PrismaService } from '../../database/prisma.service';
-import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 const includeUserAccess = {
@@ -18,6 +17,11 @@ const includeUserAccess = {
           },
         },
       },
+    },
+  },
+  permissionOverrides: {
+    include: {
+      permission: true,
     },
   },
 };
@@ -74,33 +78,8 @@ export class UsersService {
     return this.toSafeUser(user);
   }
 
-  async create(dto: CreateUserDto) {
-    const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
-    });
-
-    if (existing) {
-      throw new BadRequestException('Email already in use.');
-    }
-
-    const roles = await this.resolveRoles(dto.roles ?? ['COORDINATION_USER']);
-    const passwordHash = await bcrypt.hash(dto.password, 12);
-
-    const user = await this.prisma.user.create({
-      data: {
-        name: dto.name,
-        email: dto.email.toLowerCase(),
-        passwordHash,
-        legendaryId: dto.legendaryId,
-        roles: {
-          create: roles.map((role: { id: string }) => ({ roleId: role.id })),
-        },
-      },
-      include: includeUserAccess,
-    });
-
-    return this.toSafeUser(user);
-  }
+  // Criação direta de conta foi removida: contas nascem só por CONVITE (a pessoa
+  // define a própria senha). Ver módulo `invites`.
 
   async update(id: string, dto: UpdateUserDto) {
     await this.ensureUserExists(id);
@@ -115,7 +94,6 @@ export class UsersService {
     }
 
     const roles = dto.roles ? await this.resolveRoles(dto.roles) : undefined;
-    const passwordHash = dto.password ? await bcrypt.hash(dto.password, 12) : undefined;
 
     const user = await this.prisma.$transaction(async (tx: any) => {
       if (roles) {
@@ -127,7 +105,6 @@ export class UsersService {
         data: {
           name: dto.name,
           email: dto.email?.toLowerCase(),
-          passwordHash,
           legendaryId: dto.legendaryId,
           roles: roles
             ? {
@@ -180,13 +157,17 @@ export class UsersService {
 
   private toSafeUser(user: UserWithAccess) {
     const roles = user.roles.map((item) => item.role.name);
-    const permissions = Array.from(
-      new Set(
-        user.roles.flatMap((item) =>
-          item.role.permissions.map((rolePermission) => rolePermission.permission.key),
-        ),
-      ),
-    );
+    // Base do papel só conta para o Administrador; funções não concedem acesso.
+    const effective = new Set<string>();
+    for (const item of user.roles) {
+      if (!roleContributesBase(item.role.name)) continue;
+      for (const rolePermission of item.role.permissions) effective.add(rolePermission.permission.key);
+    }
+    for (const override of user.permissionOverrides ?? []) {
+      if (override.effect === 'GRANT') effective.add(override.permission.key);
+      else effective.delete(override.permission.key);
+    }
+    const permissions = Array.from(effective);
 
     return {
       id: user.id,

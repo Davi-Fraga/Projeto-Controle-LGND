@@ -1,9 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TopScopeGuard } from './guards/top-scope.guard';
 import { TopsService } from './tops.service';
 import { CreateTopDto, TopQueryDto } from './dto/top-query.dto';
 import { UpdateTopDto } from './dto/update-top.dto';
@@ -14,10 +15,10 @@ import { CreateTopFamilyDto, CreateTopFamilyMemberDto, TransferTopFamilyMemberDt
 import { OrgChartQueryDto } from './dto/org-chart.dto';
 
 @Controller('tops')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, TopScopeGuard)
 export class TopsController {
   constructor(private readonly tops: TopsService) {}
-  @Get() @Permissions('tops.read') findAll(@Query() q: TopQueryDto) { return this.tops.findAll(q); }
+  @Get() @Permissions('tops.read') findAll(@Query() q: TopQueryDto, @CurrentUser() user: AuthenticatedUser) { return this.tops.findAll(q, user); }
   @Get('options') @Permissions('tops.read') async options(@Query() q: OptionsQueryDto) { return { data: await this.tops.options(q) }; }
   @Get(':id') @Permissions('tops.read') async findOne(@Param('id') id: string) { return { data: await this.tops.findOne(id) }; }
   @Get(':id/org-chart') @Permissions('tops.read') async orgChart(@Param('id') id: string, @Query() q: OrgChartQueryDto) { return { data: await this.tops.getOrgChart(id, q.view) }; }

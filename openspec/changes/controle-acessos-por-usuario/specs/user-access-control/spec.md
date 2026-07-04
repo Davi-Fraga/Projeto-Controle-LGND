@@ -1,67 +1,131 @@
 ## ADDED Requirements
 
-### Requirement: Permissions efetivas por usuário (papel + exceções)
-O sistema SHALL calcular as permissions efetivas de um usuário como `permissions do papel base + concessões individuais − revogações individuais`. As concessões e revogações individuais SHALL ser persistidas por usuário, sobre o papel base, sem alterar o papel.
+### Requirement: Função na Manada não concede acesso (papéis desacoplados)
+O papel do usuário (`SystemRole`) SHALL representar a **Função na Manada** — um rótulo organizacional — e NÃO SHALL, por si só, conceder acesso a telas/permissions. A ÚNICA exceção é o papel **Administrador** (`COORDINATION_ADMIN`), que SHALL manter acesso total automático (todas as permissions) e escopo irrestrito. Todo o acesso dos demais usuários SHALL vir exclusivamente da tela Controle de Acessos (concessões por tela).
 
-#### Scenario: Concessão individual
-- **WHEN** o admin concede individualmente uma permission que o papel base não tem
-- **THEN** a permission passa a constar nas permissions efetivas do usuário
+#### Scenario: Atribuir função não dá acesso
+- **WHEN** o admin define a Função na Manada de um usuário (ex.: Representante de TOP) sem conceder telas
+- **THEN** o usuário NÃO ganha acesso a nenhuma tela por causa da função
 
-#### Scenario: Revogação individual
-- **WHEN** o admin revoga individualmente uma permission herdada do papel base
-- **THEN** a permission deixa de constar nas permissions efetivas do usuário
+#### Scenario: Administrador é atalho total
+- **WHEN** um usuário tem a função Administrador
+- **THEN** tem acesso total automático, sem precisar configurar telas
+
+### Requirement: Permissions efetivas por usuário
+O sistema SHALL calcular as permissions efetivas como `(base do papel − revogações) ∪ concessões por tela`, onde a **base do papel é o conjunto de permissions do papel APENAS quando o papel é `COORDINATION_ADMIN`**; para as demais funções a base é vazia. Assim, para não-admin, efetivas = `concessões por tela − revogações`. As permissions são um **detalhe interno**: o administrador opera por tela, não por permission crua.
+
+#### Scenario: Concessão por tela (não-admin)
+- **WHEN** o admin concede uma tela a um usuário não-admin
+- **THEN** as permissions daquela tela passam a constar nas efetivas do usuário
+
+#### Scenario: Revogação
+- **WHEN** o admin remove o acesso de uma tela
+- **THEN** as permissions daquela tela deixam de constar nas efetivas do usuário
 
 ### Requirement: Autorização reavaliada por requisição
 O `PermissionsGuard` SHALL verificar as permissions efetivas atuais do usuário **a cada requisição**, não apenas no login. O sistema NÃO SHALL confiar em permissions congeladas no access token como fonte da verdade; alterações de acesso SHALL refletir sem exigir novo login.
 
 #### Scenario: Revogação reflete em sessão ativa
-- **WHEN** o admin revoga uma permission de um usuário que está logado
+- **WHEN** o admin remove o acesso de uma tela de um usuário que está logado
 - **THEN** a próxima requisição desse usuário ao recurso correspondente é negada com 403, sem ele precisar deslogar
 
 #### Scenario: Concessão reflete em sessão ativa
-- **WHEN** o admin concede uma permission a um usuário logado
+- **WHEN** o admin concede o acesso de uma tela a um usuário logado
 - **THEN** o usuário passa a acessar o recurso correspondente sem relogar
 
-### Requirement: Escopo interno por usuário (1-N)
-O sistema SHALL permitir associar a um usuário um ou mais **escopos** de dados (por cidade, equipe ou igreja), numa relação **1-N**. O `AccessPolicyService` SHALL montar o filtro de dados considerando o **conjunto** de escopos do usuário, aplicado no backend em consultas e mutações relevantes. Uma combinação inválida de permission e escopo NÃO SHALL ser aceita.
+### Requirement: Controle de acesso por tela (não por permission individual)
+A tela administrativa SHALL apresentar o acesso em termos de **TELAS/MÓDULOS** (lista curta, ~10-12), **nunca** as permissions individuais. Cada tela SHALL ter um controle de acesso simples — no mínimo **ligado/desligado**, opcionalmente um nível **Sem acesso / Ver / Ver e editar**. Ligar/elevar uma tela SHALL ativar, no backend, o **conjunto de permissions mapeado** àquela tela. As permissions cruas SHALL permanecer **escondidas** do administrador.
 
-#### Scenario: Usuário com múltiplos escopos de cidade
+#### Scenario: Lista de telas, não de permissions
+- **WHEN** o admin abre o Controle de Acessos de um usuário
+- **THEN** vê ~10-12 telas com seu acesso, e não ~80 permissions técnicas
+
+#### Scenario: Conceder acesso a uma tela
+- **WHEN** o admin liga a tela "Equipes" (nível Ver) para um usuário
+- **THEN** o usuário passa a ter as permissions efetivas daquela tela, sem o admin ver/escolher permissions cruas
+
+#### Scenario: Nível por tela
+- **WHEN** o admin define a tela "Legendários" como "Ver e editar"
+- **THEN** o usuário recebe as permissions de leitura **e** de mutação da tela; em "Ver", apenas as de leitura
+
+### Requirement: Mapeamento Tela→Permissions no backend
+O backend SHALL definir um **mapa canônico** de cada tela/módulo para seu conjunto de permissions (separando leitura de mutação para suportar níveis), usado para traduzir a escolha por tela do admin nas permissions efetivas que o `PermissionsGuard` avalia. Esse mapa SHALL ser a fonte da verdade; a UI NÃO SHALL enviar chaves de permission cruas — apenas tela + nível.
+
+### Requirement: Criar e excluir são ações administrativas
+O nível **Ver** e **Ver e editar** de uma tela SHALL cobrir apenas ler e editar itens **dentro do escopo**. Criar e excluir itens de topo (novo TOP, nova Equipe, novo Legendário, nova Igreja, etc.) SHALL ser ação **administrativa** — as permissions `*.create`, `*.delete`, `*.restore`/`*.deactivate` de entidade de topo NÃO SHALL constar em nenhum conjunto concedível por tela; só o Administrador as possui. O backend (guard) SHALL recusar a criação/exclusão para não-admin; esconder o botão no front é só usabilidade.
+
+#### Scenario: "Ver e editar" não permite criar
+- **WHEN** um usuário não-admin com "Ver e editar" no TOP/Equipe do seu escopo tenta criar um novo TOP/Equipe
+- **THEN** o backend recusa (403) e o botão de criar não aparece para ele
+
+#### Scenario: Editar dentro do escopo continua permitido
+- **WHEN** o mesmo usuário edita o TOP/Equipe que está no seu escopo
+- **THEN** a edição é permitida
+
+### Requirement: Escopo aplicado por dimensão da tela
+O escopo SHALL ser aplicado conforme a **dimensão de cada tela**: telas de dados geográficos (**Legendários, Relatórios, Mapa**) filtram por **cidade** e **igreja**; a tela **Equipes** e o **Organograma** por **equipe**; **TOPs** por **TOP**. Um escopo de um tipo NÃO SHALL vazar para telas de outra dimensão (ex.: escopo de equipe não amplia a listagem de Legendários com membros de outras cidades). Múltiplos escopos do mesmo tipo continuam em união (1-N).
+
+#### Scenario: Escopo de equipe não vaza em Legendários
+- **WHEN** um usuário tem cidade Caldas Novas e equipe ADM, e abre Legendários
+- **THEN** vê apenas legendários de Caldas Novas (o escopo de equipe vale na tela Equipes/Organograma, não em Legendários)
+
+#### Scenario: Relatórios agregados respeitam o escopo
+- **WHEN** um usuário restrito abre relatórios por profissão/perícia
+- **THEN** as contagens consideram apenas os legendários do seu escopo
+
+#### Scenario: Tradução tela→permissions
+- **WHEN** a UI envia "tela=Equipes, nível=Ver e editar"
+- **THEN** o backend resolve o conjunto de permissions daquela tela e nível e aplica como concessões efetivas
+
+#### Scenario: UI não envia permissions cruas
+- **WHEN** uma requisição da tela administrativa tenta enviar uma permission key arbitrária fora do contrato tela+nível
+- **THEN** o backend a ignora/recusa; o contrato é por tela e nível
+
+### Requirement: Escopo por tela por usuário (1-N, com TOP)
+O sistema SHALL permitir restringir, **por tela**, a qual fatia de dados o usuário tem acesso, associando ao usuário um ou mais **escopos** (por **cidade**, **equipe**, **igreja** ou **TOP**), numa relação **1-N**. O `AccessPolicyService` SHALL montar o filtro de dados considerando o **conjunto** de escopos do usuário, aplicado no backend em **consultas e mutações** relevantes. O escopo é a **barreira real**: a API SHALL recusar dados fora do escopo, mesmo por URL direta. Uma combinação inválida de tela e escopo NÃO SHALL ser aceita.
+
+#### Scenario: Coordenador de uma equipe
+- **WHEN** o Coordenador da equipe "Segurança" tem a tela Equipes e Organograma com escopo equipe=Segurança
+- **THEN** vê somente a equipe Segurança e o organograma da Segurança, e não as demais equipes
+
+#### Scenario: Usuário com múltiplos escopos
 - **WHEN** um usuário tem escopo nas cidades Piracanjuba e Morrinhos
-- **THEN** ele vê os dados dessas duas cidades e não vê os de uma terceira cidade
-
-#### Scenario: Escopo único
-- **WHEN** um usuário tem exatamente um escopo
-- **THEN** o filtro funciona como um conjunto de um elemento, restringindo a esse escopo
+- **THEN** vê os dados dessas duas cidades e não vê os de uma terceira
 
 #### Scenario: Escopo aplicado em mutação
 - **WHEN** um usuário restrito tenta alterar um dado fora do seu conjunto de escopos
 - **THEN** a operação é negada pelo backend
 
-### Requirement: Tela administrativa de Controle de Acessos
-O sistema SHALL prover uma tela administrativa que, por usuário, liste as telas/ações disponíveis, permita ligar/desligar cada permission e **diferencie visualmente** permission herdada do papel, concedida individualmente e revogada individualmente, além de configurar e consultar os escopos internos (incluindo múltiplos).
-
-#### Scenario: Diferenciação de origem
-- **WHEN** o admin abre o Controle de Acessos de um usuário
-- **THEN** cada permission aparece marcada como herdada, concedida ou revogada
-
-#### Scenario: Gestão de múltiplos escopos
-- **WHEN** o admin adiciona/remove escopos de um usuário
-- **THEN** a associação 1-N é atualizada e refletida nas permissions/dados efetivos
-
-### Requirement: Gestor de Cidade como caso de uso
-O **Gestor de Cidade** SHALL ser configurado como papel base + permissions concedidas (incl. acesso ao Organograma) + escopo por cidade aplicado no `AccessPolicyService` sobre o `city` normalizado de `Legendary`. NÃO SHALL existir um papel rígido separado só para Gestor de Cidade. A API SHALL recusar acesso a dados de cidade fora do escopo, mesmo por URL direta.
-
-#### Scenario: Gestor de Piracanjuba no Organograma
-- **WHEN** o Gestor da Cidade de Piracanjuba abre o Organograma
-- **THEN** vê somente o organograma de Piracanjuba
-
 #### Scenario: IDOR por URL direta
-- **WHEN** um usuário restrito por cidade chama diretamente a API pedindo dados de outra cidade
-- **THEN** a requisição é negada (sem vazar dados fora do escopo)
+- **WHEN** um usuário restrito chama diretamente a API pedindo um recurso fora do seu escopo (outra equipe/cidade/igreja/TOP)
+- **THEN** a requisição é negada, sem vazar dados fora do escopo
+
+#### Scenario: Valor de escopo precisa existir
+- **WHEN** o admin tenta salvar um escopo (cidade/equipe/igreja/TOP) cujo valor NÃO corresponde a uma entidade real do banco
+- **THEN** o backend recusa (não confia no front); só valores existentes são aceitos
+
+### Requirement: Tela administrativa limpa com seletor de escopo por busca
+A tela administrativa SHALL ser limpa: uma lista de **telas** com seu acesso e, ao lado (quando aplicável), um **seletor de escopo** (quais equipes/igrejas/cidades/TOPs). NÃO SHALL haver dezenas de toggles de permission. TODOS os seletores de escopo (cidade, equipe, igreja, TOP) SHALL se comportar de forma **consistente**: um dropdown com **busca/autocomplete** que lista as **entidades reais do backend** (não lista hardcoded, **não texto livre**), filtrando conforme se digita de forma **tolerante a acento e a maiúsc/minúsc**, com **subtítulo** desambiguador quando útil (ex.: igreja → cidade). O usuário SHALL conseguir adicionar ao escopo **apenas** itens existentes na lista; digitar algo fora da lista NÃO SHALL adicionar nada. Telas sem dados segmentáveis (ex.: Painel) NÃO SHALL exibir seletor de escopo. Cada seletor SHALL suportar **múltiplos** itens (chips removíveis, 1-N).
+
+#### Scenario: Seleção de escopo por busca (todos os tipos)
+- **WHEN** o admin restringe uma tela por equipe/cidade/igreja/TOP
+- **THEN** usa um campo de busca com autocomplete que lista as entidades reais do backend e filtra conforme digita
+
+#### Scenario: Busca tolerante a acento
+- **WHEN** o admin digita "cald" no seletor de cidade
+- **THEN** a opção "Caldas Novas" aparece (acento e caixa ignorados)
+
+#### Scenario: Sem texto livre
+- **WHEN** o admin digita um valor que não corresponde a nenhuma opção da lista
+- **THEN** nada é adicionado ao escopo (não existe input de texto livre que aceite valor arbitrário)
+
+#### Scenario: Estado claro por tela
+- **WHEN** o admin abre o Controle de Acessos
+- **THEN** cada tela mostra seu nível de acesso atual e os escopos configurados (chips removíveis)
 
 ### Requirement: Menus do frontend refletem permissions efetivas
 O frontend SHALL adaptar navegação e menus às permissions efetivas do usuário, **sem** que isso seja a barreira de segurança — a autorização real permanece no backend.
 
 #### Scenario: Menu oculto não é segurança
-- **WHEN** um usuário sem uma permission tenta acessar a rota correspondente diretamente
+- **WHEN** um usuário sem acesso a uma tela tenta acessar a rota correspondente diretamente
 - **THEN** o backend nega a requisição, independentemente do menu estar oculto no front

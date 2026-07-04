@@ -1,34 +1,35 @@
-## 1. Inspeção e decisões
+## Decisões fechadas (1.2)
+- Quem convida: **só Administrador** (`users.create`).
+- Validade: **7 dias, uso único**.
+- Token: **genérico tipado** (`AuthToken.type` = INVITE | PASSWORD_RESET) — a 08 reaproveita.
+- No aceite: a pessoa define **nome + senha**; email + função + escopo + Legendário vêm do convite.
+- O convite carrega **função + Legendário + escopos**; o **acesso a telas** é configurado depois em Controle de Acessos (formulário de convite enxuto). Escopos suportados via API/metadata.
 
-- [ ] 1.1 Inspecionar auth/users atuais e o modelo de papel/escopo de `user-access-control` (02)
-- [ ] 1.2 Fechar decisões: validade do convite, quem pode convidar, token único genérico vs. tipado
-- [ ] 1.3 Modelar convite/token; apresentar e aguardar aprovação
+## 1. Inspeção e decisões
+- [x] 1.1 Inspecionar auth/users e o modelo de papel/escopo de `user-access-control` (02)
+- [x] 1.2 Fechar decisões (acima)
+- [x] 1.3 Modelar convite/token; aprovado
 
 ## 2. Modelo de dados
-
-- [ ] 2.1 Migration: modelo de convite (hash do token, validade, status, papel/escopo, `legendaryId?`, auditoria)
+- [x] 2.1 Migration `20260704120000_auth_token_invite`: `AuthToken` (hash, validade, status, roles, `legendaryId?`, metadata/escopos, auditoria)
 
 ## 3. Backend — convite
-
-- [ ] 3.1 Endpoint de gerar convite (admin/líder autorizado) → link único com token
-- [ ] 3.2 Endpoint público de aceitar convite: valida token (hash+validade+status), cria conta com papel/escopo, vincula Legendary, define senha, invalida token (transação)
-- [ ] 3.3 Garantir que nenhuma rota de cadastro funcione sem token válido
-- [ ] 3.4 Anti-enumeração nas respostas/erros + auditoria (sem logar senha/token)
+- [x] 3.1 `POST /auth/invites` (admin, `users.create`) → link único (token cru só no link; hash no banco)
+- [x] 3.2 `POST /auth/invites/:token/accept` (público): valida token, cria conta com função/escopo, vincula Legendary, define senha, invalida token — em transação
+- [x] 3.3 Sem token válido não cria conta (findValidInvite recusa; `POST /users` segue admin-only)
+- [x] 3.4 Anti-enumeração (erro genérico "Convite inválido ou expirado") + auditoria de geração/uso (sem senha/token)
 
 ## 4. Frontend
-
-- [ ] 4.1 Tela "Convidar usuário" (gera link; define papel/escopo/Legendary opcionais)
-- [ ] 4.2 Página pública de aceitar convite (valida token, pessoa define a senha)
+- [x] 4.1 Tela "Convidar usuário" (`/dashboard/usuarios/convidar`): email + função + Legendário → gera e copia o link
+- [x] 4.2 Página pública `/convite/[token]`: valida token, pessoa define nome + senha
 
 ## 5. Testes (segurança)
-
-- [ ] 5.1 Convite válido cria conta com papel/escopo (e vínculo Legendary)
-- [ ] 5.2 Convite expirado/usado recusado
-- [ ] 5.3 Cadastro sem convite recusado
-- [ ] 5.4 Auditoria de geração/uso registrada; nada de senha/token em log
+- [x] 5.1 Convite válido cria conta com função/escopo (e vínculo Legendary) — unit + smoke
+- [x] 5.2 Convite expirado/usado/outro tipo recusado
+- [x] 5.3 Cadastro sem convite recusado (token inválido → 404, sem transação)
+- [x] 5.4 Auditoria de geração/uso; hash no banco, nunca o token cru
 
 ## 6. Verificação
-
-- [ ] 6.1 Testes focados (convites/auth)
-- [ ] 6.2 `pnpm -r lint`, `pnpm -r test`, `pnpm -r build`; regenerar Prisma client (dev parado) após a migration
-- [ ] 6.3 Conferência manual: gerar link, aceitar, conta nasce com papel/escopo e ligada ao Legendary; token vira inválido
+- [x] 6.1 Testes focados (9 de invites; 158 total)
+- [x] 6.2 `pnpm -r lint` ✓, API tests ✓ (158), Prisma client regenerado (dev parado). `web build` standalone segue com EPERM de symlink (ambiente).
+- [x] 6.3 Smoke live: gerar link → validar → aceitar → login (funções ok, 0 perms = acesso via Controle de Acessos) → token vira inválido (uso único).

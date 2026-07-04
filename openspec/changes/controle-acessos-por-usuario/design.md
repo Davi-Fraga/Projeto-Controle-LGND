@@ -43,6 +43,105 @@ Migration nova adicionando os modelos de override e de escopo (sem tocar nas tab
 ## Open Questions
 
 - Cache das permissions efetivas: por requisição, TTL curto, ou consulta direta sempre? (medir custo)
-- Onde os escopos válidos por tela são declarados (mapa tela→tipos de escopo aplicáveis)?
 - O access token deve parar de carregar permissions, ou mantê-las apenas como dica não-autoritativa com TTL curto?
-- Granularidade do escopo de equipe/igreja vs. cidade — todos 1-N do mesmo jeito?
+
+## Reformulação: controle por TELA + ESCOPO (substitui a UI por permission)
+
+> Motivação: a 1ª versão expôs ~80 permissions técnicas com toggle individual — nível de máquina,
+> não usável pelo admin. As permissions continuam existindo e protegendo o backend, mas ficam
+> **escondidas**, agrupadas sob cada tela. O admin pensa em "a quais TELAS" e "de qual PARTE".
+
+### Eixo 1 — Acesso por tela (mapa Tela→Permissions no backend)
+Catálogo canônico no backend (`common/access/screen-catalog.ts`): cada tela tem `id`, `label`,
+`scopeTypes[]` e dois conjuntos de permissions — `view` (leitura) e `edit` (mutação). Nível por tela:
+**NONE / VIEW / EDIT**. VIEW concede `view`; EDIT concede `view ∪ edit`.
+
+| Tela | view (leitura) | edit (mutação) | escopo |
+|---|---|---|---|
+| Painel | dashboard.read | — | — |
+| Legendários | legendarios.read, legendarios.history.read, professions.read, expertises.read | legendarios.create/update/delete/restore, legendarios.history.create | CITY/TEAM/CHURCH |
+| Equipes | teams.read, teams.members.read | teams.create/update/delete/restore, teams.members.add/update/remove | TEAM |
+| Igrejas | churches.read | churches.create/update/delete | CHURCH |
+| TOPs | tops.read, tops.participants/servants/teams/families(.members)/preregistrations.read | tops.* (create/update/delete/restore + add/update/remove/approve/reject/transfer) | TOP |
+| Organograma | teams.read, legendarios.read, tops.read | — | CITY/TEAM |
+| Famílias | families.read | families.create/update | TOP |
+| Ações Sociais | social-actions.read, social-actions.participants.read | social-actions.* (create/update/delete/restore + participants.add/update/remove) | CITY |
+| Comunicação | communications.read, communications.recipients.read | communications.create/update/send/delete, communications.recipients.update | — |
+| Relatórios | reports.read | reports.export, reports.contacts.export | CITY |
+| Mapa | map.read | — | CITY |
+| Usuários | users.read, audit.read | users.create/update/deactivate | — |
+
+O acesso efetivo por tela é **derivado**: a tela está em EDIT se as efetivas contêm `view ∪ edit`,
+em VIEW se contêm `view`, senão NONE. Definir o nível aplica overrides (GRANT/REVOKE) sobre o
+**conjunto** da tela — nunca permission a permission na UI. (Caminho B da nota 02 preservado.)
+
+### Eixo 2 — Escopo por tela (a barreira real)
+Reusa `UserScope` (1-N) e adiciona o tipo **TOP** ao enum `UserScopeType` (migration nova; nunca
+alterar aplicada). `AccessPolicyService` ganha `buildTopWhere`/aplicação de escopo de TOP além de
+cidade/equipe/igreja, aplicado em **consultas e mutações** do módulo correspondente. IDOR coberto
+por teste (URL direta a equipe/cidade/igreja/TOP fora do escopo → recusado).
+
+Mapa tela→tipos de escopo aplicáveis vem do próprio catálogo (`scopeTypes`). Validação
+tela×escopo: só aceita escopo cujo tipo é aplicável à tela e cuja permission de leitura o usuário
+tem (generaliza a validação permission×escopo já existente).
+
+### Backend — o que muda
+- `screen-catalog.ts`: novo, fonte da verdade Tela→Permissions + scopeTypes.
+- `AccessControlService`: troca os endpoints de override-cru por **endpoints por tela**
+  (GET estado por tela+nível+escopos; PUT nível de uma tela; POST/DELETE escopo por tela). Continua
+  gravando em `UserPermissionOverride`/`UserScope` por baixo. `setPermissionOverride` cru deixa de
+  ser exposto na UI (pode virar interno).
+- `AccessPolicyService`: + escopo TOP; helpers de assert por equipe/igreja/TOP (espelhando o de cidade).
+- Migration: `UserScopeType` += `TOP`.
+- `PermissionsGuard`/efetivas: inalterados (continuam a barreira por permission).
+
+### UI — o que muda
+- A lista de ~80 toggles some. Entra uma lista de **telas** (do catálogo) com seletor de nível
+  (NONE/VIEW/EDIT) e, para telas com `scopeTypes`, um seletor de **escopo com busca/autocomplete**
+  (reusa o padrão do "legendário vinculado"). Mostra o nível e os escopos atuais por tela.
+
+### Decisões a confirmar (antes de codar)
+1. Nível por tela = **NONE/VIEW/EDIT** (vs. só ligado/desligado). Recomendo NONE/VIEW/EDIT.
+2. Incluir **escopo TOP** agora (enum + aplicação no módulo tops) — maior superfície — ou fase 2.
+3. Catálogo de telas acima (12 telas) — ajustar mapeamentos (ex.: "Famílias" = `families.*` vs `tops.families.*`).
+
+## Open Questions (reformulação)
+
+- "Famílias" como tela própria ou parte de TOPs? (afeta o mapa e o escopo TOP)
+- Telas só-leitura (Painel/Mapa/Organograma) — nível fixo VIEW (sem EDIT)?
+
+## Função na Manada (papéis desacoplados do acesso)
+
+> Decisão do cliente: os "Perfis de Acesso" do formulário de usuário deixam de conceder acesso —
+> viram a **Função na Manada** (rótulo organizacional). Todo o acesso passa a ser definido na tela
+> Controle de Acessos. Confirmado: (1) função = só rótulo; (2) Administrador = atalho total;
+> (3) escopo automático por função permanece.
+
+### Modelo
+- **Papéis (`UserRole`/`SystemRole`) = função organizacional**, NÃO concedem permissions base
+  (exceto admin). Seção do formulário renomeada para "Função na Manada".
+- **Exceção admin**: `COORDINATION_ADMIN` ("Administrador") mantém acesso total automático (todas
+  as permissions) + escopo irrestrito (`isAdmin`). É o único atalho. `COORDINATION_USER` passa a
+  ser uma função comum (sem acesso automático; sem bypass de escopo).
+- **Permissions efetivas** = `(base − revogações) ∪ concessões por tela`, onde **base = permissions
+  do papel APENAS quando o papel é `COORDINATION_ADMIN`**; para as demais funções, base = ∅. Ou seja,
+  para não-admin: efetivas = `concessões por tela (GRANT) − revogações (REVOKE)`.
+- **Escopo por função permanece** (decisão 3): `AccessPolicyService` continua derivando igrejas do
+  Líder Espiritual e equipes do Coordenador, somado aos `UserScope` explícitos. Sem mudança aqui.
+
+### Impacto no código
+- `common/access/access.constants.ts` (novo): `ADMIN_ROLE = 'COORDINATION_ADMIN'` como fonte única.
+- `EffectivePermissionsService.resolveKeys`, `auth.service.toSafeUser`, `users.service.toSafeUser`,
+  `AccessControlService` (roleKeys/computeEffective/setScreenLevel): base do papel só conta para admin.
+- `AccessPolicyService.isAdmin`: passa a ser só `COORDINATION_ADMIN` (remove `COORDINATION_USER`).
+- Front `user-form.tsx`: seção "Perfis de Acesso" → "Função na Manada" + texto que explica que não
+  define acesso (isso é na tela Controle de Acessos). Segue multi-select das funções.
+- **Migração de dados**: para não travar ninguém, converter o acesso atual (derivado de papel) de
+  cada usuário **não-admin** em concessões explícitas (`UserPermissionOverride` GRANT) na virada.
+  (Ambiente com poucos usuários; alternativa = reconfigurar do zero, se o cliente preferir.)
+
+### Riscos
+- **Sensível (auth)**: não-admin sem concessões fica sem acesso → a migração é obrigatória para
+  não regredir. Admin preservado. Testes de revalidação de login/efetivas atualizados.
+- Dados de `RolePermission` de funções não-admin ficam **latentes** (existem no banco mas não contam
+  nas efetivas). Seed mantido; limpeza opcional depois.

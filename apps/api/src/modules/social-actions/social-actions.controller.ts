@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -12,8 +12,8 @@ export class SocialActionsController {
   constructor(private readonly socialActions: SocialActionsService) {}
 
   @Get('volunteers/suggestions') @Permissions('social-actions.read') suggestions(@Query() query: VolunteerSuggestionsQueryDto) { return this.socialActions.suggestions(query); }
-  @Get() @Permissions('social-actions.read') findAll(@Query() query: SocialActionsQueryDto) { return this.socialActions.findAll(query); }
-  @Get(':id') @Permissions('social-actions.read') async findOne(@Param('id') id: string) { return { data: await this.socialActions.findOne(id) }; }
+  @Get() @Permissions('social-actions.read') findAll(@Query() query: SocialActionsQueryDto, @CurrentUser() user: AuthenticatedUser) { return this.socialActions.findAll(query, user); }
+  @Get(':id') @Permissions('social-actions.read') async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) { return { data: await this.socialActions.findOne(id, user) }; }
   @Post() @Permissions('social-actions.create') async create(@Body() dto: CreateSocialActionDto, @CurrentUser() user: { sub: string }) { return { data: await this.socialActions.create(dto, user.sub) }; }
   @Patch(':id') @Permissions('social-actions.update') async update(@Param('id') id: string, @Body() dto: UpdateSocialActionDto, @CurrentUser() user: { sub: string }) { return { data: await this.socialActions.update(id, dto, user.sub) }; }
   @Patch(':id/complete') @Permissions('social-actions.update') async complete(@Param('id') id: string, @Body() dto: CompleteSocialActionDto, @CurrentUser() user: { sub: string }) { return { data: await this.socialActions.complete(id, dto, user.sub) }; }

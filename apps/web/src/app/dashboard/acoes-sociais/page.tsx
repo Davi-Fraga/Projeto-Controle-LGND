@@ -6,6 +6,7 @@ import { SocialActionStatus } from '@central-da-manada/shared';
 import { deleteSocialAction, getSocialActions } from '@/features/social-actions/api';
 import type { SocialAction } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { hasPermission } from '@/lib/permissions';
 import { useDebounce } from '@/hooks/use-debounce';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -13,7 +14,7 @@ import { ActionMenu } from '@/components/ui/ActionMenu';
 import { Search, MapPin, Eye, Edit2, ShieldAlert, Calendar } from 'lucide-react';
 
 export default function SocialActionsPage() {
-  const { loading: authLoading } = useRequireAuth();
+  const { user, loading: authLoading } = useRequireAuth();
   const [items, setItems] = useState<SocialAction[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -75,9 +76,11 @@ export default function SocialActionsPage() {
           <h1 className="text-2xl font-black tracking-wide text-white uppercase">Ações Sociais</h1>
           <p className="text-sm text-zinc-400">Projetos de impacto social liderados pela manada.</p>
         </div>
-        <Link href="/dashboard/acoes-sociais/nova" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
-          Nova Ação Social
-        </Link>
+        {hasPermission(user, 'social-actions.create') && (
+          <Link href="/dashboard/acoes-sociais/nova" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
+            Nova Ação Social
+          </Link>
+        )}
       </div>
 
       {/* Filters Panel */}

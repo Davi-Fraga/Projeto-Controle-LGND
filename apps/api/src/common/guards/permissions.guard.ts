@@ -2,12 +2,16 @@ import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthenticatedUser } from '../decorators/current-user.decorator';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
+import { EffectivePermissionsService } from '../access/effective-permissions.service';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly effectivePermissions: EffectivePermissionsService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredPermissions = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -18,8 +22,19 @@ export class PermissionsGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<{ user?: AuthenticatedUser }>();
-    const userPermissions = request.user?.permissions ?? [];
+    const user = request.user;
 
-    return requiredPermissions.every((permission) => userPermissions.includes(permission));
+    if (!user?.sub) {
+      return false;
+    }
+
+    // Reavaliado por requisição: a fonte da verdade são as permissions efetivas
+    // atuais no banco, não as congeladas no access token. Assim conceder/revogar
+    // reflete na próxima requisição, sem o usuário precisar relogar.
+    const effective = await this.effectivePermissions.resolveKeys(user.sub);
+    // Mantém o request coerente para @CurrentUser e qualquer uso downstream.
+    user.permissions = effective;
+
+    return requiredPermissions.every((permission) => effective.includes(permission));
   }
 }

@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { LegendaryHistoryType, SocialActionParticipantStatus, SocialActionStatus } from '@central-da-manada/shared';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { PrismaService } from '../../database/prisma.service';
+import { AccessPolicyService } from '../../common/access/access-policy.service';
+import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { AuditService } from '../audit/audit.service';
 import { AddSocialActionParticipantDto, CompleteSocialActionDto, CreateSocialActionDto, SocialActionsQueryDto, UpdateSocialActionDto, UpdateSocialActionParticipantDto, VolunteerSuggestionsQueryDto } from './dto/social-actions.dto';
 
@@ -10,12 +12,18 @@ const includeParticipant = { legendary: true };
 
 @Injectable()
 export class SocialActionsService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly accessPolicy: AccessPolicyService,
+  ) {}
 
-  async findAll(query: SocialActionsQueryDto) {
+  async findAll(query: SocialActionsQueryDto, user: AuthenticatedUser) {
     const { page, perPage, skip, take } = getPagination(query);
+    const scope = await this.accessPolicy.resolveScope(user);
     const where: any = { deletedAt: null, status: query.status, city: query.city ? { contains: query.city, mode: 'insensitive' } : undefined };
     if (query.search) where.OR = [{ title: { contains: query.search, mode: 'insensitive' } }, { description: { contains: query.search, mode: 'insensitive' } }];
+    if (!scope.isAdmin) where.AND = [this.accessPolicy.buildCityWhere(scope)];
     const [items, total] = await Promise.all([
       this.prisma.socialAction.findMany({ where, include: includeAction, orderBy: { startDate: 'desc' }, skip, take }),
       this.prisma.socialAction.count({ where }),
@@ -23,8 +31,11 @@ export class SocialActionsService {
     return toPaginatedResponse(items.map((item: any) => this.toActionResponse(item)), total, page, perPage);
   }
 
-  async findOne(id: string) {
-    const action = await this.prisma.socialAction.findFirst({ where: { id, deletedAt: null }, include: includeAction });
+  async findOne(id: string, user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    const where: any = { id, deletedAt: null };
+    if (!scope.isAdmin) where.AND = [this.accessPolicy.buildCityWhere(scope)];
+    const action = await this.prisma.socialAction.findFirst({ where, include: includeAction });
     if (!action) throw new NotFoundException('Social action not found.');
     return this.toActionResponse(action);
   }
@@ -83,7 +94,7 @@ export class SocialActionsService {
   }
 
   async participants(id: string) {
-    await this.findOne(id);
+    await this.findExisting(id);
     return this.prisma.socialActionParticipant.findMany({ where: { socialActionId: id, deletedAt: null }, include: includeParticipant, orderBy: { createdAt: 'asc' } });
   }
 
@@ -98,7 +109,7 @@ export class SocialActionsService {
   }
 
   async updateParticipant(id: string, participantId: string, dto: UpdateSocialActionParticipantDto, actorUserId?: string) {
-    await this.findOne(id);
+    await this.findExisting(id);
     const before = await this.findParticipant(id, participantId);
     const after = await this.prisma.socialActionParticipant.update({
       where: { id: participantId },

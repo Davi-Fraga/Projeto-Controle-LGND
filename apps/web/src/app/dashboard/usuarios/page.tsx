@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { UserCog, Edit2, ShieldAlert, Link2 } from 'lucide-react';
+import { UserCog, Edit2, ShieldAlert, Link2, ShieldCheck, KeyRound, Copy, Check, X } from 'lucide-react';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { deactivateUser, getUsers } from '@/features/users/api';
 import type { UserSummary } from '@/features/users/api';
+import { createPasswordReset } from '@/features/password-reset/api';
 import { ActionMenu } from '@/components/ui/ActionMenu';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
@@ -17,6 +18,26 @@ export default function UsuariosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const [resetLink, setResetLink] = useState<{ email: string; link: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function handleGenerateReset(user: UserSummary) {
+    setError(null);
+    try {
+      const res = await createPasswordReset(user.id);
+      setResetLink({ email: user.email, link: res.data.link });
+      setCopied(false);
+    } catch {
+      setError('Não foi possível gerar o link de redefinição.');
+    }
+  }
+
+  async function copyReset() {
+    if (!resetLink) return;
+    await navigator.clipboard.writeText(resetLink.link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   useEffect(() => {
     if (authLoading) return;
@@ -60,10 +81,28 @@ export default function UsuariosPage() {
           <h1 className="text-2xl font-black tracking-wide text-white uppercase">Usuários</h1>
           <p className="text-sm text-zinc-400">Acessos do sistema, perfis e vínculo com legendário.</p>
         </div>
-        <Link href="/dashboard/usuarios/novo" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
-          Novo Usuário
+        <Link href="/dashboard/usuarios/convidar" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
+          Convidar Usuário
         </Link>
       </div>
+
+      {resetLink && (
+        <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-orange-400">Link de redefinição para {resetLink.email}</p>
+              <p className="mt-0.5 text-[11px] text-zinc-500">Envie à pessoa (ex.: WhatsApp). Vale 24h e só pode ser usado uma vez. Você não vê a senha dela.</p>
+              <div className="mt-2 flex items-center gap-2">
+                <input readOnly value={resetLink.link} onFocus={(e) => e.target.select()} className="input flex-1 font-mono text-xs" />
+                <button onClick={copyReset} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-orange-600 px-3 text-xs font-bold uppercase tracking-wider text-white hover:bg-orange-500">
+                  {copied ? <><Check className="h-3.5 w-3.5" /> Copiado</> : <><Copy className="h-3.5 w-3.5" /> Copiar</>}
+                </button>
+              </div>
+            </div>
+            <button onClick={() => setResetLink(null)} className="text-zinc-500 hover:text-zinc-300"><X className="h-4 w-4" /></button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-semibold text-rose-400">
@@ -143,6 +182,8 @@ export default function UsuariosPage() {
                         <ActionMenu
                           items={[
                             { label: 'Editar', href: `/dashboard/usuarios/${user.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> },
+                            { label: 'Controle de Acessos', href: `/dashboard/usuarios/${user.id}/acessos`, icon: <ShieldCheck className="h-3.5 w-3.5" /> },
+                            { label: 'Redefinir senha', onClick: () => handleGenerateReset(user), icon: <KeyRound className="h-3.5 w-3.5" /> },
                             ...(user.isActive
                               ? [{ label: 'Inativar', onClick: () => setDeactivatingId(user.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true }]
                               : []),

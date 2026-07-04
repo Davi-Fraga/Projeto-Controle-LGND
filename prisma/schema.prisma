@@ -28,6 +28,55 @@ enum TeamMembershipStatus {
   PAUSED
 }
 
+enum PermissionEffect {
+  GRANT
+  REVOKE
+}
+
+enum UserScopeType {
+  CITY
+  TEAM
+  CHURCH
+  TOP
+}
+
+enum AuthTokenType {
+  INVITE
+  PASSWORD_RESET
+}
+
+enum AuthTokenStatus {
+  PENDING
+  USED
+  REVOKED
+}
+
+// Token de link único (convite de cadastro e, futuramente, redefinição de senha).
+// Guarda o HASH do token cru (o valor só vai no link), com validade e uso único.
+model AuthToken {
+  id              String          @id @default(uuid()) @db.Uuid
+  type            AuthTokenType
+  tokenHash       String          @unique
+  status          AuthTokenStatus @default(PENDING)
+  expiresAt       DateTime
+  usedAt          DateTime?
+  // Convite (INVITE): identidade + função/escopo iniciais definidos pelo admin.
+  email           String?
+  roles           String[]
+  legendaryId     String?         @db.Uuid
+  metadata        Json?
+  // Redefinição de senha (PASSWORD_RESET), usado pela feature 08.
+  userId          String?         @db.Uuid
+  // Auditoria.
+  createdByUserId String?         @db.Uuid
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([type])
+  @@index([email])
+  @@index([expiresAt])
+}
+
 enum TopEventStatus {
   PLANNED
   REGISTRATION_OPEN
@@ -149,6 +198,8 @@ model User {
   internalMessages InternalMessage[] @relation("InternalMessageCreator")
   messageRecipients MessageRecipient[]
   spiritualLeaderChurches Church[] @relation("ChurchSpiritualLeader")
+  permissionOverrides UserPermissionOverride[]
+  scopes              UserScope[]
 }
 
 model Role {
@@ -168,6 +219,7 @@ model Permission {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   roles       RolePermission[]
+  userOverrides UserPermissionOverride[]
 }
 
 model UserRole {
@@ -194,6 +246,37 @@ model RolePermission {
   @@unique([roleId, permissionId])
   @@index([roleId])
   @@index([permissionId])
+}
+
+// Ajuste fino por usuário sobre o papel base: concede (GRANT) ou revoga (REVOKE)
+// uma permission individualmente. Efetivas = (papel ∪ GRANTs) − REVOKEs.
+model UserPermissionOverride {
+  id           String           @id @default(uuid()) @db.Uuid
+  userId       String           @db.Uuid
+  permissionId String           @db.Uuid
+  effect       PermissionEffect
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  user         User             @relation(fields: [userId], references: [id])
+  permission   Permission       @relation(fields: [permissionId], references: [id])
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@index([permissionId])
+}
+
+// Escopo interno de dados por usuário (1-N). value = cidade normalizada, teamId
+// ou churchId, conforme type. O AccessPolicyService monta o filtro pelo conjunto.
+model UserScope {
+  id        String        @id @default(uuid()) @db.Uuid
+  userId    String        @db.Uuid
+  type      UserScopeType
+  value     String
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@unique([userId, type, value])
+  @@index([userId])
 }
 
 model RefreshToken {

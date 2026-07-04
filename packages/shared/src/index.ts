@@ -131,6 +131,54 @@ export enum TopPreRegistrationStatus {
   REJECTED = 'REJECTED',
 }
 
+// Ajuste fino de permission por usuário sobre o papel base.
+export enum PermissionEffect {
+  GRANT = 'GRANT',
+  REVOKE = 'REVOKE',
+}
+
+// Tipo de escopo interno de dados associado a um usuário (1-N).
+export enum UserScopeType {
+  CITY = 'CITY',
+  TEAM = 'TEAM',
+  CHURCH = 'CHURCH',
+  TOP = 'TOP',
+}
+
+// Nível de acesso por TELA. VIEW = só leitura da tela; EDIT = leitura + mutação.
+export enum ScreenAccessLevel {
+  NONE = 'NONE',
+  VIEW = 'VIEW',
+  EDIT = 'EDIT',
+}
+
+// Um escopo do usuário, agrupado sob a tela cujos scopeTypes o contêm.
+export type ScreenScopeEntry = {
+  id: string;
+  type: UserScopeType;
+  value: string;
+  label?: string | null;
+};
+
+// Estado de acesso de UMA tela para um usuário (o admin opera por tela, não por permission).
+export type ScreenAccessEntry = {
+  id: string;
+  label: string;
+  level: ScreenAccessLevel;
+  // false para telas só-leitura (sem conjunto de mutação) — não oferecem nível EDIT.
+  supportsEdit: boolean;
+  // tipos de escopo aplicáveis a esta tela (vazio = sem recorte)
+  scopeTypes: UserScopeType[];
+  // escopos atuais do usuário cujo tipo é aplicável a esta tela
+  scopes: ScreenScopeEntry[];
+};
+
+export type UserScreenAccessControl = {
+  userId: string;
+  roles: string[];
+  screens: ScreenAccessEntry[];
+};
+
 export type ApiResponse<T> = {
   data: T;
   message?: string;

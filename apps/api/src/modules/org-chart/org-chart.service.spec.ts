@@ -1,16 +1,26 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { OrgChartService } from './org-chart.service';
 
 describe('OrgChartService', () => {
   let service: OrgChartService;
   let prisma: any;
+  let accessPolicy: any;
+  const user = { sub: 'u1', email: 'a@b.c', roles: ['COORDINATION_ADMIN'], permissions: [] } as any;
 
   beforeEach(() => {
     prisma = {
       team: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
       legendary: { findMany: jest.fn().mockResolvedValue([]) },
     };
-    service = new OrgChartService(prisma);
+    // Admin/irrestrito por padrão: sem filtro de cidade e sem barreira de IDOR.
+    accessPolicy = {
+      resolveScope: jest.fn().mockResolvedValue({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [], cityKeys: [], legendaryCities: [], topIds: [] }),
+      buildLegendaryWhere: jest.fn().mockReturnValue({}),
+      isCityRestricted: jest.fn().mockReturnValue(false),
+      assertCityAllowed: jest.fn(),
+      assertTeamAllowed: jest.fn(),
+    };
+    service = new OrgChartService(prisma, accessPolicy);
   });
 
   describe('getTeamChart', () => {
@@ -28,7 +38,7 @@ describe('OrgChartService', () => {
         ],
       });
 
-      const root = await service.getTeamChart('t1');
+      const root = await service.getTeamChart('t1', user);
 
       expect(root.id).toBe('team:t1');
       expect(root.kind).toBe('group');
@@ -59,7 +69,7 @@ describe('OrgChartService', () => {
         deputyCoordinator: null,
         memberships: [{ id: 'm9', legendaryId: 'l9', legendary: { fullName: 'Membro 9' }, role: 'Servo' }],
       });
-      const root = await service.getTeamChart('t2');
+      const root = await service.getTeamChart('t2', user);
       expect(root.leaderId).toBeUndefined();
       expect(root.children.find((n) => n.id === 'member:m9')).toBeDefined(); // directly under the group
       expect(root.count).toBe(1);
@@ -67,13 +77,19 @@ describe('OrgChartService', () => {
 
     it('strips the "TOP #<n> | " prefix from the team name label', async () => {
       prisma.team.findFirst.mockResolvedValueOnce({ id: 't9', name: 'TOP #1910 | Coordenação', coordinatorLegendaryId: null, coordinator: null, deputyCoordinatorLegendaryId: null, deputyCoordinator: null, memberships: [] });
-      const root = await service.getTeamChart('t9');
+      const root = await service.getTeamChart('t9', user);
       expect(root.label).toBe('Coordenação');
     });
 
     it('throws 404 when the team does not exist', async () => {
       prisma.team.findFirst.mockResolvedValueOnce(null);
-      await expect(service.getTeamChart('nope')).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.getTeamChart('nope', user)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('denies a team out of scope (IDOR) for a team-restricted user', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, teamIds: ['team-seg'] });
+      accessPolicy.assertTeamAllowed.mockImplementationOnce(() => { throw new ForbiddenException('Team out of scope.'); });
+      await expect(service.getTeamChart('team-x', user)).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 
@@ -113,7 +129,7 @@ describe('OrgChartService', () => {
         { city: 'Brasília' },
         { city: null },
       ]);
-      const options = await service.getCityOptions();
+      const options = await service.getCityOptions(user);
       const goiania = options.find((o) => o.value === 'goiania')!;
       expect(goiania.count).toBe(2);
       expect(options.find((o) => o.value === '__none__')).toMatchObject({ label: 'Sem cidade', count: 1 });
@@ -129,11 +145,19 @@ describe('OrgChartService', () => {
         { id: 'l3', fullName: 'C', city: 'Brasília' },
       ]);
 
-      const root = await service.getCitiesChart('legendaries', 'goiania');
+      const root = await service.getCitiesChart('legendaries', 'goiania', user);
 
       expect(root.id).toBe('city:goiania');
       expect(root.kind).toBe('city');
       expect(root.count).toBe(2); // both Goiânia spellings, Brasília excluded
+    });
+
+    it('denies an out-of-scope city for a city-restricted user (IDOR)', async () => {
+      // Simula a barreira do AccessPolicyService para cidade fora do escopo.
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: [], legendaryIds: [], cityKeys: ['piracanjuba'], legendaryCities: ['Piracanjuba'] });
+      accessPolicy.assertCityAllowed.mockImplementationOnce(() => { throw new ForbiddenException('City out of scope.'); });
+
+      await expect(service.getCitiesChart('legendaries', 'goiania', user)).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('city="__none__" returns the "Sem cidade" group', async () => {
@@ -141,7 +165,7 @@ describe('OrgChartService', () => {
         { id: 'l1', fullName: 'A', city: 'Goiânia' },
         { id: 'l3', fullName: 'C', city: null },
       ]);
-      const root = await service.getCitiesChart('legendaries', '__none__');
+      const root = await service.getCitiesChart('legendaries', '__none__', user);
       expect(root.id).toBe('city:none');
       expect(root.count).toBe(1);
     });
@@ -153,7 +177,7 @@ describe('OrgChartService', () => {
         { id: 'l3', fullName: 'C', city: 'Brasília', churchId: 'ch9', church: { name: 'Outra' } },
       ]);
 
-      const root = await service.getCitiesChart('churches', 'goiania');
+      const root = await service.getCitiesChart('churches', 'goiania', user);
 
       expect(root.id).toBe('city:goiania');
       expect(root.count).toBe(2);
@@ -173,9 +197,9 @@ describe('OrgChartService', () => {
       node.children.forEach(assertShape);
     };
     prisma.legendary.findMany.mockResolvedValue([{ id: 'l1', fullName: 'A', city: 'Goiânia', churchId: 'ch1', church: { name: 'Igreja X' } }]);
-    assertShape(await service.getTeamChart('t1'));
+    assertShape(await service.getTeamChart('t1', user));
     assertShape(await service.getCoordinatorsChart());
-    assertShape(await service.getCitiesChart('legendaries', 'goiania'));
-    assertShape(await service.getCitiesChart('churches', 'goiania'));
+    assertShape(await service.getCitiesChart('legendaries', 'goiania', user));
+    assertShape(await service.getCitiesChart('churches', 'goiania', user));
   });
 });

@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SystemRole } from '@central-da-manada/shared';
-import { createUser, updateUser, type UserSummary } from './api';
+import { updateUser, type UserSummary } from './api';
 import { getLegendario, getLegendarioOptions } from '@/features/legendarios/api';
 import { AsyncCombobox, type ComboboxOption } from '@/components/ui/AsyncCombobox';
 
@@ -25,10 +25,8 @@ const ROLE_ORDER = Object.values(SystemRole);
 
 export function UserForm({ user }: Props) {
   const router = useRouter();
-  const isEdit = Boolean(user);
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
-  const [password, setPassword] = useState('');
   const [legendaryId, setLegendaryId] = useState(user?.legendaryId ?? '');
   const [legendaryLabel, setLegendaryLabel] = useState('');
   const [roles, setRoles] = useState<string[]>(user?.roles ?? []);
@@ -67,37 +65,19 @@ export function UserForm({ user }: Props) {
     setError(null);
 
     if (roles.length === 0) {
-      setError('Selecione ao menos um perfil de acesso.');
+      setError('Selecione ao menos uma função na manada.');
       return;
     }
-    if (!isEdit && password.length < 8) {
-      setError('A senha deve ter pelo menos 8 caracteres.');
-      return;
-    }
-    if (isEdit && password.length > 0 && password.length < 8) {
-      setError('A nova senha deve ter pelo menos 8 caracteres.');
-      return;
-    }
+    if (!user) return;
 
     setLoading(true);
     try {
-      if (isEdit && user) {
-        await updateUser(user.id, {
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          legendaryId: legendaryId || null,
-          roles,
-          ...(password ? { password } : {}),
-        });
-      } else {
-        await createUser({
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          password,
-          legendaryId: legendaryId || null,
-          roles,
-        });
-      }
+      await updateUser(user.id, {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        legendaryId: legendaryId || null,
+        roles,
+      });
       router.push('/dashboard/usuarios');
       router.refresh();
     } catch {
@@ -125,20 +105,6 @@ export function UserForm({ user }: Props) {
           <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </label>
         <label className="block space-y-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-            {isEdit ? 'Nova senha (deixe em branco para manter)' : 'Senha'}
-          </span>
-          <input
-            className="input"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required={!isEdit}
-            minLength={isEdit ? undefined : 8}
-            placeholder={isEdit ? '••••••••' : 'Mínimo 8 caracteres'}
-          />
-        </label>
-        <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Legendário vinculado</span>
           <AsyncCombobox
             value={legendaryId}
@@ -158,7 +124,11 @@ export function UserForm({ user }: Props) {
       </section>
 
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/10 p-5">
-        <span className="text-xs font-bold uppercase tracking-widest text-orange-500">Perfis de Acesso</span>
+        <span className="text-xs font-bold uppercase tracking-widest text-orange-500">Função na Manada</span>
+        <p className="mt-1 text-[11px] text-zinc-500">
+          Papel organizacional do usuário — <strong className="text-zinc-400">não define o acesso</strong>.
+          O acesso a telas e dados é configurado em <strong className="text-zinc-400">Controle de Acessos</strong>.
+        </p>
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           {ROLE_ORDER.map((role) => (
             <label key={role} className="flex items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/30 px-3 py-2.5 cursor-pointer hover:border-zinc-700">

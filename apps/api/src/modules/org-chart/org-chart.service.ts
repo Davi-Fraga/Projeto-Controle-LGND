@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { LegendaryStatus, TeamMembershipStatus, TeamStatus, teamDisplayName } from '@central-da-manada/shared';
 import type { OrgChartNode } from '@central-da-manada/shared';
 import { PrismaService } from '../../database/prisma.service';
+import { AccessPolicyService } from '../../common/access/access-policy.service';
+import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { annotateCounts, normalizeCityKey, orgNode } from '../../common/org-chart/org-chart.util';
 import type { CitiesMode } from './dto/cities-query.dto';
 
@@ -10,10 +12,18 @@ export const NO_CITY = '__none__';
 
 @Injectable()
 export class OrgChartService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly accessPolicy: AccessPolicyService,
+  ) {}
 
   // Team (group) -> coordinator (leader) holding the members; deputy is a sibling leader without members.
-  async getTeamChart(teamId: string): Promise<OrgChartNode> {
+  async getTeamChart(teamId: string, user: AuthenticatedUser): Promise<OrgChartNode> {
+    // Barreira de escopo: usuário restrito por equipe só vê o organograma das suas
+    // equipes (ex.: Coordenador da Segurança só vê a Segurança), inclusive por URL direta.
+    const scope = await this.accessPolicy.resolveScope(user);
+    this.accessPolicy.assertTeamAllowed(scope, teamId);
+
     const team = await this.prisma.team.findFirst({
       where: { id: teamId, deletedAt: null },
       include: {
@@ -73,10 +83,34 @@ export class OrgChartService {
     return root;
   }
 
+  // Seletor de EQUIPES do organograma — restrito ao escopo de equipe do usuário.
+  async getTeamOptions(user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    const where: any = { deletedAt: null, status: TeamStatus.ACTIVE };
+    if (!scope.isAdmin) Object.assign(where, this.accessPolicy.buildTeamWhere(scope));
+    const teams = await this.prisma.team.findMany({ where, select: { id: true, name: true }, orderBy: { name: 'asc' } });
+    return teams.map((team: any) => ({ id: team.id, label: team.name, value: team.id }));
+  }
+
+  // Seletor de TOPs do organograma — restrito ao escopo de TOP do usuário.
+  async getTopOptions(user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    const where: any = { deletedAt: null };
+    if (!scope.isAdmin) Object.assign(where, this.accessPolicy.buildTopWhere(scope));
+    const tops = await this.prisma.topEvent.findMany({ where, select: { id: true, name: true, number: true, city: true }, orderBy: { startDate: 'desc' } });
+    return tops.map((top: any) => ({ id: top.id, label: `TOP #${top.number} - ${top.name}`, value: top.id, metadata: { city: top.city } }));
+  }
+
   // Distinct cities (normalized) for the city selector, plus "Sem cidade" when applicable.
-  async getCityOptions(): Promise<{ value: string; label: string; count: number }[]> {
+  // Restrito ao conjunto de escopos do usuário (Gestor de Cidade só vê suas cidades).
+  async getCityOptions(user: AuthenticatedUser): Promise<{ value: string; label: string; count: number }[]> {
+    const scope = await this.accessPolicy.resolveScope(user);
     const rows = await this.prisma.legendary.findMany({
-      where: { deletedAt: null, status: { not: LegendaryStatus.INACTIVE } },
+      where: {
+        deletedAt: null,
+        status: { not: LegendaryStatus.INACTIVE },
+        AND: [this.accessPolicy.buildLegendaryWhere(scope)],
+      },
       select: { city: true },
     });
     const map = new Map<string, { label: string; count: number }>();
@@ -100,9 +134,18 @@ export class OrgChartService {
   }
 
   // Cities (global): one city at a time. city -> legendary, or city -> church -> legendary.
-  async getCitiesChart(mode: CitiesMode, city: string): Promise<OrgChartNode> {
+  async getCitiesChart(mode: CitiesMode, city: string, user: AuthenticatedUser): Promise<OrgChartNode> {
+    const scope = await this.accessPolicy.resolveScope(user);
+    // Barreira de IDOR: usuário restrito por cidade não acessa outra cidade nem o
+    // bucket "sem cidade", mesmo chamando a API diretamente com outro slug.
+    this.accessPolicy.assertCityAllowed(scope, city);
+
     const legendaries = await this.prisma.legendary.findMany({
-      where: { deletedAt: null, status: { not: LegendaryStatus.INACTIVE } },
+      where: {
+        deletedAt: null,
+        status: { not: LegendaryStatus.INACTIVE },
+        AND: [this.accessPolicy.buildLegendaryWhere(scope)],
+      },
       include: mode === 'churches' ? { church: true } : undefined,
       orderBy: { fullName: 'asc' },
     });

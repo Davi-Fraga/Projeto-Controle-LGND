@@ -1,36 +1,37 @@
-## 1. Pré-requisito e decisões
+## Decisões fechadas (1.2)
+- Reusa o `AuthToken` da 07 com `type=PASSWORD_RESET` + `userId` (sem migration nova).
+- Validade: **24h, uso único** (credencial sensível; mais curto que o convite).
+- Quem gera: **só Administrador** (`users.update`).
+- **Só por convite**: o admin não define senha em ponto nenhum — removido do criar (rota `POST /users` e a página "Novo Usuário") **e** do editar.
+- Ao redefinir: além de trocar a senha, **revoga as sessões (refresh tokens)** do usuário.
 
-- [ ] 1.1 Confirmar que `convite-por-link-cadastro` (07) está implementada (mecanismo de link/token)
-- [ ] 1.2 Decidir: reusar o token da 07 com `purpose` PASSWORD_RESET vs. modelo separado; validade; quem gera
-- [ ] 1.3 Apresentar plano e aguardar aprovação
+## 1. Pré-requisito e decisões
+- [x] 1.1 07 (convite) implementada — `AuthToken` disponível
+- [x] 1.2 Decisões fechadas (acima)
+- [x] 1.3 Plano aprovado
 
 ## 2. Backend — redefinição
-
-- [ ] 2.1 Endpoint de gerar link de redefinição (admin/líder autorizado) → token
-- [ ] 2.2 Endpoint público de redefinir: valida token (hash+validade+status), atualiza `passwordHash` (bcrypt), invalida token (transação)
-- [ ] 2.3 Garantir que nenhuma rota de redefinição funcione sem token válido
-- [ ] 2.4 Anti-enumeração + auditoria de geração/uso (sem logar senha nem token)
+- [x] 2.1 `POST /auth/password-reset` (admin, `users.update`) → link (token cru só no link; hash no banco)
+- [x] 2.2 `POST /auth/password-reset/:token/reset` (público): valida token, atualiza `passwordHash` (bcrypt), revoga refresh tokens, invalida token — em transação
+- [x] 2.3 Sem token válido não redefine (findValidReset recusa)
+- [x] 2.4 Anti-enumeração (erro genérico) + auditoria de geração/uso (sem senha/token)
 
 ## 3. Remover controle de senha do admin (após o fluxo do dono existir)
-
-- [ ] 3.1 Remover o campo **Nova senha** do `UpdateUserDto` e da edição administrativa
-- [ ] 3.2 Garantir que o admin não consiga definir senha de terceiro por nenhuma via (DTO, service, API)
+- [x] 3.1 Removido `password` do `UserDataDto`/`UpdateUserDto` e da edição
+- [x] 3.2 Admin não define senha por nenhuma via: `POST /users` removido; `UsersService.create` removido; `update` sem senha; PATCH com `password` → 400 (whitelist)
 
 ## 4. Frontend
-
-- [ ] 4.1 Remover o campo de senha da edição de usuário; admin só vê nome/email
-- [ ] 4.2 Ação **Gerar link de redefinição** na tela de usuário
-- [ ] 4.3 Página pública de redefinição (valida token, pessoa define a senha)
+- [x] 4.1 Página pública `/redefinir-senha/[token]`: valida token, pessoa define a nova senha
+- [x] 4.2 Ação **"Redefinir senha"** na lista de usuários → gera e copia o link
+- [x] 4.3 Removido o campo de senha do form + página "Novo Usuário" + botão (fica só "Convidar")
 
 ## 5. Testes (segurança)
-
-- [ ] 5.1 Link válido redefine a senha; token vira inválido
-- [ ] 5.2 Link expirado/usado recusado; redefinição sem token recusada
-- [ ] 5.3 Admin não consegue definir senha de terceiro por nenhuma via
-- [ ] 5.4 Auditoria registrada; nada de senha/token em log; perfis/logins existentes seguem funcionando
+- [x] 5.1 Link válido redefine; token vira inválido (unit + smoke)
+- [x] 5.2 Link expirado/usado/tipo errado recusado; sem token recusado
+- [x] 5.3 Admin não define senha de terceiro por nenhuma via (POST 404, PATCH 400)
+- [x] 5.4 Auditoria de geração/uso; hash no banco, nunca o cru; sessões revogadas no reset
 
 ## 6. Verificação
-
-- [ ] 6.1 Testes focados (auth/senha)
-- [ ] 6.2 `pnpm -r lint`, `pnpm -r test`, `pnpm -r build`; regenerar Prisma client (dev parado) se mudar schema
-- [ ] 6.3 Conferência manual: gerar link, pessoa redefine, admin não vê senha em lugar nenhum
+- [x] 6.1 Testes focados (6 de password-reset; 164 total)
+- [x] 6.2 `pnpm -r lint` ✓, API tests ✓ (164), sem migration (reusa AuthToken)
+- [x] 6.3 Smoke live: gerar → validar → redefinir → login senha nova ok, senha antiga negada (401) → token uso único (404); admin sem definir senha (POST 404 / PATCH 400)

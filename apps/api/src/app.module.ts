@@ -25,6 +25,8 @@ import { OrgChartModule } from './modules/org-chart/org-chart.module';
 import { CacheModule } from './common/cache/cache.module';
 import { AccessPolicyModule } from './common/access/access-policy.module';
 import { AccessControlModule } from './modules/access-control/access-control.module';
+import { InvitesModule } from './modules/invites/invites.module';
+import { PasswordResetModule } from './modules/password-reset/password-reset.module';
 import { REDIS_CONFIG } from './config/env';
 import { RateLimitGuard } from './common/guards/rate-limit.guard';
 
@@ -44,6 +46,8 @@ import { RateLimitGuard } from './common/guards/rate-limit.guard';
     AuthModule,
     UsersModule,
     AccessControlModule,
+    InvitesModule,
+    PasswordResetModule,
     RolesModule,
     PermissionsModule,
     AuditModule,

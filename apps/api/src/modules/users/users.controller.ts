@@ -1,11 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { SystemRole } from '@central-da-manada/shared';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { PaginationDto } from '../../common/pagination/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
 
@@ -31,11 +30,7 @@ export class UsersController {
     return { data: await this.usersService.findOne(id) };
   }
 
-  @Post()
-  @Roles(SystemRole.COORDINATION_ADMIN)
-  async create(@Body() dto: CreateUserDto) {
-    return { data: await this.usersService.create(dto) };
-  }
+  // Criação direta removida: conta nasce só por convite (POST /auth/invites).
 
   @Patch(':id')
   @Roles(SystemRole.COORDINATION_ADMIN)

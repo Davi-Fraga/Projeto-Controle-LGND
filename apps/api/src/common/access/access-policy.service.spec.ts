@@ -111,31 +111,36 @@ describe('AccessPolicyService', () => {
     expect(service.buildLegendaryWhere(scope)).toEqual({ id: { in: [] } });
   });
 
-  it('builds a scoped legendary filter combining church and team membership scopes', () => {
+  it('monta filtro GEOGRÁFICO de legendários (cidade ∪ igreja), sem equipe', () => {
     const where = service.buildLegendaryWhere({
       isAdmin: false,
       churchIds: ['church-1'],
-      teamIds: ['team-1'],
+      teamIds: ['team-1'], // escopo de equipe NÃO entra no filtro de legendários
       legendaryIds: [],
-      cityKeys: [],
-      legendaryCities: [],
+      cityKeys: ['caldas novas'],
+      legendaryCities: ['Caldas Novas'],
       topIds: [],
     });
 
     expect(where).toEqual({
       OR: [
         { churchId: { in: ['church-1'] } },
-        {
-          teamMemberships: {
-            some: {
-              deletedAt: null,
-              status: 'ACTIVE',
-              teamId: { in: ['team-1'] },
-            },
-          },
-        },
+        { city: { in: ['Caldas Novas'] } },
       ],
     });
+  });
+
+  it('legendário só com escopo de equipe não vê legendários (equipe vale em Equipes/Organograma)', () => {
+    const where = service.buildLegendaryWhere({
+      isAdmin: false,
+      churchIds: [],
+      teamIds: ['team-1'],
+      legendaryIds: [],
+      cityKeys: [],
+      legendaryCities: [],
+      topIds: [],
+    });
+    expect(where).toEqual({ id: { in: [] } });
   });
 
   describe('city scope', () => {

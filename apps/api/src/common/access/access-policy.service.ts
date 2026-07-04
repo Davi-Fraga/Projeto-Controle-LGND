@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { TeamMembershipStatus, UserScopeType } from '@central-da-manada/shared';
+import { UserScopeType } from '@central-da-manada/shared';
 import { AuthenticatedUser } from '../decorators/current-user.decorator';
 import { normalizeCityKey } from '../org-chart/org-chart.util';
 import { hasAdminRole } from './access.constants';
@@ -52,6 +52,10 @@ export class AccessPolicyService {
     };
   }
 
+  // Filtro GEOGRÁFICO de legendários (telas Legendários/Relatórios/Mapa):
+  // cidade ∪ igreja (∪ ids explícitos). O escopo de EQUIPE NÃO entra aqui — ele
+  // vale só nas telas Equipes/Organograma (buildTeamWhere), para não vazar membros
+  // de equipe de outras cidades na listagem de legendários.
   buildLegendaryWhere(scope: AccessScope) {
     if (scope.isAdmin) return {};
 
@@ -59,18 +63,6 @@ export class AccessPolicyService {
 
     if (scope.churchIds.length) {
       OR.push({ churchId: { in: scope.churchIds } });
-    }
-
-    if (scope.teamIds.length) {
-      OR.push({
-        teamMemberships: {
-          some: {
-            deletedAt: null,
-            status: TeamMembershipStatus.ACTIVE,
-            teamId: { in: scope.teamIds },
-          },
-        },
-      });
     }
 
     if (scope.legendaryCities.length) {
@@ -97,6 +89,13 @@ export class AccessPolicyService {
   buildTopWhere(scope: AccessScope) {
     if (scope.isAdmin) return {};
     return scope.topIds.length ? { id: { in: scope.topIds } } : { id: { in: [] } };
+  }
+
+  // Filtro por cidade para entidades com campo `city` (ex.: SocialAction).
+  // Não-admin sem escopo de cidade não vê nada (fail-closed).
+  buildCityWhere(scope: AccessScope) {
+    if (scope.isAdmin) return {};
+    return scope.legendaryCities.length ? { city: { in: scope.legendaryCities } } : { id: { in: [] } };
   }
 
   // True quando o usuário está restrito a um conjunto de cidades.

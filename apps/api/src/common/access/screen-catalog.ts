@@ -24,35 +24,23 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     id: 'legendarios',
     label: 'Legendários',
     view: ['legendarios.read', 'legendarios.history.read', 'professions.read', 'expertises.read'],
-    edit: [
-      'legendarios.create',
-      'legendarios.update',
-      'legendarios.delete',
-      'legendarios.restore',
-      'legendarios.history.create',
-    ],
+    // create/delete/restore de topo são administrativos → fora do "Ver e editar".
+    edit: ['legendarios.update', 'legendarios.history.create'],
     scopeTypes: [UserScopeType.CITY, UserScopeType.TEAM, UserScopeType.CHURCH],
   },
   {
     id: 'teams',
     label: 'Equipes',
     view: ['teams.read', 'teams.members.read'],
-    edit: [
-      'teams.create',
-      'teams.update',
-      'teams.delete',
-      'teams.restore',
-      'teams.members.add',
-      'teams.members.update',
-      'teams.members.remove',
-    ],
+    // Criar/excluir equipe = admin. "Ver e editar" = editar a equipe do escopo + membros.
+    edit: ['teams.update', 'teams.members.add', 'teams.members.update', 'teams.members.remove'],
     scopeTypes: [UserScopeType.TEAM],
   },
   {
     id: 'churches',
     label: 'Igrejas',
     view: ['churches.read'],
-    edit: ['churches.create', 'churches.update', 'churches.delete'],
+    edit: ['churches.update'],
     scopeTypes: [UserScopeType.CHURCH],
   },
   {
@@ -67,11 +55,9 @@ export const SCREEN_CATALOG: ScreenDef[] = [
       'tops.families.members.read',
       'tops.preregistrations.read',
     ],
+    // Criar/excluir TOP = admin. "Ver e editar" = editar o TOP do escopo e seus sub-recursos.
     edit: [
-      'tops.create',
       'tops.update',
-      'tops.delete',
-      'tops.restore',
       'tops.participants.add',
       'tops.participants.update',
       'tops.participants.remove',
@@ -106,18 +92,16 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     id: 'families',
     label: 'Famílias',
     view: ['families.read'],
-    edit: ['families.create', 'families.update'],
+    edit: ['families.update'],
     scopeTypes: [],
   },
   {
     id: 'social-actions',
     label: 'Ações Sociais',
     view: ['social-actions.read', 'social-actions.participants.read'],
+    // Criar/excluir ação social = admin. "Ver e editar" = editar a ação do escopo + participantes.
     edit: [
-      'social-actions.create',
       'social-actions.update',
-      'social-actions.delete',
-      'social-actions.restore',
       'social-actions.participants.add',
       'social-actions.participants.update',
       'social-actions.participants.remove',
@@ -128,11 +112,10 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     id: 'communications',
     label: 'Comunicação',
     view: ['communications.read', 'communications.recipients.read'],
+    // Criar/excluir comunicado = admin. "Ver e editar" = editar/enviar e gerir destinatários.
     edit: [
-      'communications.create',
       'communications.update',
       'communications.send',
-      'communications.delete',
       'communications.recipients.update',
     ],
     scopeTypes: [],
@@ -155,7 +138,7 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     id: 'users',
     label: 'Usuários',
     view: ['users.read', 'audit.read'],
-    edit: ['users.create', 'users.update', 'users.deactivate'],
+    edit: ['users.update'],
     scopeTypes: [],
   },
 ];

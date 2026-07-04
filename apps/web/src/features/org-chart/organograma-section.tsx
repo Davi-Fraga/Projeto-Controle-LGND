@@ -4,9 +4,8 @@ import { useEffect, useState } from 'react';
 import type { OrgChartNode } from '@central-da-manada/shared';
 import { teamDisplayName } from '@central-da-manada/shared';
 import { Network } from 'lucide-react';
-import { getTeamsOptionsList, getTopOptions } from '@/features/tops/api';
 import type { OptionItem } from '@/features/tops/types';
-import { getCitiesOrgChart, getCityOrgChartOptions, getCoordinatorsOrgChart, getTeamOrgChart, type CitiesMode, type CityOption } from './api';
+import { getCitiesOrgChart, getCityOrgChartOptions, getCoordinatorsOrgChart, getTeamOrgChart, getTeamOrgChartOptions, getTopOrgChartOptions, type CitiesMode, type CityOption } from './api';
 import { OrgChartTree } from './org-chart-tree';
 import { OrgChartView as TopOrgChartView } from './org-chart-view';
 
@@ -39,10 +38,10 @@ export function OrganogramaSection() {
   // Load option lists for the scopes that need a secondary selector.
   useEffect(() => {
     if (scope === 'equipes' && teamOptions.length === 0) {
-      getTeamsOptionsList().then((r) => setTeamOptions(r.data)).catch(() => {});
+      getTeamOrgChartOptions().then((r) => setTeamOptions(r.data)).catch(() => {});
     }
     if (scope === 'tops' && topOptions.length === 0) {
-      getTopOptions().then((r) => setTopOptions(r.data)).catch(() => {});
+      getTopOrgChartOptions().then((r) => setTopOptions(r.data)).catch(() => {});
     }
     if (scope === 'cidades' && cityOptions.length === 0) {
       getCityOrgChartOptions().then((r) => setCityOptions(r.data)).catch(() => {});

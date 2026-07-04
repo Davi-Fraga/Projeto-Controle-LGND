@@ -66,3 +66,24 @@
 - [x] 9.5 Front `user-form.tsx`: "Perfis de Acesso" → "Função na Manada" + texto de que não define acesso.
 - [x] 9.6 Testes: função não-admin não concede; admin total; efetivas não-admin = concessões − revogações. 146 testes verdes.
 - [x] 9.7 Verificação: `pnpm -r lint` ✓, API tests ✓ (146), smoke live (admin=86 total; não-admin=concessões; boot OK).
+
+## 10. Correção de vazamentos de escopo + criar/excluir admin
+
+### Grupo 1 — escopo por dimensão da tela (composição)
+- [ ] 10.1 `AccessPolicyService.buildLegendaryWhere`: virar filtro GEOGRÁFICO (cidade ∪ igreja ∪ legendaryIds) — remover o branch de equipe. Legendários/Relatórios/Mapa deixam de vazar membros de equipe de outras cidades. (Equipe segue em `buildTeamWhere` para Equipes/Organograma; TOP em `buildTopWhere`.)
+- [ ] 10.2 Reports: aplicar escopo em `byProfession`/`byExpertise` (hoje contam tudo). Revisar todos os endpoints de reports.
+- [ ] 10.3 Revisar módulos sem escopo por dimensão: dashboard, social-actions, communications — aplicar o filtro geográfico onde listam dados de legendários/cidade.
+
+### Grupo 2 — criar/excluir = admin
+- [ ] 10.4 `screen-catalog`: remover `*.create`/`*.delete`/`*.restore`/`*.deactivate` de ENTIDADE DE TOPO dos conjuntos `edit` (viram admin-only). Manter update e sub-recursos (members.add/remove, participants.add, etc.).
+- [ ] 10.5 Limpeza de dados: remover overrides GRANT de create/delete que porventura existam para não-admin.
+- [ ] 10.6 Front: esconder botões "Novo TOP"/"Nova Equipe"/etc. para quem não tem a permission de criar (só usabilidade; backend já barra).
+
+### Grupo 3 — seletores do organograma escopados
+- [ ] 10.7 Organograma: os seletores de equipe/TOP listam só o que está no escopo do usuário (cidades já vêm escopadas). Endpoints/seleção respeitam o escopo.
+
+### Testes e verificação
+- [x] 10.8 Testes: filtro geográfico (cidade∪igreja, sem equipe); catálogo não concede create/delete de topo; access-control EDIT sem create/delete. 149 testes verdes. Smoke live: city+team → 133, 0 fora de Caldas; POST tops/teams → 403; org-chart teams/options só ['ADM'].
+- [x] 10.9 `pnpm -r lint` ✓ (api/web/shared), API tests ✓ (149), smoke live ✓. Usuários de teste removidos.
+
+> NOTA (follow-up separado): o **Dashboard** (`/dashboard` summary) conta legendários/equipes/TOPs/cidades de forma GLOBAL, sem escopo — vaza agregados para não-admin. Não estava na lista explícita (superfície grande); tratar numa próxima iteração se desejado.

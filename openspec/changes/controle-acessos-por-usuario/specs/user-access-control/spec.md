@@ -51,6 +51,28 @@ A tela administrativa SHALL apresentar o acesso em termos de **TELAS/MÓDULOS** 
 ### Requirement: Mapeamento Tela→Permissions no backend
 O backend SHALL definir um **mapa canônico** de cada tela/módulo para seu conjunto de permissions (separando leitura de mutação para suportar níveis), usado para traduzir a escolha por tela do admin nas permissions efetivas que o `PermissionsGuard` avalia. Esse mapa SHALL ser a fonte da verdade; a UI NÃO SHALL enviar chaves de permission cruas — apenas tela + nível.
 
+### Requirement: Criar e excluir são ações administrativas
+O nível **Ver** e **Ver e editar** de uma tela SHALL cobrir apenas ler e editar itens **dentro do escopo**. Criar e excluir itens de topo (novo TOP, nova Equipe, novo Legendário, nova Igreja, etc.) SHALL ser ação **administrativa** — as permissions `*.create`, `*.delete`, `*.restore`/`*.deactivate` de entidade de topo NÃO SHALL constar em nenhum conjunto concedível por tela; só o Administrador as possui. O backend (guard) SHALL recusar a criação/exclusão para não-admin; esconder o botão no front é só usabilidade.
+
+#### Scenario: "Ver e editar" não permite criar
+- **WHEN** um usuário não-admin com "Ver e editar" no TOP/Equipe do seu escopo tenta criar um novo TOP/Equipe
+- **THEN** o backend recusa (403) e o botão de criar não aparece para ele
+
+#### Scenario: Editar dentro do escopo continua permitido
+- **WHEN** o mesmo usuário edita o TOP/Equipe que está no seu escopo
+- **THEN** a edição é permitida
+
+### Requirement: Escopo aplicado por dimensão da tela
+O escopo SHALL ser aplicado conforme a **dimensão de cada tela**: telas de dados geográficos (**Legendários, Relatórios, Mapa**) filtram por **cidade** e **igreja**; a tela **Equipes** e o **Organograma** por **equipe**; **TOPs** por **TOP**. Um escopo de um tipo NÃO SHALL vazar para telas de outra dimensão (ex.: escopo de equipe não amplia a listagem de Legendários com membros de outras cidades). Múltiplos escopos do mesmo tipo continuam em união (1-N).
+
+#### Scenario: Escopo de equipe não vaza em Legendários
+- **WHEN** um usuário tem cidade Caldas Novas e equipe ADM, e abre Legendários
+- **THEN** vê apenas legendários de Caldas Novas (o escopo de equipe vale na tela Equipes/Organograma, não em Legendários)
+
+#### Scenario: Relatórios agregados respeitam o escopo
+- **WHEN** um usuário restrito abre relatórios por profissão/perícia
+- **THEN** as contagens consideram apenas os legendários do seu escopo
+
 #### Scenario: Tradução tela→permissions
 - **WHEN** a UI envia "tela=Equipes, nível=Ver e editar"
 - **THEN** o backend resolve o conjunto de permissions daquela tela e nível e aplica como concessões efetivas

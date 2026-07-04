@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { LegendaryStatus } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { hasPermission } from '@/lib/permissions';
 import { useDebounce } from '@/hooks/use-debounce';
 import {
   deactivateLegendario,
@@ -19,7 +20,7 @@ import { ActionMenu } from '@/components/ui/ActionMenu';
 import { Search, MapPin, Eye, Edit2, UserMinus } from 'lucide-react';
 
 export default function LegendariosPage() {
-  const { loading: authLoading } = useRequireAuth();
+  const { user, loading: authLoading } = useRequireAuth();
   const [items, setItems] = useState<Legendary[]>([]);
   const [churches, setChurches] = useState<Church[]>([]);
   const [professions, setProfessions] = useState<Profession[]>([]);
@@ -127,9 +128,11 @@ export default function LegendariosPage() {
           <h1 className="text-2xl font-black tracking-wide text-white uppercase">Legendários</h1>
           <p className="text-sm text-zinc-400">Cadastro central de homens da manada.</p>
         </div>
-        <Link href="/dashboard/legendarios/novo" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
-          Novo Legendário
-        </Link>
+        {hasPermission(user, 'legendarios.create') && (
+          <Link href="/dashboard/legendarios/novo" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
+            Novo Legendário
+          </Link>
+        )}
       </div>
 
       {/* Filters Panel */}

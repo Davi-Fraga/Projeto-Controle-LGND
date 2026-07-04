@@ -110,10 +110,13 @@ describe('AccessControlService (por tela)', () => {
       expect(audit.create).toHaveBeenCalled();
     });
 
-    it('EDIT concede leitura + mutação', async () => {
+    it('EDIT concede leitura + EDIÇÃO, mas NÃO create/delete (admin-only)', async () => {
       await service.setScreenLevel('u1', 'churches', ScreenAccessLevel.EDIT);
       const grantedIds = prisma.userPermissionOverride.upsert.mock.calls.map((c: any[]) => c[0].create.permissionId);
-      expect(grantedIds).toEqual(expect.arrayContaining(['p-read', 'p-create', 'p-update', 'p-delete']));
+      // churches EDIT = churches.read + churches.update; create/delete são administrativos.
+      expect(grantedIds).toEqual(expect.arrayContaining(['p-read', 'p-update']));
+      expect(grantedIds).not.toContain('p-create');
+      expect(grantedIds).not.toContain('p-delete');
     });
 
     it('rejeita tela desconhecida', async () => {

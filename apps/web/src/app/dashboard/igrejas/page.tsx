@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Building2, Edit2, Eye, MapPin, Phone, Trash2, User } from 'lucide-react';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { hasPermission } from '@/lib/permissions';
 import { deleteChurch, getChurches } from '@/features/churches/api';
 import type { Church } from '@/features/churches/api';
 import { ActionMenu } from '@/components/ui/ActionMenu';
@@ -12,7 +13,7 @@ import { ChurchDetailModal } from '@/features/churches/church-detail-modal';
 import { ApiError } from '@/lib/api';
 
 export default function IgrejasPage() {
-  const { loading: authLoading } = useRequireAuth();
+  const { user, loading: authLoading } = useRequireAuth();
   const [churches, setChurches] = useState<Church[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,9 +67,11 @@ export default function IgrejasPage() {
           <h1 className="text-2xl font-black tracking-wide text-white uppercase">Igrejas</h1>
           <p className="text-sm text-zinc-400">Cadastro de igrejas, líderes espirituais e localização.</p>
         </div>
-        <Link href="/dashboard/igrejas/nova" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
-          Nova Igreja
-        </Link>
+        {hasPermission(user, 'churches.create') && (
+          <Link href="/dashboard/igrejas/nova" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
+            Nova Igreja
+          </Link>
+        )}
       </div>
 
       {error && (

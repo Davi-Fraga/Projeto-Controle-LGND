@@ -83,6 +83,24 @@ export class OrgChartService {
     return root;
   }
 
+  // Seletor de EQUIPES do organograma — restrito ao escopo de equipe do usuário.
+  async getTeamOptions(user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    const where: any = { deletedAt: null, status: TeamStatus.ACTIVE };
+    if (!scope.isAdmin) Object.assign(where, this.accessPolicy.buildTeamWhere(scope));
+    const teams = await this.prisma.team.findMany({ where, select: { id: true, name: true }, orderBy: { name: 'asc' } });
+    return teams.map((team: any) => ({ id: team.id, label: team.name, value: team.id }));
+  }
+
+  // Seletor de TOPs do organograma — restrito ao escopo de TOP do usuário.
+  async getTopOptions(user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    const where: any = { deletedAt: null };
+    if (!scope.isAdmin) Object.assign(where, this.accessPolicy.buildTopWhere(scope));
+    const tops = await this.prisma.topEvent.findMany({ where, select: { id: true, name: true, number: true, city: true }, orderBy: { startDate: 'desc' } });
+    return tops.map((top: any) => ({ id: top.id, label: `TOP #${top.number} - ${top.name}`, value: top.id, metadata: { city: top.city } }));
+  }
+
   // Distinct cities (normalized) for the city selector, plus "Sem cidade" when applicable.
   // Restrito ao conjunto de escopos do usuário (Gestor de Cidade só vê suas cidades).
   async getCityOptions(user: AuthenticatedUser): Promise<{ value: string; label: string; count: number }[]> {

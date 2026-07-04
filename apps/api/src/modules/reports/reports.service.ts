@@ -53,8 +53,21 @@ export class ReportsService {
     });
   }
 
-  byProfession() { return this.prisma.profession.findMany({ where: { deletedAt: null }, select: { id: true, name: true, _count: { select: { legendarios: { where: { deletedAt: null } } } } }, orderBy: { name: 'asc' } }); }
-  byExpertise() { return this.prisma.expertise.findMany({ where: { deletedAt: null }, select: { id: true, name: true, _count: { select: { legendarios: true } } }, orderBy: { name: 'asc' } }); }
+  async byProfession(user: AuthenticatedUser) {
+    const legWhere = await this.scopedLegendaryWhere(user);
+    return this.prisma.profession.findMany({ where: { deletedAt: null }, select: { id: true, name: true, _count: { select: { legendarios: { where: legWhere } } } }, orderBy: { name: 'asc' } });
+  }
+
+  async byExpertise(user: AuthenticatedUser) {
+    const legWhere = await this.scopedLegendaryWhere(user);
+    return this.prisma.expertise.findMany({ where: { deletedAt: null }, select: { id: true, name: true, _count: { select: { legendarios: { where: { legendary: legWhere } } } } }, orderBy: { name: 'asc' } });
+  }
+
+  // Where geográfico de legendário (deletedAt + escopo do usuário) para contagens.
+  private async scopedLegendaryWhere(user: AuthenticatedUser): Promise<any> {
+    const scope = await this.accessPolicy.resolveScope(user);
+    return scope.isAdmin ? { deletedAt: null } : { deletedAt: null, AND: [this.accessPolicy.buildLegendaryWhere(scope)] };
+  }
 
   async socialInterested(user: AuthenticatedUser) {
     const scope = await this.accessPolicy.resolveScope(user);

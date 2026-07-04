@@ -16,8 +16,8 @@ export class ReportsController {
   @Get('legendarios/by-city') @Permissions('reports.read') async byCity(@CurrentUser() user: AuthenticatedUser) { return { data: await this.reports.byCity(user) }; }
   @Get('legendarios/by-church') @Permissions('reports.read') async byChurch(@CurrentUser() user: AuthenticatedUser) { return { data: await this.reports.byChurch(user) }; }
   @Get('legendarios/by-team') @Permissions('reports.read') async byTeam(@CurrentUser() user: AuthenticatedUser) { return { data: await this.reports.byTeam(user) }; }
-  @Get('legendarios/by-profession') @Permissions('reports.read') async byProfession() { return { data: await this.reports.byProfession() }; }
-  @Get('legendarios/by-expertise') @Permissions('reports.read') async byExpertise() { return { data: await this.reports.byExpertise() }; }
+  @Get('legendarios/by-profession') @Permissions('reports.read') async byProfession(@CurrentUser() user: AuthenticatedUser) { return { data: await this.reports.byProfession(user) }; }
+  @Get('legendarios/by-expertise') @Permissions('reports.read') async byExpertise(@CurrentUser() user: AuthenticatedUser) { return { data: await this.reports.byExpertise(user) }; }
   @Get('legendarios/social-interested') @Permissions('reports.read') async socialInterested(@CurrentUser() user: AuthenticatedUser) { return { data: await this.reports.socialInterested(user) }; }
   @Get('pending-review') @Permissions('reports.read') async pendingReview(@CurrentUser() user: AuthenticatedUser) { return { data: await this.reports.pendingReview(user) }; }
   @Get('tops/:topId/participants') @Permissions('reports.read') async topParticipants(@Param('topId') topId: string, @CurrentUser() user: AuthenticatedUser) { return { data: await this.reports.topParticipants(topId, user) }; }

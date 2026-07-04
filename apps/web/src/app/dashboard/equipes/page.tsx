@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { TeamStatus } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { hasPermission } from '@/lib/permissions';
 import { useDebounce } from '@/hooks/use-debounce';
 import { deactivateTeam, getTeams } from '@/features/teams/api';
 import type { Team } from '@/features/teams/types';
@@ -14,7 +15,7 @@ import { Search, Eye, Edit2, ShieldAlert, Shield } from 'lucide-react';
 import { formatTeamName } from '@/lib/teams';
 
 export default function TeamsPage() {
-  const { loading: authLoading } = useRequireAuth();
+  const { user, loading: authLoading } = useRequireAuth();
   const [teams, setTeams] = useState<Team[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -77,9 +78,11 @@ export default function TeamsPage() {
           <h1 className="text-2xl font-black tracking-wide text-white uppercase">Equipes</h1>
           <p className="text-sm text-zinc-400">Áreas de serviço e ministérios da manada.</p>
         </div>
-        <Link href="/dashboard/equipes/nova" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
-          Nova Equipe
-        </Link>
+        {hasPermission(user, 'teams.create') && (
+          <Link href="/dashboard/equipes/nova" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
+            Nova Equipe
+          </Link>
+        )}
       </div>
 
       {/* Filters Panel */}

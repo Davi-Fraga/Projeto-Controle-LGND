@@ -60,9 +60,14 @@ export default function UsuariosPage() {
           <h1 className="text-2xl font-black tracking-wide text-white uppercase">Usuários</h1>
           <p className="text-sm text-zinc-400">Acessos do sistema, perfis e vínculo com legendário.</p>
         </div>
-        <Link href="/dashboard/usuarios/novo" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
-          Novo Usuário
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/dashboard/usuarios/convidar" className="inline-flex h-10 items-center justify-center rounded-lg border border-orange-600/50 bg-orange-600/10 px-5 text-xs font-bold uppercase tracking-wider text-orange-400 transition-all hover:bg-orange-600/20">
+            Convidar
+          </Link>
+          <Link href="/dashboard/usuarios/novo" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
+            Novo Usuário
+          </Link>
+        </div>
       </div>
 
       {error && (

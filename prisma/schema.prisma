@@ -40,6 +40,43 @@ enum UserScopeType {
   TOP
 }
 
+enum AuthTokenType {
+  INVITE
+  PASSWORD_RESET
+}
+
+enum AuthTokenStatus {
+  PENDING
+  USED
+  REVOKED
+}
+
+// Token de link único (convite de cadastro e, futuramente, redefinição de senha).
+// Guarda o HASH do token cru (o valor só vai no link), com validade e uso único.
+model AuthToken {
+  id              String          @id @default(uuid()) @db.Uuid
+  type            AuthTokenType
+  tokenHash       String          @unique
+  status          AuthTokenStatus @default(PENDING)
+  expiresAt       DateTime
+  usedAt          DateTime?
+  // Convite (INVITE): identidade + função/escopo iniciais definidos pelo admin.
+  email           String?
+  roles           String[]
+  legendaryId     String?         @db.Uuid
+  metadata        Json?
+  // Redefinição de senha (PASSWORD_RESET), usado pela feature 08.
+  userId          String?         @db.Uuid
+  // Auditoria.
+  createdByUserId String?         @db.Uuid
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([type])
+  @@index([email])
+  @@index([expiresAt])
+}
+
 enum TopEventStatus {
   PLANNED
   REGISTRATION_OPEN

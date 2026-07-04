@@ -17,18 +17,11 @@ export type UserSummary = {
 export type UsersResponse = PaginatedResponse<UserSummary>;
 export type UserResponse = { data: UserSummary };
 
-export type CreateUserPayload = {
-  name: string;
-  email: string;
-  password: string;
-  legendaryId?: string | null;
-  roles?: string[];
-};
-
+// Edição administrativa NÃO inclui senha (o admin nunca define senha de terceiros).
+// Criação de conta é só por convite.
 export type UpdateUserPayload = {
   name?: string;
   email?: string;
-  password?: string;
   legendaryId?: string | null;
   roles?: string[];
 };
@@ -48,10 +41,6 @@ export function getUsers(filters: Record<string, unknown> = { perPage: 200 }) {
 
 export function getUser(id: string) {
   return api<UserResponse>(`/users/${id}`);
-}
-
-export function createUser(payload: CreateUserPayload) {
-  return api<UserResponse>('/users', { method: 'POST', body: JSON.stringify(payload) });
 }
 
 export function updateUser(id: string, payload: UpdateUserPayload) {

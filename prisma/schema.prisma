@@ -363,6 +363,24 @@ model Legendary {
   firstTopExternalText  String?
   firstTopNotes         String?
 
+  // Campos coletados pelo Google Forms da manada (sincronização contínua).
+  // Todos nuláveis/@default → seguros para linhas já existentes. Ver
+  // openspec change `sincronizar-legendarios-via-forms` (design D7).
+  email                 String?              // dado pessoal sensível — exposição restrita por escopo (D12)
+  birthDate             DateTime?            // dado pessoal sensível — exposição restrita por escopo (D12)
+  district              String?              // bairro
+  state                 String?              // UF
+  spiritualLeaderName   String?
+  spiritualLeaderPhone  String?
+  skillsText            String?              // habilidades em texto bruto (sem parse de Expertise)
+  relativeName          String?              // esposa ou mãe
+  relativePhone         String?
+  relativeEmail         String?
+  isSpiritualLeader     Boolean              @default(false)
+  leadershipRole        String?              // "qual sua liderança?" quando isSpiritualLeader
+  lastFormsSyncAt       DateTime?            // timestamp da última resposta aplicada (last-write-wins)
+  formsResponseId       String?              // id da resposta/linha da planilha (idempotência)
+
   @@index([fullName])
   @@index([lgndNumber])
   @@index([phone])
@@ -374,6 +392,7 @@ model Legendary {
   @@index([needsReview])
   @@index([firstTopEventId])
   @@index([firstTopFamilyId])
+  @@index([formsResponseId])
 }
 
 model Church {

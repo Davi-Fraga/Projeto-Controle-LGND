@@ -19,6 +19,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CommunicationsModule } from './modules/communications/communications.module';
 import { SocialActionsModule } from './modules/social-actions/social-actions.module';
 import { PreRegistrationsModule } from './modules/preregistrations/preregistrations.module';
+import { LegendaryFormsSyncModule } from './modules/legendary-forms-sync/legendary-forms-sync.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { MapModule } from './modules/map/map.module';
 import { OrgChartModule } from './modules/org-chart/org-chart.module';
@@ -61,6 +62,7 @@ import { RateLimitGuard } from './common/guards/rate-limit.guard';
     CommunicationsModule,
     SocialActionsModule,
     PreRegistrationsModule,
+    LegendaryFormsSyncModule,
     ReportsModule,
     MapModule,
     OrgChartModule,

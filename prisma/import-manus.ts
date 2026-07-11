@@ -22,69 +22,22 @@
  * NÃO toca em auth, permissões, nem em dados existentes fora dos legendários importados.
  */
 import { PrismaClient, LegendaryStatus, TeamMembershipStatus } from '@prisma/client';
+// Import relativo à fonte (não ao pacote): este script roda com `tsx` a partir da
+// raiz, onde `@central-da-manada/shared` não está linkado. tsx resolve o .ts direto.
+import { canonCity as canonCityShared, cleanPhone, cleanLgnd } from '../packages/shared/src/normalization';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const prisma = new PrismaClient();
 
-// ---- Normalização de cidade -------------------------------------------------
-// Chaves declaradas em texto livre; o lookup real (CITY_LOOKUP) é construído
-// aplicando cityKey() a cada chave, garantindo que entrada e mapa passem pela
-// MESMA normalização. Sem isso, chaves que contêm "goias" (que cityKey remove)
-// nunca casariam e cairiam no fallback Title-Case (pontos duplicados no mapa).
-const CANON_CITY: Record<string, string> = {
-  'caldas novas': 'Caldas Novas', 'caldas nova': 'Caldas Novas', morrinhos: 'Morrinhos',
-  goiania: 'Goiânia', 'aparecida de goiania': 'Aparecida de Goiânia', goiatuba: 'Goiatuba',
-  itatiba: 'Itatiba', mairipotaba: 'Mairipotaba', piracanjuba: 'Piracanjuba',
-  corumbaiba: 'Corumbaíba', itumbiara: 'Itumbiara', 'rio verde': 'Rio Verde',
-  bonfinopolis: 'Bonfinópolis', 'ponta grossa': 'Ponta Grossa', uberlandia: 'Uberlândia',
-  sanclerlandia: 'Sanclerlândia', edeia: 'Edéia', caiaponia: 'Caiapônia', aloandia: 'Aloândia',
-  luziania: 'Luziânia', alvorada: 'Alvorada', 'aguas lindas de goias': 'Águas Lindas de Goiás',
-  ipameri: 'Ipameri', araguari: 'Araguari', 'ribeirao preto': 'Ribeirão Preto',
-  pontalina: 'Pontalina', canapolis: 'Canápolis', marzagao: 'Marzagão', catalao: 'Catalão',
-  'sao paulo': 'São Paulo', 'bela vista de goias': 'Bela Vista de Goiás', brasilia: 'Brasília',
-  jatai: 'Jataí', maraba: 'Marabá',
-};
-
-function cityKey(s: string): string {
-  let k = (s || '').trim().toLowerCase();
-  k = k.normalize('NFD').replace(/[̀-ͯ]/g, ''); // tira acentos
-  k = k.replace(/-/g, ' ');
-  for (const suf of [' goias', ' go']) if (k.endsWith(suf)) k = k.slice(0, -suf.length).trim();
-  return k.replace(/\s+/g, ' ').trim();
-}
-
-// Lookup normalizado: cityKey aplicado também às chaves do mapa.
-const CITY_LOOKUP = new Map<string, string>(
-  Object.entries(CANON_CITY).map(([k, v]) => [cityKey(k), v]),
-);
+// Normalização (cidade/telefone/número) agora vem do helper compartilhado
+// `@central-da-manada/shared` — MESMA lógica usada pelo webhook de sincronização,
+// garantindo chave de dedup idêntica. Ver packages/shared/src/normalization.ts.
 
 // Grafias que caíram no fallback Title-Case (não estavam no mapa) — reportadas no resumo.
 const unmappedCities = new Set<string>();
-
-function canonCity(s: string | null): string | null {
-  if (!s) return null;
-  const k = cityKey(s);
-  if (!k) return null;
-  const mapped = CITY_LOOKUP.get(k);
-  if (mapped) return mapped;
-  unmappedCities.add(s.trim());
-  return k.split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
-
-// ---- Limpeza de telefone e número ------------------------------------------
-function cleanPhone(t: string | null): string | null {
-  let d = (t || '').replace(/\D/g, '');
-  if (d.startsWith('55') && d.length >= 12) d = d.slice(2);
-  if (d.length > 11 && d.startsWith('0')) d = d.replace(/^0+/, '');
-  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-  return d || null;
-}
-function cleanLgnd(n: string | null): string | null {
-  const d = (n || '').replace(/\D/g, '');
-  return d || null;
-}
+const canonCity = (s: string | null): string | null =>
+  canonCityShared(s, (raw) => unmappedCities.add(raw));
 
 // função de liderança? (marca needsReview)
 function isLeadership(funcao: string | null): boolean {

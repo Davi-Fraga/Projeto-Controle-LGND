@@ -27,6 +27,30 @@ export default function LegendarioDetalhePage() {
   if (authLoading || loading) return <main className="p-6 text-sm text-zinc-600">Carregando...</main>;
   if (!legendario) return null;
 
+  // Dados vindos do Google Forms da manada (sincronização contínua). email/birthDate
+  // podem vir omitidos pela API para papéis escopados (D12) — nesse caso exibem "-".
+  const fmtDate = (v?: string | null) => (v ? new Date(v).toLocaleDateString('pt-BR') : '-');
+  const hasFormsData = Boolean(
+    legendario.lastFormsSyncAt || legendario.district || legendario.state || legendario.email ||
+    legendario.birthDate || legendario.spiritualLeaderName || legendario.relativeName ||
+    legendario.skillsText || legendario.isSpiritualLeader || legendario.leadershipRole,
+  );
+  const formsRows: Array<[string, React.ReactNode]> = [
+    ['Bairro', legendario.district || '-'],
+    ['Estado / UF', legendario.state || '-'],
+    ['E-mail', legendario.email || '-'],
+    ['Data de nascimento', fmtDate(legendario.birthDate)],
+    ['Líder espiritual?', legendario.isSpiritualLeader ? 'Sim' : 'Não'],
+    ['Liderança', legendario.leadershipRole || '-'],
+    ['Líder espiritual (nome)', legendario.spiritualLeaderName || '-'],
+    ['Líder espiritual (contato)', legendario.spiritualLeaderPhone || '-'],
+    ['Esposa/Mãe (nome)', legendario.relativeName || '-'],
+    ['Esposa/Mãe (contato)', legendario.relativePhone || '-'],
+    ['Esposa/Mãe (e-mail)', legendario.relativeEmail || '-'],
+    ['Habilidades', legendario.skillsText || '-'],
+    ['Última sincronização', fmtDate(legendario.lastFormsSyncAt)],
+  ];
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Top Bar / Navigation */}
@@ -117,6 +141,7 @@ export default function LegendarioDetalhePage() {
               : []),
           ]}
         />
+        {hasFormsData ? <Info title="Dados do Google Forms" rows={formsRows} /> : null}
       </div>
 
       {/* Expertises Card */}

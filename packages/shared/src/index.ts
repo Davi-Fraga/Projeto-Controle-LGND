@@ -251,6 +251,23 @@ export type Legendary = {
   firstTopExternalText?: string | null;
   firstTopNotes?: string | null;
   topServants?: TopServant[] | null;
+  // Campos do Google Forms da manada (sincronização contínua). `email`/`birthDate`
+  // são dados pessoais sensíveis: só aparecem na visão administrativa restrita por
+  // escopo, nunca em listagens gerais (change `sincronizar-legendarios-via-forms`).
+  email?: string | null;
+  birthDate?: string | null;
+  district?: string | null;
+  state?: string | null;
+  spiritualLeaderName?: string | null;
+  spiritualLeaderPhone?: string | null;
+  skillsText?: string | null;
+  relativeName?: string | null;
+  relativePhone?: string | null;
+  relativeEmail?: string | null;
+  isSpiritualLeader?: boolean;
+  leadershipRole?: string | null;
+  lastFormsSyncAt?: string | null;
+  formsResponseId?: string | null;
 };
 
 export type LegendaryFilters = PaginationParams & {
@@ -553,3 +570,5 @@ export type TopPreRegistration = {
   updatedAt: string;
   deletedAt?: string | null;
 };
+
+export * from './normalization';

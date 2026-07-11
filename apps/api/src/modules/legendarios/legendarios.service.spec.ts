@@ -49,6 +49,42 @@ describe('LegendariosService', () => {
     expect(accessPolicy.buildLegendaryWhere).not.toHaveBeenCalled();
   });
 
+  it('NUNCA expõe email/birthDate em listagem, nem para admin (D12 — dados sensíveis)', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] });
+    prisma.legendary.findMany.mockResolvedValueOnce([
+      { id: '1', fullName: 'Joao', email: 'joao@x.com', birthDate: new Date('1990-01-01'), expertises: [] },
+    ]);
+    prisma.legendary.count.mockResolvedValueOnce(1);
+
+    const result = await service.findAll({ page: 1, perPage: 10 }, adminUser);
+
+    expect(result.data[0]).not.toHaveProperty('email');
+    expect(result.data[0]).not.toHaveProperty('birthDate');
+    expect(result.data[0].fullName).toBe('Joao');
+  });
+
+  it('findOne expõe email/birthDate para admin (visão administrativa de detalhe)', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] });
+    prisma.legendary.findFirst.mockResolvedValueOnce({ id: '1', fullName: 'Joao', email: 'joao@x.com', birthDate: new Date('1990-01-01'), expertises: [] });
+
+    const result: any = await service.findOne('1', adminUser);
+
+    expect(result.email).toBe('joao@x.com');
+    expect(result.birthDate).toBeInstanceOf(Date);
+  });
+
+  it('findOne OCULTA email/birthDate para papel escopado (não-admin)', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: ['church-1'], teamIds: [], legendaryIds: [] });
+    accessPolicy.buildLegendaryWhere.mockReturnValueOnce({ OR: [{ churchId: { in: ['church-1'] } }] });
+    prisma.legendary.findFirst.mockResolvedValueOnce({ id: '1', fullName: 'Joao', email: 'joao@x.com', birthDate: new Date('1990-01-01'), expertises: [] });
+
+    const result: any = await service.findOne('1', restrictedUser);
+
+    expect(result).not.toHaveProperty('email');
+    expect(result).not.toHaveProperty('birthDate');
+    expect(result.fullName).toBe('Joao');
+  });
+
   it('scopes findAll for restricted user by appending AND filter', async () => {
     const scopeFilter = { OR: [{ churchId: { in: ['church-1'] } }] };
     accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: ['church-1'], teamIds: [], legendaryIds: [] });

@@ -69,7 +69,14 @@ export class LegendariosService {
       this.prisma.legendary.count({ where }),
     ]);
 
-    return toPaginatedResponse(items.map((item: any) => this.toResponse(item)), total, page, perPage);
+    // email/birthDate são dados pessoais sensíveis (change sincronizar-legendarios-via-forms,
+    // D12): NUNCA em listagens gerais, para ninguém.
+    return toPaginatedResponse(
+      items.map((item: any) => this.stripSensitive(this.toResponse(item))),
+      total,
+      page,
+      perPage,
+    );
   }
 
   async findOne(id: string, user: AuthenticatedUser) {
@@ -88,7 +95,10 @@ export class LegendariosService {
       throw new NotFoundException('Legendario not found.');
     }
 
-    return this.toResponse(legendario);
+    // Detalhe administrativo: email/birthDate (dados pessoais sensíveis, D12) só para
+    // escopo irrestrito (Administrador). Papéis escopados não recebem esses campos.
+    const response = this.toResponse(legendario);
+    return scope.isAdmin ? response : this.stripSensitive(response);
   }
 
   async options(query: OptionsQueryDto, user: AuthenticatedUser) {
@@ -450,6 +460,19 @@ export class LegendariosService {
       ...legendario,
       expertises: (legendario.expertises ?? []).map((item: any) => item.expertise),
     };
+  }
+
+  /**
+   * Remove dados pessoais sensíveis (email, data de nascimento) da resposta HTTP.
+   * D12: só o escopo administrativo irrestrito vê esses campos, e nunca em listagens.
+   * Não afeta o que é persistido nem os registros de auditoria (internos).
+   */
+  private stripSensitive(response: any) {
+    if (!response) return response;
+    const rest = { ...response };
+    delete rest.email;
+    delete rest.birthDate;
+    return rest;
   }
 
   private async createHistory(

@@ -19,19 +19,21 @@
  * unidades de cidades diferentes.
  *
  * USO:
- *   pnpm tsx scripts/backfill-churches-from-forms.ts "<arquivo.xlsx|.csv>"            # dry-run (gera o arquivo)
+ *   pnpm tsx scripts/backfill-churches-from-forms.ts "<arquivo.xlsx|.csv>"            # dry-run (gera o arquivo de curadoria a partir da planilha)
  *   pnpm tsx scripts/backfill-churches-from-forms.ts "<arquivo.xlsx|.csv>" --force    # regenera, sobrescrevendo edições
- *   pnpm tsx scripts/backfill-churches-from-forms.ts --apply                          # cria a partir do arquivo curado
+ *   pnpm tsx scripts/backfill-churches-from-forms.ts --plan                           # PREVIEW read-only: o que o --apply criaria (lê o banco, não escreve)
+ *   pnpm tsx scripts/backfill-churches-from-forms.ts --apply                          # cria igrejas + aliases a partir do arquivo curado
  */
 import { PrismaClient } from '@prisma/client';
 import { normalizeName } from '../packages/shared/src/normalization';
-import { decideChurchAlias } from '../apps/api/src/modules/legendary-forms-sync/backfill/church-alias-curation';
+import { planChurchBackfill } from '../apps/api/src/modules/legendary-forms-sync/backfill/church-alias-curation';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import * as XLSX from 'xlsx';
 
 const prisma = new PrismaClient();
 const APPLY = process.argv.includes('--apply');
+const PLAN = process.argv.includes('--plan');
 const FORCE = process.argv.includes('--force');
 const FILE_ARG = process.argv.slice(2).find((a) => !a.startsWith('--'));
 const CURATION_PATH = join(__dirname, '..', 'prisma', 'data', 'churches-curation.json');
@@ -229,84 +231,66 @@ async function runDryRun(file: string) {
   console.log('\nRevise/edite o arquivo e depois rode com --apply para criar as igrejas.');
 }
 
-async function runApply() {
+/**
+ * Backfill de igrejas a partir da curadoria. `write=false` (--plan) é preview
+ * READ-ONLY: lê o banco, computa o plano e só relata; `write=true` (--apply)
+ * executa o MESMO plano. Ambos usam `planChurchBackfill` → o preview prevê o apply
+ * com fidelidade. Idempotente por nome normalizado (igrejas) e por normalizedAlias
+ * (aliases). Colisões (D2) são puladas e reportadas por canônico, sem PII.
+ */
+async function runBackfill(write: boolean) {
   if (!existsSync(CURATION_PATH)) {
     throw new Error(`Arquivo de curadoria não encontrado: ${CURATION_PATH}. Rode o dry-run primeiro (sem --apply).`);
   }
   const curation: Curation = JSON.parse(readFileSync(CURATION_PATH, 'utf-8'));
 
-  // 1) Igrejas canônicas — idempotente por nome normalizado. Mapa normName -> churchId
-  //    (existentes + criadas) alimenta a regra de colisão de alias (canônico de outra igreja).
-  const existing = await prisma.church.findMany({ where: { deletedAt: null }, select: { id: true, name: true } });
-  const canonicalOwnerByNorm = new Map<string, string>();
-  for (const c of existing) canonicalOwnerByNorm.set(normalizeName(c.name), c.id);
-
-  let churchesCreated = 0;
-  let churchesSkipped = 0;
-  for (const cluster of curation.clusters) {
-    const name = (cluster.canonical ?? '').trim();
-    if (!name) continue;
-    const key = normalizeName(name);
-    if (canonicalOwnerByNorm.has(key)) { churchesSkipped++; continue; }
-    const church = await prisma.church.create({ data: { name } });
-    canonicalOwnerByNorm.set(key, church.id);
-    churchesCreated++;
-  }
-
-  // 2) Aliases das variantes — idempotente por normalizedAlias; regra de colisão (D2).
+  const existingChurches = await prisma.church.findMany({ where: { deletedAt: null }, select: { id: true, name: true } });
   const existingAliases = await prisma.churchAlias.findMany({ select: { normalizedAlias: true, churchId: true } });
-  const aliasOwnerByNorm = new Map<string, string>();
-  for (const a of existingAliases) aliasOwnerByNorm.set(a.normalizedAlias, a.churchId);
 
-  let aliasesCreated = 0;
-  let aliasesNoop = 0;
-  const collisions: string[] = [];
-  for (const cluster of curation.clusters) {
-    const canonicalName = (cluster.canonical ?? '').trim();
-    if (!canonicalName) continue;
-    const canonicalNormalized = normalizeName(canonicalName);
-    const churchId = canonicalOwnerByNorm.get(canonicalNormalized);
-    if (!churchId) continue;
-    for (const variant of cluster.variants ?? []) {
-      const { decision, normalizedAlias } = decideChurchAlias({
-        variant,
-        churchId,
-        canonicalNormalized,
-        canonicalOwnerByNorm,
-        aliasOwnerByNorm,
-      });
-      if (decision === 'created') {
-        await prisma.churchAlias.create({ data: { churchId, alias: variant, normalizedAlias, source: 'curation' } });
-        aliasOwnerByNorm.set(normalizedAlias, churchId);
-        aliasesCreated++;
-      } else if (decision === 'collision') {
-        collisions.push(`"${variant}" (cluster "${canonicalName}")`);
-      } else {
-        aliasesNoop++;
-      }
+  const plan = planChurchBackfill(curation.clusters, existingChurches, existingAliases);
+
+  if (write) {
+    // Cria as igrejas faltantes e mapeia normName -> id real; depois grava os aliases.
+    const idByNorm = new Map<string, string>(existingChurches.map((c) => [normalizeName(c.name), c.id]));
+    for (const name of plan.churchesToCreate) {
+      const church = await prisma.church.create({ data: { name } });
+      idByNorm.set(normalizeName(name), church.id);
+    }
+    for (const a of plan.aliasesToCreate) {
+      const churchId = idByNorm.get(a.canonicalNormalized);
+      if (!churchId) continue;
+      await prisma.churchAlias.create({ data: { churchId, alias: a.alias, normalizedAlias: a.normalizedAlias, source: 'curation' } });
     }
   }
 
-  console.log('===== APLICADO (a partir do arquivo curado) =====');
-  console.log(`Igrejas criadas:              ${churchesCreated}`);
-  console.log(`Igrejas já existentes:        ${churchesSkipped}`);
-  console.log(`Aliases criados:              ${aliasesCreated}`);
-  console.log(`Aliases já existentes/no-op:  ${aliasesNoop}`);
-  console.log(`Colisões de alias (puladas):  ${collisions.length}`);
-  collisions.forEach((c) => console.log(`  ⚠ ${c}`));
+  const verb = write ? 'criadas' : 'a criar';
+  const aliasVerb = write ? 'criados' : 'a criar';
+  console.log(write ? '===== APLICADO (a partir do arquivo curado) =====' : '===== PLANO (--plan · nada foi escrito) =====');
+  console.log(`Igrejas ${verb}:${' '.repeat(Math.max(1, 15 - verb.length))}${plan.churchesToCreate.length}`);
+  console.log(`Igrejas já existentes:        ${plan.churchesExisting}`);
+  console.log(`Aliases ${aliasVerb}:${' '.repeat(Math.max(1, 15 - aliasVerb.length))}${plan.aliasesToCreate.length}`);
+  console.log(`Aliases já existentes/no-op:  ${plan.aliasNoop}`);
+  console.log(`Colisões de alias (puladas):  ${plan.collisions.length}`);
+  plan.collisions.forEach((c) => console.log(`  ⚠ ${c}`));
   console.log(`Ignorados — review:           ${curation.review?.length ?? 0}`);
   console.log(`Ignorados — generic:          ${curation.generic?.length ?? 0}`);
   console.log(`Ignorados — noise:            ${curation.noise?.length ?? 0}`);
+  if (!write) console.log('\n--plan concluído (read-only). Para escrever, rode com --apply.');
 }
 
 async function main() {
   if (APPLY) {
-    await runApply();
+    await runBackfill(true);
+    return;
+  }
+  if (PLAN) {
+    await runBackfill(false); // preview read-only do que o --apply criaria
     return;
   }
   if (!FILE_ARG) {
-    console.error('Uso: pnpm tsx scripts/backfill-churches-from-forms.ts "<arquivo.xlsx|.csv>" [--force]  (dry-run)');
-    console.error('     pnpm tsx scripts/backfill-churches-from-forms.ts --apply                        (cria do arquivo curado)');
+    console.error('Uso: pnpm tsx scripts/backfill-churches-from-forms.ts "<arquivo.xlsx|.csv>" [--force]  (dry-run: gera a curadoria)');
+    console.error('     pnpm tsx scripts/backfill-churches-from-forms.ts --plan                          (preview read-only do apply)');
+    console.error('     pnpm tsx scripts/backfill-churches-from-forms.ts --apply                         (cria do arquivo curado)');
     process.exit(1);
   }
   if (!existsSync(FILE_ARG)) {

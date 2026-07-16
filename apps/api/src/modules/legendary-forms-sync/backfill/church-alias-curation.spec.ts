@@ -1,4 +1,4 @@
-import { decideChurchAlias } from './church-alias-curation';
+import { decideChurchAlias, planChurchBackfill } from './church-alias-curation';
 import { normalizeName } from '@central-da-manada/shared';
 
 const CANON = 'Primeira Igreja Batista (PIB) — Caldas Novas';
@@ -45,5 +45,46 @@ describe('decideChurchAlias', () => {
 
   it('devolve a forma normalizada da variante', () => {
     expect(decideChurchAlias(ctx({ variant: 'Primeira Batista' })).normalizedAlias).toBe('primeira batista');
+  });
+});
+
+describe('planChurchBackfill', () => {
+  const clusters = [
+    {
+      canonical: 'Primeira Igreja Batista (PIB) — Caldas Novas',
+      variants: ['PIB', 'Primeira Batista', 'Primeira Igreja Batista (PIB) — Caldas Novas'],
+    },
+    { canonical: 'Igreja Sal da Terra', variants: ['Sal da terra'] },
+  ];
+
+  it('banco vazio: conta igrejas e aliases a criar; variante == canônico é no-op', () => {
+    const plan = planChurchBackfill(clusters, [], []);
+    expect(plan.churchesToCreate).toHaveLength(2);
+    expect(plan.churchesExisting).toBe(0);
+    // 'PIB', 'Primeira Batista', 'Sal da terra' → 3; a variante igual ao canônico → no-op
+    expect(plan.aliasesToCreate.map((a) => a.alias).sort()).toEqual(['PIB', 'Primeira Batista', 'Sal da terra']);
+    expect(plan.aliasNoop).toBe(1);
+    expect(plan.collisions).toHaveLength(0);
+  });
+
+  it('igreja existente conta como já existente e não recria', () => {
+    const existing = [{ id: 'ch-sal', name: 'Igreja Sal da Terra' }];
+    const plan = planChurchBackfill(clusters, existing, []);
+    expect(plan.churchesExisting).toBe(1);
+    expect(plan.churchesToCreate).toEqual(['Primeira Igreja Batista (PIB) — Caldas Novas']);
+  });
+
+  it('colisão: variante cujo normalizado é canônico de OUTRA igreja é reportada, não criada', () => {
+    const existing = [{ id: 'ch-outra', name: 'Sal da Terra' }]; // normaliza p/ "sal da terra"
+    const plan = planChurchBackfill(clusters, existing, []);
+    expect(plan.collisions).toEqual(['"Sal da terra" (cluster "Igreja Sal da Terra")']);
+    expect(plan.aliasesToCreate.map((a) => a.alias)).not.toContain('Sal da terra');
+  });
+
+  it('colisão: variante que já é alias de OUTRA igreja é reportada', () => {
+    const existing = [{ id: 'ch-x', name: 'Igreja X' }];
+    const aliases = [{ normalizedAlias: 'pib', churchId: 'ch-x' }];
+    const plan = planChurchBackfill(clusters, existing, aliases);
+    expect(plan.collisions).toContain('"PIB" (cluster "Primeira Igreja Batista (PIB) — Caldas Novas")');
   });
 });

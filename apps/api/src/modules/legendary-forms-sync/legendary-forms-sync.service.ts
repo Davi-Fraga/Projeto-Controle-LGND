@@ -39,7 +39,14 @@ export class LegendaryFormsSyncService {
     private readonly audit: AuditService,
   ) {}
 
-  async ingest(payload: FormsSyncWebhookDto): Promise<FormsSyncResult> {
+  /**
+   * @param db  Transação já aberta pelo chamador (opcional). Quando presente, o serviço
+   *   PARTICIPA dela em vez de abrir a sua — é o caminho do backfill em lote, que roda
+   *   todas as linhas numa transação única e dá ROLLBACK no dry-run. Sem `db`, o
+   *   comportamento é o de produção: uma transação por resposta (webhook).
+   */
+  async ingest(payload: FormsSyncWebhookDto, db?: Prisma.TransactionClient): Promise<FormsSyncResult> {
+    const client = db ?? this.prisma;
     const lgndNumber = cleanLgnd(payload.lgndNumber);
     const fullName = payload.fullName?.trim();
     if (!lgndNumber || !fullName) {
@@ -50,7 +57,7 @@ export class LegendaryFormsSyncService {
       throw new BadRequestException('responseTimestamp inválido.');
     }
 
-    const existing = await this.prisma.legendary.findUnique({ where: { lgndNumber } });
+    const existing = await client.legendary.findUnique({ where: { lgndNumber } });
 
     // Idempotência: mesma resposta já processada (aplicada ou marcada como conflito) → no-op.
     if (existing?.formsResponseId && existing.formsResponseId === payload.responseId) {
@@ -62,7 +69,7 @@ export class LegendaryFormsSyncService {
     }
     // Conflito número-vs-nome: número existe mas o nome diverge → não sobrescrever.
     if (existing && normalizeName(existing.fullName) !== normalizeName(fullName)) {
-      return this.handleConflict(existing, payload, responseTimestamp);
+      return this.handleConflict(existing, payload, responseTimestamp, db);
     }
 
     // ---- Resolução de vínculos + issues de validação (não bloqueiam) ----
@@ -125,7 +132,7 @@ export class LegendaryFormsSyncService {
       formsResponseId: payload.responseId,
     };
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.runInTransaction(db, async (tx) => {
       let legendary;
       let result: 'created' | 'updated';
       if (existing) {
@@ -170,13 +177,14 @@ export class LegendaryFormsSyncService {
     existing: { id: string; fullName: string; notes: string | null },
     payload: FormsSyncWebhookDto,
     responseTimestamp: Date,
+    db?: Prisma.TransactionClient,
   ): Promise<FormsSyncResult> {
     const marker = `[CONFLITO Forms responseId=${payload.responseId}] nome recebido="${payload.fullName}" difere do cadastrado="${existing.fullName}"`;
     const notes = existing.notes?.includes(payload.responseId)
       ? existing.notes
       : [existing.notes, marker].filter(Boolean).join('\n');
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.runInTransaction(db, async (tx) => {
       const updated = await tx.legendary.update({
         where: { id: existing.id },
         // Só sinaliza revisão e registra o conflito; NÃO sobrescreve identidade nem
@@ -207,6 +215,19 @@ export class LegendaryFormsSyncService {
     });
 
     return { result: 'conflict', legendaryId: existing.id, needsReview: true };
+  }
+
+  /**
+   * Executa `fn` na transação injetada (`db`), quando o chamador já abriu uma; senão
+   * abre a própria (`$transaction`). Permite ao backfill rodar todas as linhas numa
+   * transação única e dar ROLLBACK no dry-run, SEM alterar o comportamento de produção
+   * (sem `db`, é exatamente uma transação por resposta, como antes).
+   */
+  private runInTransaction<T>(
+    db: Prisma.TransactionClient | undefined,
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return db ? fn(db) : this.prisma.$transaction(fn);
   }
 
   private async ensureMembership(tx: Prisma.TransactionClient, teamId: string, legendaryId: string) {

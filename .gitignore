@@ -10,3 +10,8 @@ coverage
 *.log
 *.tsbuildinfo
 prisma/dev.db
+
+# Planilhas/exports com dados pessoais (backfill do Forms) — NUNCA versionar
+*.xlsx
+*.csv
+

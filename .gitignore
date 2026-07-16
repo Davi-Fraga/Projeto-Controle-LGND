@@ -15,3 +15,6 @@ prisma/dev.db
 *.xlsx
 *.csv
 
+# Export do Manus com dados pessoais de legendários — removido do versionamento
+prisma/data/manus-membros.json
+

@@ -25,6 +25,7 @@
  */
 import { PrismaClient } from '@prisma/client';
 import { normalizeName } from '../packages/shared/src/normalization';
+import { decideChurchAlias } from '../apps/api/src/modules/legendary-forms-sync/backfill/church-alias-curation';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import * as XLSX from 'xlsx';
@@ -234,26 +235,65 @@ async function runApply() {
   }
   const curation: Curation = JSON.parse(readFileSync(CURATION_PATH, 'utf-8'));
 
-  const existing = await prisma.church.findMany({ where: { deletedAt: null }, select: { name: true } });
-  const existingKeys = new Set(existing.map((c) => normalizeName(c.name)));
+  // 1) Igrejas canônicas — idempotente por nome normalizado. Mapa normName -> churchId
+  //    (existentes + criadas) alimenta a regra de colisão de alias (canônico de outra igreja).
+  const existing = await prisma.church.findMany({ where: { deletedAt: null }, select: { id: true, name: true } });
+  const canonicalOwnerByNorm = new Map<string, string>();
+  for (const c of existing) canonicalOwnerByNorm.set(normalizeName(c.name), c.id);
 
-  let created = 0;
-  let skipped = 0;
-  const seen = new Set<string>();
+  let churchesCreated = 0;
+  let churchesSkipped = 0;
   for (const cluster of curation.clusters) {
     const name = (cluster.canonical ?? '').trim();
     if (!name) continue;
     const key = normalizeName(name);
-    if (existingKeys.has(key) || seen.has(key)) { skipped++; continue; } // idempotente
-    await prisma.church.create({ data: { name } });
-    existingKeys.add(key);
-    seen.add(key);
-    created++;
+    if (canonicalOwnerByNorm.has(key)) { churchesSkipped++; continue; }
+    const church = await prisma.church.create({ data: { name } });
+    canonicalOwnerByNorm.set(key, church.id);
+    churchesCreated++;
+  }
+
+  // 2) Aliases das variantes — idempotente por normalizedAlias; regra de colisão (D2).
+  const existingAliases = await prisma.churchAlias.findMany({ select: { normalizedAlias: true, churchId: true } });
+  const aliasOwnerByNorm = new Map<string, string>();
+  for (const a of existingAliases) aliasOwnerByNorm.set(a.normalizedAlias, a.churchId);
+
+  let aliasesCreated = 0;
+  let aliasesNoop = 0;
+  const collisions: string[] = [];
+  for (const cluster of curation.clusters) {
+    const canonicalName = (cluster.canonical ?? '').trim();
+    if (!canonicalName) continue;
+    const canonicalNormalized = normalizeName(canonicalName);
+    const churchId = canonicalOwnerByNorm.get(canonicalNormalized);
+    if (!churchId) continue;
+    for (const variant of cluster.variants ?? []) {
+      const { decision, normalizedAlias } = decideChurchAlias({
+        variant,
+        churchId,
+        canonicalNormalized,
+        canonicalOwnerByNorm,
+        aliasOwnerByNorm,
+      });
+      if (decision === 'created') {
+        await prisma.churchAlias.create({ data: { churchId, alias: variant, normalizedAlias, source: 'curation' } });
+        aliasOwnerByNorm.set(normalizedAlias, churchId);
+        aliasesCreated++;
+      } else if (decision === 'collision') {
+        collisions.push(`"${variant}" (cluster "${canonicalName}")`);
+      } else {
+        aliasesNoop++;
+      }
+    }
   }
 
   console.log('===== APLICADO (a partir do arquivo curado) =====');
-  console.log(`Igrejas criadas:              ${created}`);
-  console.log(`Já existentes (inalteradas):  ${skipped}`);
+  console.log(`Igrejas criadas:              ${churchesCreated}`);
+  console.log(`Igrejas já existentes:        ${churchesSkipped}`);
+  console.log(`Aliases criados:              ${aliasesCreated}`);
+  console.log(`Aliases já existentes/no-op:  ${aliasesNoop}`);
+  console.log(`Colisões de alias (puladas):  ${collisions.length}`);
+  collisions.forEach((c) => console.log(`  ⚠ ${c}`));
   console.log(`Ignorados — review:           ${curation.review?.length ?? 0}`);
   console.log(`Ignorados — generic:          ${curation.generic?.length ?? 0}`);
   console.log(`Ignorados — noise:            ${curation.noise?.length ?? 0}`);

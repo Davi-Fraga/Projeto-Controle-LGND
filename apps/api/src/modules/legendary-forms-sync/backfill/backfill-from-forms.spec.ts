@@ -46,6 +46,7 @@ describe('backfill-from-forms (serviço real)', () => {
       },
       team: { findMany: jest.fn().mockResolvedValue([{ id: 'tm-midia', name: 'Mídia' }]) },
       church: { findMany: jest.fn().mockResolvedValue([{ id: 'ch-x', name: 'Igreja X' }]) },
+      churchAlias: { findUnique: jest.fn().mockResolvedValue(null) },
       profession: { findMany: jest.fn().mockResolvedValue([{ id: 'pr-ped', name: 'Pedreiro' }]) },
       teamMembership: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn() },
       legendaryHistory: { create: jest.fn() },

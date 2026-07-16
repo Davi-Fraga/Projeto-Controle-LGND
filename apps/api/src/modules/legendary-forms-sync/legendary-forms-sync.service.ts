@@ -73,36 +73,7 @@ export class LegendaryFormsSyncService {
     }
 
     // ---- Resolução de vínculos + issues de validação (não bloqueiam) ----
-    const issues: string[] = [];
-    const churchId = await this.resolveChurchByName(payload.churchName ?? null);
-    const professionId = await this.resolveProfessionByName(payload.profession ?? null);
-    const { teamId, unmatched: teamUnmatched } = await this.resolveTeamByName(payload.team ?? null);
-
-    if (payload.churchName?.trim() && !churchId) issues.push(`Igreja não encontrada: ${payload.churchName.trim()}`);
-    if (payload.profession?.trim() && !professionId) issues.push(`Profissão não encontrada: ${payload.profession.trim()}`);
-    if (teamUnmatched) issues.push(`Equipe não encontrada: ${teamUnmatched}`);
-    if (payload.isSpiritualLeader) issues.push('Declarou-se líder espiritual — revisar liderança.');
-
-    const emailA = normalizeName(payload.email ?? null);
-    const emailB = normalizeName(payload.emailConfirmation ?? null);
-    if (emailA && emailB && emailA !== emailB) issues.push('E-mail e confirmação divergem.');
-
-    let birthDate: Date | null = null;
-    if (payload.birthDate) {
-      const d = new Date(payload.birthDate);
-      if (Number.isNaN(d.getTime())) issues.push(`Data de nascimento inválida: ${payload.birthDate}`);
-      else birthDate = d;
-    }
-
-    // Campos obrigatórios do Forms ausentes → issue (mas ainda faz upsert).
-    for (const [label, value] of [
-      ['telefone', payload.phone], ['e-mail', payload.email], ['bairro', payload.district],
-      ['cidade', payload.city], ['estado', payload.state], ['igreja', payload.churchName],
-      ['profissão', payload.profession], ['esposa/mãe', payload.relativeName],
-    ] as const) {
-      if (!value?.trim()) issues.push(`Campo obrigatório ausente: ${label}`);
-    }
-
+    const { churchId, professionId, teamId, birthDate, issues } = await this.resolveReferencesAndIssues(payload);
     const needsReview = issues.length > 0 || Boolean(existing?.needsReview);
     const city = canonCity(payload.city ?? null);
 
@@ -169,6 +140,99 @@ export class LegendaryFormsSyncService {
       });
 
       return { result, legendaryId: legendary.id, needsReview, issues };
+    });
+  }
+
+  /**
+   * Resolve igreja/profissão/equipe e computa as issues de validação (não bloqueiam).
+   * Caminho ÚNICO de resolução — usado pelo `ingest` (webhook + backfill) e pela
+   * reconciliação retroativa (`reconcileReferences`). Reusa `resolveChurchByName`
+   * (ciente de aliases). Não escreve nada.
+   */
+  private async resolveReferencesAndIssues(payload: FormsSyncWebhookDto): Promise<{
+    churchId?: string;
+    professionId?: string;
+    teamId?: string;
+    teamUnmatched?: string;
+    birthDate: Date | null;
+    issues: string[];
+  }> {
+    const issues: string[] = [];
+    const churchId = await this.resolveChurchByName(payload.churchName ?? null);
+    const professionId = await this.resolveProfessionByName(payload.profession ?? null);
+    const { teamId, unmatched: teamUnmatched } = await this.resolveTeamByName(payload.team ?? null);
+
+    if (payload.churchName?.trim() && !churchId) issues.push(`Igreja não encontrada: ${payload.churchName.trim()}`);
+    if (payload.profession?.trim() && !professionId) issues.push(`Profissão não encontrada: ${payload.profession.trim()}`);
+    if (teamUnmatched) issues.push(`Equipe não encontrada: ${teamUnmatched}`);
+    if (payload.isSpiritualLeader) issues.push('Declarou-se líder espiritual — revisar liderança.');
+
+    const emailA = normalizeName(payload.email ?? null);
+    const emailB = normalizeName(payload.emailConfirmation ?? null);
+    if (emailA && emailB && emailA !== emailB) issues.push('E-mail e confirmação divergem.');
+
+    let birthDate: Date | null = null;
+    if (payload.birthDate) {
+      const d = new Date(payload.birthDate);
+      if (Number.isNaN(d.getTime())) issues.push(`Data de nascimento inválida: ${payload.birthDate}`);
+      else birthDate = d;
+    }
+
+    // Campos obrigatórios do Forms ausentes → issue (mas ainda faz upsert).
+    for (const [label, value] of [
+      ['telefone', payload.phone], ['e-mail', payload.email], ['bairro', payload.district],
+      ['cidade', payload.city], ['estado', payload.state], ['igreja', payload.churchName],
+      ['profissão', payload.profession], ['esposa/mãe', payload.relativeName],
+    ] as const) {
+      if (!value?.trim()) issues.push(`Campo obrigatório ausente: ${label}`);
+    }
+
+    return { churchId, professionId, teamId, teamUnmatched, birthDate, issues };
+  }
+
+  /**
+   * Reconciliação retroativa de VÍNCULOS (change church-name-aliases). Re-resolve
+   * igreja/profissão/equipe da resposta usando o MESMO caminho (`resolveChurchByName`,
+   * agora ciente de aliases) e atualiza `churchId`/`professionId`/`needsReview` +
+   * membership do legendário EXISTENTE. NÃO toca identidade, `lastFormsSyncAt`,
+   * `formsResponseId` nem histórico — por isso é seguro rodar após o backfill (que,
+   * por idempotência, pularia as linhas antes de reresolver). Idempotente: rodar de
+   * novo quando já casado é no-op. Se o legendário não existe, é no-op.
+   */
+  async reconcileReferences(
+    payload: FormsSyncWebhookDto,
+    db?: Prisma.TransactionClient,
+  ): Promise<{ result: 'reconciled' | 'unchanged' | 'not_found'; legendaryId?: string; needsReview?: boolean }> {
+    const client = db ?? this.prisma;
+    const lgndNumber = cleanLgnd(payload.lgndNumber);
+    if (!lgndNumber) return { result: 'not_found' };
+    const existing = await client.legendary.findUnique({
+      where: { lgndNumber },
+      select: { id: true, churchId: true, professionId: true, needsReview: true },
+    });
+    if (!existing) return { result: 'not_found' };
+
+    const { churchId, professionId, teamId, issues } = await this.resolveReferencesAndIssues(payload);
+    const needsReview = issues.length > 0;
+
+    const fieldsChanged =
+      (churchId ?? null) !== existing.churchId ||
+      (professionId ?? null) !== existing.professionId ||
+      needsReview !== existing.needsReview;
+
+    if (!fieldsChanged && !teamId) {
+      return { result: 'unchanged', legendaryId: existing.id, needsReview: existing.needsReview };
+    }
+
+    return this.runInTransaction(db, async (tx) => {
+      if (fieldsChanged) {
+        await tx.legendary.update({
+          where: { id: existing.id },
+          data: { churchId: churchId ?? null, professionId: professionId ?? null, needsReview },
+        });
+      }
+      if (teamId) await this.ensureMembership(tx, teamId, existing.id);
+      return { result: fieldsChanged ? 'reconciled' : 'unchanged', legendaryId: existing.id, needsReview };
     });
   }
 
@@ -248,13 +312,27 @@ export class LegendaryFormsSyncService {
     return match ? { teamId: match.id } : { unmatched: raw };
   }
 
-  /** Resolve Church por nome normalizado. NÃO cria church no runtime (D11). */
+  /**
+   * Resolve Church por nome normalizado, casando por nome canônico OU alias.
+   * Precedência: canônico primeiro; só consulta alias se o canônico não casar
+   * (garante que nunca se cria vínculo errado — change church-name-aliases).
+   * Alias de igreja soft-deleted não resolve. NÃO cria church no runtime (D11).
+   */
   private async resolveChurchByName(name: string | null): Promise<string | undefined> {
     const raw = name?.trim();
     if (!raw) return undefined;
     const target = normalizeName(raw);
+
     const churches = await this.prisma.church.findMany({ where: { deletedAt: null }, select: { id: true, name: true } });
-    return churches.find((c) => normalizeName(c.name) === target)?.id;
+    const canonical = churches.find((c) => normalizeName(c.name) === target)?.id;
+    if (canonical) return canonical;
+
+    const alias = await this.prisma.churchAlias.findUnique({
+      where: { normalizedAlias: target },
+      select: { churchId: true, church: { select: { deletedAt: true } } },
+    });
+    if (alias && !alias.church.deletedAt) return alias.churchId;
+    return undefined;
   }
 
   /** Resolve Profession por nome normalizado. NÃO cria profissão a partir do Forms. */

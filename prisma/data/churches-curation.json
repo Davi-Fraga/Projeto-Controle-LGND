@@ -1,0 +1,523 @@
+{
+  "_leia-me": "Curadoria de igrejas para o --apply. clusters[].canonical SERÁ criado (idempotente por nome normalizado). review NÃO é criado (confirme e mova para clusters se for o caso). generic NÃO vira igreja (o legendário fica needsReview). noise é descartado. Edite livremente: mova nomes entre seções, ajuste canonical/variants. A decisão de agrupamento é sua. Regra: fusões só de grafia da MESMA localidade; cidades/localidades diferentes ficam separadas.",
+  "clusters": [
+    {
+      "canonical": "Primeira Igreja Batista (PIB) — Caldas Novas",
+      "variants": [
+        "PIB",
+        "PIB - Caldas Novas",
+        "PIB - Primeira Igreja Batista",
+        "PIB Caldas",
+        "PIB Caldas novas",
+        "PIB de Caldas Novas GO",
+        "PIB-Primeira Igreja Batista",
+        "Primeira batista",
+        "Primeira igreja batista",
+        "Primeira Igreja Batista (PIB)",
+        "Primeira igreja Batista (PIB) Caldas Novas",
+        "Primeira Igreja Batista (PIB).",
+        "Primeira Igreja Batista de Caldas Novas",
+        "Primeira igreja batista de Caldas novas PIB",
+        "Primeira igreja batista em Caldas novas",
+        "Primeira Igreja Batista em Caldas Novas."
+      ]
+    },
+    {
+      "canonical": "Igreja Vida na Palavra (IVP)",
+      "variants": [
+        "(IVP) IGREJA VIDA NA PALAVRA",
+        "Igreja Vida na Palavra",
+        "IVP",
+        "IVP Igreja Vida na Palavra",
+        "Vida ba palavra",
+        "Vida Na Palavra"
+      ]
+    },
+    {
+      "canonical": "Assembleia de Deus Madureira",
+      "variants": [
+        "ADS - Assembleia de Deus Madureira",
+        "Ass de Deus Madureira",
+        "Assembleia de Deus - Madureira",
+        "Assembleia de Deus Madureira",
+        "Igreja evangélica assembléia de Deus-madureira"
+      ]
+    },
+    {
+      "canonical": "Ministério Palavra da Reconciliação (MPR)",
+      "variants": [
+        "Ministério Palavra da Reconciliação",
+        "MPR",
+        "MPR CALDAS",
+        "MPR Ministerio palavra da reconciliação",
+        "Mpr palavra da reconciliação"
+      ]
+    },
+    {
+      "canonical": "Assembleia de Deus Caldas do Oeste (ADCO)",
+      "variants": [
+        "ADC caldas do oeste",
+        "Adcn Caldas doeste",
+        "ADCO Caldas do Oeste",
+        "Assembleia de Deus caldas do oeste"
+      ]
+    },
+    {
+      "canonical": "Ministério Tempo de Colher",
+      "variants": [
+        "Ministério Evangélico Tempo de Colher",
+        "Ministério tempo de colher",
+        "Templo de colher",
+        "Tempo de colher"
+      ]
+    },
+    {
+      "canonical": "Igreja Batista Vida Nova",
+      "variants": [
+        "A igreja Vida Nova",
+        "Batista Vida Nova",
+        "Igreja Batista Vida Nova"
+      ]
+    },
+    {
+      "canonical": "Igreja Católica São Sebastião",
+      "variants": [
+        "Igreja Católica São Sebastião",
+        "Sao Sebastião",
+        "São Sebastião e Nossa Senhora do Rosário"
+      ]
+    },
+    {
+      "canonical": "Igreja Cristã Nova Aliança (ICNA)",
+      "variants": [
+        "Icna",
+        "IGREJA CRISTÃ NOVA ALIANÇA",
+        "NOVA ALIANÇA"
+      ]
+    },
+    {
+      "canonical": "Igreja da Paz",
+      "variants": [
+        "Igreja da paz",
+        "Igreja da Paz ministério evangélico nazareno",
+        "Igreja da Paz ministério Jesus Nazareno"
+      ]
+    },
+    {
+      "canonical": "Comunidade das Nações — Goiânia",
+      "variants": [
+        "CN Goiânia",
+        "Comunidade das Nações de Goiânia"
+      ]
+    },
+    {
+      "canonical": "Comunidade das Nações — Valparaíso",
+      "variants": [
+        "CN VALPARAÍSO",
+        "Comunidade das Nações - Valparaíso"
+      ]
+    },
+    {
+      "canonical": "Igreja Adventista do Sétimo Dia",
+      "variants": [
+        "Adventista do Sétimo Dia",
+        "Igreja Adventista do Sétimo Dia"
+      ]
+    },
+    {
+      "canonical": "Igreja Amor e Cuidado",
+      "variants": [
+        "Amor e cuidado",
+        "Igreja Amor e Cuidado"
+      ]
+    },
+    {
+      "canonical": "Igreja Batista Kerygma",
+      "variants": [
+        "Batista kerygma",
+        "Igreja batista kerygma"
+      ]
+    },
+    {
+      "canonical": "Igreja Fonte da Vida — Caldas Novas",
+      "variants": [
+        "Fonte da Vida",
+        "Fonte da Vida - Caldas Novas"
+      ]
+    },
+    {
+      "canonical": "Igreja Nova História",
+      "variants": [
+        "Igreja Nova História",
+        "Nova História"
+      ]
+    },
+    {
+      "canonical": "Ministério Internacional Plenitude de Deus",
+      "variants": [
+        "Ministério internacional plenitude de Deus",
+        "Plenitude de Deus"
+      ]
+    },
+    {
+      "canonical": "AD.Manancial Rhema",
+      "variants": [
+        "AD.Manancial Rhema"
+      ]
+    },
+    {
+      "canonical": "ADEG",
+      "variants": [
+        "ADEG"
+      ]
+    },
+    {
+      "canonical": "Aprisco",
+      "variants": [
+        "Aprisco"
+      ]
+    },
+    {
+      "canonical": "Assembleia de Deus Ágape",
+      "variants": [
+        "Assembleia de Deus Ágape"
+      ]
+    },
+    {
+      "canonical": "Assembleia de Deus Caldas Novas (ADCN)",
+      "variants": [
+        "ADCN Caldas Novas"
+      ]
+    },
+    {
+      "canonical": "Assembleia de Deus Ministério Vila Nova",
+      "variants": [
+        "Assembleia de Deus ministério vila nova",
+        "Ministério vila nova"
+      ]
+    },
+    {
+      "canonical": "Assembleia Restaurados por Cristo",
+      "variants": [
+        "Assembleia Restaurados por Cristo"
+      ]
+    },
+    {
+      "canonical": "Batista Itatiba",
+      "variants": [
+        "Batista Itatiba"
+      ]
+    },
+    {
+      "canonical": "Batista renovada",
+      "variants": [
+        "Batista renovada"
+      ]
+    },
+    {
+      "canonical": "Catedral da Família de Rio Verde",
+      "variants": [
+        "Catedarl da Familia de Rio Verde"
+      ]
+    },
+    {
+      "canonical": "Church City",
+      "variants": [
+        "Church City"
+      ]
+    },
+    {
+      "canonical": "Comunidade braseiro",
+      "variants": [
+        "Comunidade braseiro"
+      ]
+    },
+    {
+      "canonical": "Conectados com Deus",
+      "variants": [
+        "Conectados com Deus"
+      ]
+    },
+    {
+      "canonical": "Cristo Redentor",
+      "variants": [
+        "Cristo Redentor"
+      ]
+    },
+    {
+      "canonical": "Family Church",
+      "variants": [
+        "Family Church"
+      ]
+    },
+    {
+      "canonical": "IBAV",
+      "variants": [
+        "IBAV"
+      ]
+    },
+    {
+      "canonical": "IBMG",
+      "variants": [
+        "IBMG"
+      ]
+    },
+    {
+      "canonical": "IBR",
+      "variants": [
+        "IBR"
+      ]
+    },
+    {
+      "canonical": "ICB Casa da Bênção",
+      "variants": [
+        "Icb \"casa da bênção\""
+      ]
+    },
+    {
+      "canonical": "Igreja Apostólica",
+      "variants": [
+        "Igreja apostólica"
+      ]
+    },
+    {
+      "canonical": "Igreja Batista Refúgio",
+      "variants": [
+        "Igreja Batista  Refúgio"
+      ]
+    },
+    {
+      "canonical": "Igreja Batista Água Viva",
+      "variants": [
+        "Igreja Batista Água Viva"
+      ]
+    },
+    {
+      "canonical": "Igreja Batista Água Viva — Itatiba",
+      "variants": [
+        "Igreja Batista Água Viva em Itatiba"
+      ]
+    },
+    {
+      "canonical": "Igreja Batista Atos de Justiça",
+      "variants": [
+        "Igreja Batista Atos de Justiça"
+      ]
+    },
+    {
+      "canonical": "Igreja Batista Ministério da Graça",
+      "variants": [
+        "Igreja Batista Ministério da Graça"
+      ]
+    },
+    {
+      "canonical": "Igreja de Cristo",
+      "variants": [
+        "Igreja de Cristo"
+      ]
+    },
+    {
+      "canonical": "Igreja de Cristo ministério vida de Deus",
+      "variants": [
+        "Igreja de Cristo ministério vida de Deus"
+      ]
+    },
+    {
+      "canonical": "Igreja de Deus",
+      "variants": [
+        "Igreja de Deus"
+      ]
+    },
+    {
+      "canonical": "Igreja de Deus no Brasil",
+      "variants": [
+        "Igreja de Deus no Brasil"
+      ]
+    },
+    {
+      "canonical": "Igreja Evangélica Avivamento Bíblico",
+      "variants": [
+        "Igreja Evangélica Avivamento Bíblico"
+      ]
+    },
+    {
+      "canonical": "Igreja Metodista de Bela Vista de Goiás",
+      "variants": [
+        "Igreja Metodista de bela Vista De Goiás"
+      ]
+    },
+    {
+      "canonical": "Igreja Presbiteriana Força e Luz",
+      "variants": [
+        "Igreja Presbiteriana força e Luz"
+      ]
+    },
+    {
+      "canonical": "Igreja Sal da Terra",
+      "variants": [
+        "Sal da terra"
+      ]
+    },
+    {
+      "canonical": "Igreja Sal da Terra — Morrinhos",
+      "variants": [
+        "Sal da Terra Morrinhos"
+      ]
+    },
+    {
+      "canonical": "Igreja Sal da Terra — Zona Sul",
+      "variants": [
+        "Sal da terra zona sul"
+      ]
+    },
+    {
+      "canonical": "Igreja São Lucas",
+      "variants": [
+        "Igreja sao lucas"
+      ]
+    },
+    {
+      "canonical": "Igreja Sobrenatural",
+      "variants": [
+        "Igreja sobrenatural"
+      ]
+    },
+    {
+      "canonical": "Igreja Vinho Novo",
+      "variants": [
+        "Igreja vinho novo"
+      ]
+    },
+    {
+      "canonical": "Impactados",
+      "variants": [
+        "Impactados"
+      ]
+    },
+    {
+      "canonical": "IMR",
+      "variants": [
+        "Imr"
+      ]
+    },
+    {
+      "canonical": "Luz para os povos",
+      "variants": [
+        "Luz para os povos"
+      ]
+    },
+    {
+      "canonical": "Ministério Apostólico Família",
+      "variants": [
+        "Ministério Apostólico Família"
+      ]
+    },
+    {
+      "canonical": "Ministério salvação pentecostal",
+      "variants": [
+        "Ministério salvação pentecostal"
+      ]
+    },
+    {
+      "canonical": "Monte das oliveiras ADS",
+      "variants": [
+        "Monte das oliveiras ADS"
+      ]
+    },
+    {
+      "canonical": "Paróquia Divino Espírito Santo",
+      "variants": [
+        "Paróquia Divino Espírito Santo"
+      ]
+    },
+    {
+      "canonical": "Paróquia Jesus Bom Pastor",
+      "variants": [
+        "Paroquia jesus bom pastor"
+      ]
+    },
+    {
+      "canonical": "Paróquia Santo Inácio de Loyola",
+      "variants": [
+        "Paróquia Santo Inácio de Loyola"
+      ]
+    },
+    {
+      "canonical": "Paróquia São Francisco de Assis",
+      "variants": [
+        "Paróquia São Francisco de Assis"
+      ]
+    },
+    {
+      "canonical": "Paróquia São Pedro",
+      "variants": [
+        "Paróquia São Pedro"
+      ]
+    },
+    {
+      "canonical": "RG CHURCH",
+      "variants": [
+        "RG CHURCH"
+      ]
+    },
+    {
+      "canonical": "Sara nossa terra",
+      "variants": [
+        "Sara nossa terra"
+      ]
+    },
+    {
+      "canonical": "Semeando a Palavra de Cristo",
+      "variants": [
+        "Semeando a Palavra de Cristo"
+      ]
+    },
+    {
+      "canonical": "Verbo da Vida",
+      "variants": [
+        "Verbo da Vida"
+      ]
+    },
+    {
+      "canonical": "Videira",
+      "variants": [
+        "Videira"
+      ]
+    }
+  ],
+  "review": [
+    {
+      "canonical": "Comunidade das Nações",
+      "variants": [
+        "Comunidade das Nações"
+      ],
+      "note": "Localidade não especificada — confirmar a cidade. NÃO fundida com Goiânia/Valparaíso."
+    },
+    {
+      "canonical": "Primeira Igreja Batista Central",
+      "variants": [
+        "Primeira Igreja Batista Central"
+      ],
+      "note": "Confirmar com a liderança se é a mesma PIB de Caldas Novas ou outra igreja. NÃO fundida por padrão."
+    }
+  ],
+  "generic": [
+    "Assembleia de Deus",
+    "Batista",
+    "Católica",
+    "Evangelica",
+    "Igreja Batista",
+    "Igreja Católica",
+    "Metodista",
+    "Universal"
+  ],
+  "noise": [
+    "Ainda nao tenho",
+    "Casa de estudo espírita Ismael",
+    "Colônia espírita vinha de luz",
+    "Ddd",
+    "Não frequento",
+    "Nenhuma",
+    "Sem igreja no momento"
+  ]
+}

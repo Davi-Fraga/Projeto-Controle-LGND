@@ -10,3 +10,11 @@ coverage
 *.log
 *.tsbuildinfo
 prisma/dev.db
+
+# Planilhas/exports com dados pessoais (backfill do Forms) — NUNCA versionar
+*.xlsx
+*.csv
+
+# Export do Manus com dados pessoais de legendários — removido do versionamento
+prisma/data/manus-membros.json
+

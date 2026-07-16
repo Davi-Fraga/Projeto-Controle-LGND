@@ -410,10 +410,27 @@ model Church {
   updatedAt   DateTime    @updatedAt
   deletedAt   DateTime?
   legendarios Legendary[]
+  aliases     ChurchAlias[]
 
   @@index([name])
   @@index([city])
   @@index([spiritualLeaderUserId])
+}
+
+/// Apelido (variante de grafia) de uma igreja canônica. A resolução do sync casa
+/// por nome canônico OU alias (por nome normalizado). `normalizedAlias` é único
+/// globalmente — a constraint É a regra de colisão (um alias resolve p/ no máx.
+/// uma igreja). Aliases só são criados por curadoria/backfill, nunca no runtime.
+model ChurchAlias {
+  id              String   @id @default(uuid()) @db.Uuid
+  churchId        String   @db.Uuid
+  church          Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  alias           String
+  normalizedAlias String   @unique
+  source          String   @default("curation")
+  createdAt       DateTime @default(now())
+
+  @@index([churchId])
 }
 
 model Profession {

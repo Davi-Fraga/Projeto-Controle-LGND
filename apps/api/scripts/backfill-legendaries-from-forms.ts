@@ -115,6 +115,11 @@ export function readSheet(filePath: string): { headers: string[]; records: Recor
 async function main() {
   const args = process.argv.slice(2);
   const apply = args.includes('--apply');
+  // Reconciliação retroativa (change church-name-aliases): re-resolve igreja/profissão/
+  // equipe dos legendários já existentes e atualiza churchId/needsReview, SEM tocar
+  // identidade/LWW/histórico. Necessário porque um re-run puro do backfill pularia as
+  // linhas por idempotência antes de reresolver.
+  const refreshRefs = args.includes('--refresh-refs');
   const filePath = args.find((a) => !a.startsWith('--'));
 
   if (!filePath) {
@@ -141,20 +146,34 @@ async function main() {
     .map((rec, idx) => ({ rowNum: idx + 2, ...rowToPayload(rec) })) // +2: linha 1 é cabeçalho, 1-based
     .sort((a, b) => (a.timestampMs ?? Number.POSITIVE_INFINITY) - (b.timestampMs ?? Number.POSITIVE_INFINITY));
 
+  const modeLabel = refreshRefs
+    ? `REFRESH-REFS ${apply ? 'APPLY (escreve)' : 'DRY-RUN (nada será escrito)'}`
+    : apply
+      ? 'APPLY (escreve)'
+      : 'DRY-RUN (nada será escrito)';
   console.log(`Arquivo: ${filePath}`);
   console.log(`Linhas de resposta consideradas: ${items.length}`);
-  console.log(`Modo: ${apply ? 'APPLY (escreve)' : 'DRY-RUN (nada será escrito)'}\n`);
+  console.log(`Modo: ${modeLabel}\n`);
 
   const prisma = new PrismaClient();
   const service = new LegendaryFormsSyncService(prisma as any, new AuditService(prisma as any));
 
   const summary = { created: 0, updated: 0, conflict: 0, needsReview: 0, duplicate: 0, stale: 0, validationError: 0 };
+  const reconcileSummary = { reconciled: 0, unchanged: 0, notFound: 0 };
   // Linhas problemáticas: SOMENTE número de legendário + linha + categoria (sem PII).
   const problems: { lgnd: string; rowNum: number; reason: string }[] = [];
   // Motivos de needsReview agregados por categoria (ocorrências; uma linha pode ter várias).
   const reasonCounts = new Map<string, number>();
 
+  const processReconcile = async (item: (typeof items)[number], db?: any) => {
+    const res = await service.reconcileReferences(item.payload, db);
+    if (res.result === 'reconciled') reconcileSummary.reconciled++;
+    else if (res.result === 'unchanged') reconcileSummary.unchanged++;
+    else reconcileSummary.notFound++;
+  };
+
   const processOne = async (item: (typeof items)[number], db?: any) => {
+    if (refreshRefs) return processReconcile(item, db);
     const lgnd = item.payload.lgndNumber || '(sem número)';
     try {
       const res = await service.ingest(item.payload, db);
@@ -214,6 +233,16 @@ async function main() {
   }
 
   // ---- Resumo ----
+  if (refreshRefs) {
+    console.log('===== RESUMO (REFRESH-REFS) =====');
+    console.log(`Total processado:        ${items.length}`);
+    console.log(`Reconciliados (mudaram): ${reconcileSummary.reconciled}`);
+    console.log(`Inalterados (no-op):     ${reconcileSummary.unchanged}`);
+    console.log(`Sem legendário (skip):   ${reconcileSummary.notFound}`);
+    if (!apply) console.log('\nDRY-RUN concluído (nada foi escrito). Para aplicar, rode com --refresh-refs --apply.');
+    return;
+  }
+
   console.log('===== RESUMO =====');
   console.log(`Total processado:        ${items.length}`);
   console.log(`Criados:                 ${summary.created}`);

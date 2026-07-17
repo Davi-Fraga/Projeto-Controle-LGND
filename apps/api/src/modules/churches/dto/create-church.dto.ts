@@ -9,6 +9,12 @@ export class CreateChurchDto {
   @IsString()
   city?: string;
 
+  // Endereço opcional: quando preenchido, melhora a precisão do geocoding
+  // (busca por endereço + cidade antes de nome + cidade).
+  @IsOptional()
+  @IsString()
+  address?: string;
+
   @IsOptional()
   @IsString()
   spiritualLeaderName?: string;

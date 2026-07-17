@@ -23,8 +23,8 @@ export class ChurchesService {
     });
   }
 
-  geocode(name: string | undefined, city: string) {
-    return this.geocoding.geocode(name, city);
+  geocode(name: string | undefined, city: string, locationHint?: string) {
+    return this.geocoding.geocode(name, city, locationHint);
   }
 
   async findOne(id: string) {
@@ -92,11 +92,12 @@ export class ChurchesService {
       await this.validateSpiritualLeaderUser(dto.spiritualLeaderUserId);
     }
 
+    const locationHint = dto.address?.trim() || null;
     let latitude = dto.latitude ?? null;
     let longitude = dto.longitude ?? null;
     // Geocoda apenas quando o usuário não informou coordenadas manualmente.
     if (dto.latitude == null && dto.longitude == null) {
-      const geo = await this.geocoding.geocode(dto.name, dto.city);
+      const geo = await this.geocoding.geocode(dto.name, dto.city, locationHint);
       if (geo) {
         latitude = geo.lat;
         longitude = geo.lng;
@@ -107,6 +108,7 @@ export class ChurchesService {
       data: {
         name: dto.name.trim(),
         city: dto.city?.trim() || null,
+        address: dto.address?.trim() || null,
         spiritualLeaderName: dto.spiritualLeaderName?.trim() || null,
         spiritualLeaderPhone: dto.spiritualLeaderPhone?.trim() || null,
         spiritualLeaderUserId: dto.spiritualLeaderUserId || null,
@@ -134,10 +136,15 @@ export class ChurchesService {
     const hasManualCoords = dto.latitude !== undefined || dto.longitude !== undefined;
     const newName = dto.name !== undefined ? dto.name.trim() : before.name;
     const newCity = dto.city === null ? null : (dto.city !== undefined ? dto.city.trim() : before.city);
-    const nameOrCityChanged = newName !== before.name || newCity !== before.city;
+    const newAddress = dto.address === null ? null : (dto.address !== undefined ? dto.address.trim() : before.address);
+    const newLocationHint = newAddress || null;
+    const geoInputChanged =
+      newName !== before.name ||
+      newCity !== before.city ||
+      newAddress !== before.address;
 
-    if (!hasManualCoords && nameOrCityChanged) {
-      const geo = await this.geocoding.geocode(newName, newCity);
+    if (!hasManualCoords && geoInputChanged) {
+      const geo = await this.geocoding.geocode(newName, newCity, newLocationHint);
       if (geo) {
         latitude = geo.lat;
         longitude = geo.lng;
@@ -149,6 +156,7 @@ export class ChurchesService {
       data: {
         name: dto.name?.trim(),
         city: dto.city === null ? null : (dto.city !== undefined ? dto.city.trim() : undefined),
+        address: dto.address === null ? null : (dto.address !== undefined ? dto.address.trim() : undefined),
         spiritualLeaderName: dto.spiritualLeaderName === null ? null : (dto.spiritualLeaderName !== undefined ? dto.spiritualLeaderName.trim() : undefined),
         spiritualLeaderPhone: dto.spiritualLeaderPhone === null ? null : (dto.spiritualLeaderPhone !== undefined ? dto.spiritualLeaderPhone.trim() : undefined),
         spiritualLeaderUserId: dto.spiritualLeaderUserId !== undefined ? (dto.spiritualLeaderUserId ?? null) : undefined,

@@ -203,6 +203,7 @@ export type Church = {
   id: string;
   name: string;
   city?: string | null;
+  address?: string | null;
   spiritualLeaderName?: string | null;
   spiritualLeaderPhone?: string | null;
   spiritualLeaderUserId?: string | null;

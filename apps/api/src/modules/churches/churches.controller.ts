@@ -29,7 +29,7 @@ export class ChurchesController {
   @Get('geocode')
   @Permissions('churches.read')
   async geocode(@Query() query: GeocodeQueryDto) {
-    return { data: await this.churchesService.geocode(query.name, query.city) };
+    return { data: await this.churchesService.geocode(query.name, query.city, query.address) };
   }
 
   // Rota parametrizada declarada após as estáticas (spiritual-leaders, geocode).

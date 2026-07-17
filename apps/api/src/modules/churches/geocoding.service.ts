@@ -1,10 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { expandBrAbbreviations } from './br-address';
 
-export type GeocodeResult = {
+/** Coordenada crua devolvida pelo Nominatim, antes de anexar a precisão. */
+type GeocodeHit = {
   lat: number;
   lng: number;
   displayName: string;
 };
+
+/**
+ * Nível de precisão do resultado, para o consumidor ser honesto com o usuário:
+ * - `address`: casou pelo endereço informado (preciso);
+ * - `name`: casou por nome da igreja + cidade (aproximado);
+ * - `city`: só a cidade resolveu (centro da cidade — NÃO é o endereço).
+ */
+export type GeocodePrecision = 'address' | 'name' | 'city';
+
+export type GeocodeResult = GeocodeHit & { precision: GeocodePrecision };
 
 type NominatimRow = {
   lat?: string;
@@ -36,40 +48,69 @@ export class GeocodingService {
   private queue: Promise<unknown> = Promise.resolve();
   private lastCallAt = 0;
 
-  async geocode(name?: string | null, city?: string | null): Promise<GeocodeResult | null> {
+  /**
+   * Geocoda em cascata. Quando `locationHint` (endereço da igreja) é informado, ele é
+   * mais específico que o nome e é tentado PRIMEIRO: `endereço + cidade` →
+   * `nome + cidade` → `cidade`. Sem `locationHint`, o comportamento é o original
+   * (`nome + cidade` → `cidade`).
+   */
+  async geocode(name?: string | null, city?: string | null, locationHint?: string | null): Promise<GeocodeResult | null> {
     const trimmedName = name?.trim() || null;
     const trimmedCity = city?.trim() || null;
+    const trimmedHint = locationHint?.trim() || null;
 
-    if (!trimmedName && !trimmedCity) return null;
+    if (!trimmedName && !trimmedCity && !trimmedHint) return null;
 
-    const key = this.cacheKey(trimmedName, trimmedCity);
+    const key = this.cacheKey(trimmedName, trimmedCity, trimmedHint);
     if (this.cache.has(key)) return this.cache.get(key) ?? null;
 
     try {
-      const result = await this.lookup(trimmedName, trimmedCity);
+      const result = await this.lookup(trimmedName, trimmedCity, trimmedHint);
       // cacheia tanto o hit quanto a busca vazia (null), mas nunca um erro
       this.cache.set(key, result);
       return result;
     } catch (error) {
-      this.logger.warn(`Geocoding indisponível para "${trimmedName ?? ''} / ${trimmedCity ?? ''}": ${(error as Error).message}`);
+      this.logger.warn(`Geocoding indisponível para "${trimmedHint ?? trimmedName ?? ''} / ${trimmedCity ?? ''}": ${(error as Error).message}`);
       return null;
     }
   }
 
-  private async lookup(name: string | null, city: string | null): Promise<GeocodeResult | null> {
-    if (name && city) {
-      const byNameAndCity = await this.request(`${name}, ${city}`);
-      if (byNameAndCity) return byNameAndCity;
+  private async lookup(name: string | null, city: string | null, locationHint: string | null): Promise<GeocodeResult | null> {
+    // 1) Endereço (mais preciso). Tenta o texto literal e, se falhar, a versão com
+    //    abreviações BR expandidas ("St." → "Setor"), que o Nominatim reconhece melhor.
+    for (const query of this.hintQueries(locationHint, city)) {
+      const hit = await this.request(query);
+      if (hit) return { ...hit, precision: 'address' };
     }
+    // 2) Nome da igreja + cidade (aproximado).
+    if (name && city) {
+      const hit = await this.request(`${name}, ${city}`);
+      if (hit) return { ...hit, precision: 'name' };
+    }
+    // 3) Só cidade (centro da cidade — último recurso, não é o endereço).
     if (city) {
-      const byCity = await this.request(city);
-      if (byCity) return byCity;
+      const hit = await this.request(city);
+      if (hit) return { ...hit, precision: 'city' };
     }
     return null;
   }
 
+  /**
+   * Consultas a tentar para o endereço, em ordem, sem repetir: texto literal e versão
+   * expandida. A cidade só é anexada quando o endereço ainda NÃO a contém — evita a
+   * query duplicada ("...Goiânia..., Goiânia") que o Nominatim rejeitava.
+   */
+  private hintQueries(locationHint: string | null, city: string | null): string[] {
+    if (!locationHint) return [];
+    const withCity = (text: string) =>
+      city && !this.normalize(text).includes(this.normalize(city)) ? `${text}, ${city}` : text;
+    const raw = withCity(locationHint);
+    const expanded = withCity(expandBrAbbreviations(locationHint));
+    return [...new Set([raw, expanded])];
+  }
+
   /** Uma chamada ao Nominatim, serializada e respeitando o throttle. Lança em erro de rede/resposta inválida. */
-  private request(query: string): Promise<GeocodeResult | null> {
+  private request(query: string): Promise<GeocodeHit | null> {
     const run = this.queue.then(async () => {
       const elapsed = Date.now() - this.lastCallAt;
       const wait = this.minIntervalMs - elapsed;
@@ -85,7 +126,7 @@ export class GeocodingService {
     return run;
   }
 
-  private async fetchOne(query: string): Promise<GeocodeResult | null> {
+  private async fetchOne(query: string): Promise<GeocodeHit | null> {
     const url = `${this.endpoint}?q=${encodeURIComponent(query)}&format=json&limit=1`;
     const response = await fetch(url, { headers: { 'User-Agent': this.userAgent } });
     if (!response.ok) {
@@ -103,8 +144,8 @@ export class GeocodingService {
     return { lat, lng, displayName: first.display_name ?? query };
   }
 
-  private cacheKey(name: string | null, city: string | null): string {
-    return `${this.normalize(name)}|${this.normalize(city)}`;
+  private cacheKey(name: string | null, city: string | null, locationHint: string | null): string {
+    return `${this.normalize(locationHint)}|${this.normalize(name)}|${this.normalize(city)}`;
   }
 
   /** Normaliza para chave de cache: sem acento, caixa baixa, espaços colapsados. */

@@ -9,4 +9,10 @@ export class GeocodeQueryDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  // Endereço opcional: quando informado, o preview geocodifica por ele primeiro
+  // (mais preciso que o centro da cidade), igual ao save.
+  @IsOptional()
+  @IsString()
+  address?: string;
 }

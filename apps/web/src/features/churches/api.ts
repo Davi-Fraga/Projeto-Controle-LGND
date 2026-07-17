@@ -9,6 +9,7 @@ export type ChurchResponse = { data: Church };
 export type ChurchPayload = {
   name: string;
   city?: string | null;
+  address?: string | null;
   spiritualLeaderName?: string | null;
   spiritualLeaderPhone?: string | null;
   spiritualLeaderUserId?: string | null;
@@ -48,11 +49,13 @@ export function deleteChurch(id: string) {
   return api<{ data: Church }>(`/churches/${id}`, { method: 'DELETE' });
 }
 
-export type GeocodeResult = { lat: number; lng: number; displayName: string };
+export type GeocodePrecision = 'address' | 'name' | 'city';
+export type GeocodeResult = { lat: number; lng: number; displayName: string; precision: GeocodePrecision };
 export type GeocodeResponse = { data: GeocodeResult | null };
 
-export function geocodeChurch(params: { city: string; name?: string }) {
+export function geocodeChurch(params: { city: string; name?: string; address?: string }) {
   const query = new URLSearchParams({ city: params.city });
   if (params.name?.trim()) query.set('name', params.name.trim());
+  if (params.address?.trim()) query.set('address', params.address.trim());
   return api<GeocodeResponse>(`/churches/geocode?${query.toString()}`);
 }

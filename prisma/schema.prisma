@@ -399,6 +399,10 @@ model Church {
   id          String      @id @default(uuid()) @db.Uuid
   name        String
   city        String?
+  // Endereço da igreja (opcional). Quando preenchido, o geocoding busca por ele
+  // (mais preciso que nome+cidade), deixando o "Buscar localização automaticamente"
+  // certeiro. Ajuste manual de latitude/longitude continua sendo a fonte de verdade.
+  address     String?
   spiritualLeaderName String?
   spiritualLeaderPhone String?
   spiritualLeaderUserId String? @db.Uuid

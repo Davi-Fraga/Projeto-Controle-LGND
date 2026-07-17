@@ -30,9 +30,20 @@ describe('ChurchesService geocoding integration', () => {
 
       await service.create({ name: 'Igreja Central', city: 'Goiânia' } as any, 'actor');
 
-      expect(geocoding.geocode).toHaveBeenCalledWith('Igreja Central', 'Goiânia');
+      expect(geocoding.geocode).toHaveBeenCalledWith('Igreja Central', 'Goiânia', null);
       expect(prisma.church.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ latitude: -16.68, longitude: -49.26 }) }),
+      );
+    });
+
+    it('usa endereço como locationHint no geocoding e o persiste', async () => {
+      geocoding.geocode.mockResolvedValueOnce({ lat: -16.7, lng: -49.3, displayName: 'Rua X' });
+
+      await service.create({ name: 'Igreja Central', city: 'Goiânia', address: 'Rua X, 100' } as any, 'actor');
+
+      expect(geocoding.geocode).toHaveBeenCalledWith('Igreja Central', 'Goiânia', 'Rua X, 100');
+      expect(prisma.church.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ address: 'Rua X, 100', latitude: -16.7, longitude: -49.3 }) }),
       );
     });
 
@@ -65,9 +76,21 @@ describe('ChurchesService geocoding integration', () => {
 
       await service.update('church-1', { city: 'Anápolis' } as any, 'actor');
 
-      expect(geocoding.geocode).toHaveBeenCalledWith('Antiga', 'Anápolis');
+      expect(geocoding.geocode).toHaveBeenCalledWith('Antiga', 'Anápolis', null);
       expect(prisma.church.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ latitude: -16.68, longitude: -49.26 }) }),
+      );
+    });
+
+    it('geocodifica ao mudar endereço, mesmo sem mudar nome/cidade', async () => {
+      prisma.church.findFirst.mockResolvedValueOnce(before);
+      geocoding.geocode.mockResolvedValueOnce({ lat: -16.7, lng: -49.3, displayName: 'Rua Y' });
+
+      await service.update('church-1', { address: 'Rua Y, 200' } as any, 'actor');
+
+      expect(geocoding.geocode).toHaveBeenCalledWith('Antiga', 'Goiânia', 'Rua Y, 200');
+      expect(prisma.church.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ address: 'Rua Y, 200', latitude: -16.7, longitude: -49.3 }) }),
       );
     });
 
@@ -88,6 +111,16 @@ describe('ChurchesService geocoding integration', () => {
       expect(prisma.church.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ latitude: -5.5, longitude: -6.6 }) }),
       );
+    });
+  });
+
+  describe('geocode (preview)', () => {
+    it('repassa o endereço como hint ao GeocodingService', async () => {
+      geocoding.geocode.mockResolvedValueOnce({ lat: 1, lng: 2, displayName: 'x' });
+
+      await service.geocode('Igreja', 'Goiânia', 'Setor Bueno');
+
+      expect(geocoding.geocode).toHaveBeenCalledWith('Igreja', 'Goiânia', 'Setor Bueno');
     });
   });
 

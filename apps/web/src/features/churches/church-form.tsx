@@ -11,6 +11,7 @@ type Props = { church?: Church };
 type FormState = {
   name: string;
   city: string;
+  address: string;
   spiritualLeaderName: string;
   spiritualLeaderPhone: string;
   spiritualLeaderUserId: string;
@@ -25,6 +26,7 @@ export function ChurchForm({ church }: Props) {
   const [form, setForm] = useState<FormState>({
     name: church?.name ?? '',
     city: church?.city ?? '',
+    address: church?.address ?? '',
     spiritualLeaderName: church?.spiritualLeaderName ?? '',
     spiritualLeaderPhone: church?.spiritualLeaderPhone ?? '',
     spiritualLeaderUserId: church?.spiritualLeaderUserId ?? '',
@@ -36,7 +38,11 @@ export function ChurchForm({ church }: Props) {
   const [loading, setLoading] = useState(false);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoFeedback, setGeoFeedback] = useState<
-    { kind: 'found'; displayName: string } | { kind: 'not-found' } | { kind: 'error' } | null
+    | { kind: 'found'; displayName: string }
+    | { kind: 'approximate'; displayName: string }
+    | { kind: 'not-found' }
+    | { kind: 'error' }
+    | null
   >(null);
 
   async function handleGeocode() {
@@ -44,11 +50,12 @@ export function ChurchForm({ church }: Props) {
     setGeoLoading(true);
     setGeoFeedback(null);
     try {
-      const response = await geocodeChurch({ city: form.city, name: form.name });
+      const response = await geocodeChurch({ city: form.city, name: form.name, address: form.address });
       const result = response.data;
       if (result) {
         setForm((current) => ({ ...current, latitude: String(result.lat), longitude: String(result.lng) }));
-        setGeoFeedback({ kind: 'found', displayName: result.displayName });
+        // Honestidade: só é "encontrado" quando casou pelo endereço. Nome/cidade = aproximado.
+        setGeoFeedback({ kind: result.precision === 'address' ? 'found' : 'approximate', displayName: result.displayName });
       } else {
         setGeoFeedback({ kind: 'not-found' });
       }
@@ -77,6 +84,7 @@ export function ChurchForm({ church }: Props) {
     const payload: ChurchPayload = {
       name: form.name.trim(),
       city: form.city.trim() || null,
+      address: form.address.trim() || null,
       spiritualLeaderName: form.spiritualLeaderName.trim() || null,
       spiritualLeaderPhone: form.spiritualLeaderPhone.trim() || null,
       spiritualLeaderUserId: form.spiritualLeaderUserId || null,
@@ -168,13 +176,23 @@ export function ChurchForm({ church }: Props) {
           </button>
         </div>
         <p className="md:col-span-2 text-[11px] text-zinc-500">
-          A localização pode ser preenchida automaticamente usando o nome e a cidade. Ajuste latitude e longitude
+          A localização pode ser preenchida automaticamente usando o nome e a cidade. Informar o <strong>endereço</strong>{' '}
+          (rua, número, bairro) torna a busca mais precisa e evita cair no centro da cidade. Ajuste latitude e longitude
           manualmente apenas se o resultado estiver incorreto.
         </p>
+        <label className="md:col-span-2 block space-y-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Endereço</span>
+          <input className="input" value={form.address} onChange={(e) => setField('address', e.target.value)} placeholder="Ex.: Av. Orcalino Santos, 123 - Setor Central" />
+        </label>
         {geoFeedback ? (
           <div className="md:col-span-2 text-[11px] font-semibold">
             {geoFeedback.kind === 'found' ? (
               <span className="text-emerald-400">Endereço encontrado: {geoFeedback.displayName}</span>
+            ) : geoFeedback.kind === 'approximate' ? (
+              <span className="text-amber-400">
+                Não encontrei o endereço exato — usei um ponto aproximado ({geoFeedback.displayName}). Confira e ajuste
+                latitude/longitude se necessário.
+              </span>
             ) : geoFeedback.kind === 'not-found' ? (
               <span className="text-amber-400">Nenhuma localização encontrada. Informe latitude e longitude manualmente.</span>
             ) : (

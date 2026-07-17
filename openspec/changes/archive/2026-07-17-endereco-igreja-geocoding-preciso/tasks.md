@@ -27,4 +27,4 @@ Causa-raiz (reproduzida no Nominatim real): (a) o serviço **duplicava a cidade*
 ## 5. Verificação
 
 - [x] 5.1 API lint (eslint+tsc) ✓ · **241 testes ✓** (cascata, expansão BR, no-dup-cidade, precisão, wiring) · web tsc/lint ✓.
-- [ ] 5.2 Verificar na UI real: cadastrar/editar igreja com endereço e conferir o pino + a mensagem de precisão (pendente subir o app).
+- [x] 5.2 Verificado na UI em produção (autor): campo Endereço no formulário + geocoding pelo endereço; deploy via PR #11 + `deploy.sh`.

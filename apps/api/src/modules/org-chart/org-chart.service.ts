@@ -38,19 +38,38 @@ export class OrgChartService {
     const branchLeaderId = team.coordinatorLegendaryId ?? undefined;
     const root = orgNode(`team:${team.id}`, 'group', teamDisplayName(team.name), { subtitle: 'Equipe', leaderId: branchLeaderId });
     const excluded = new Set([team.coordinatorLegendaryId, team.deputyCoordinatorLegendaryId].filter(Boolean) as string[]);
-    const memberNodes = team.memberships
-      .filter((m: any) => !excluded.has(m.legendaryId))
-      .map((m: any) => orgNode(`member:${m.id}`, 'person', m.legendary?.fullName ?? 'Sem nome', { subtitle: m.role || undefined }));
+
+    // Árvore derivada dos vínculos persistidos (change hierarquia-limites-organograma):
+    // memberships agrupadas por managerMembershipId. Sub-coordenador = membership que
+    // gerencia outras; integrante = folha. `null` = direto sob o coordenador.
+    const members = team.memberships.filter((m: any) => !excluded.has(m.legendaryId));
+    const childrenOf = new Map<string, any[]>();
+    for (const m of members) {
+      const key = m.managerMembershipId ?? 'ROOT';
+      const list = childrenOf.get(key) ?? [];
+      list.push(m);
+      childrenOf.set(key, list);
+    }
+    const buildMemberNode = (m: any): OrgChartNode => {
+      const kids = childrenOf.get(m.id) ?? [];
+      const node = orgNode(`member:${m.id}`, kids.length ? 'leader' : 'person', m.legendary?.fullName ?? 'Sem nome', {
+        subtitle: m.role || (kids.length ? 'Sub-coordenador' : undefined),
+        leaderId: branchLeaderId,
+      });
+      for (const child of kids) node.children.push(buildMemberNode(child));
+      return node;
+    };
+    const topMemberNodes = (childrenOf.get('ROOT') ?? []).map(buildMemberNode);
 
     if (team.coordinatorLegendaryId) {
       const coordNode = orgNode(`leader:${team.id}`, 'leader', team.coordinator?.fullName ?? 'Coordenador', { subtitle: 'Coordenador', leaderId: branchLeaderId });
-      coordNode.children.push(...memberNodes);
+      coordNode.children.push(...topMemberNodes);
       root.children.push(coordNode);
       if (team.deputyCoordinatorLegendaryId) {
         root.children.push(orgNode(`deputy:${team.id}`, 'leader', team.deputyCoordinator?.fullName ?? 'Vice-coordenador', { subtitle: 'Vice-coordenador', leaderId: branchLeaderId }));
       }
     } else {
-      root.children.push(...memberNodes);
+      root.children.push(...topMemberNodes);
     }
     annotateCounts(root);
     return root;
@@ -166,12 +185,15 @@ export class OrgChartService {
   }
 
   private populateCityNode(cityNode: OrgChartNode, legendaries: any[], mode: CitiesMode): void {
+    // Modo legendários: hierarquia de gestão derivada (change hierarquia-limites-organograma).
+    // cidade -> Líder -> legendários geridos; quem não tem Líder e não lidera ninguém vai
+    // para o nó "Sem gestor". (2 níveis: Líderes têm cityLeaderId nulo.)
+    if (mode === 'legendaries') {
+      this.populateCityLeaders(cityNode, legendaries);
+      return;
+    }
     for (const legendary of legendaries) {
       const personNode = orgNode(`legendary:${legendary.id}`, 'person', legendary.fullName);
-      if (mode === 'legendaries') {
-        cityNode.children.push(personNode);
-        continue;
-      }
       // churches mode: city -> church -> legendary
       if (legendary.churchId && legendary.church) {
         const churchId = `church:${legendary.churchId}`;
@@ -190,6 +212,46 @@ export class OrgChartService {
         }
         noChurch.children.push(personNode);
       }
+    }
+  }
+
+  /** cidade -> Líder -> geridos; e um nó "Sem gestor" para os não vinculados. */
+  private populateCityLeaders(cityNode: OrgChartNode, legendaries: any[]): void {
+    const byId = new Map<string, any>(legendaries.map((l) => [l.id, l]));
+    const ledBy = new Map<string, any[]>();
+    const leaderIds = new Set<string>();
+    for (const l of legendaries) {
+      if (l.cityLeaderId && byId.has(l.cityLeaderId)) {
+        const list = ledBy.get(l.cityLeaderId) ?? [];
+        list.push(l);
+        ledBy.set(l.cityLeaderId, list);
+        leaderIds.add(l.cityLeaderId);
+      }
+    }
+
+    // Sem nenhum Líder atribuído nesta cidade → lista plana (comportamento anterior),
+    // evita envolver todo mundo num "Sem gestor" enquanto a hierarquia não foi montada.
+    if (leaderIds.size === 0) {
+      for (const l of legendaries) cityNode.children.push(orgNode(`legendary:${l.id}`, 'person', l.fullName));
+      return;
+    }
+
+    // Nós de Líder (topo) com seus geridos como filhos.
+    for (const leaderId of leaderIds) {
+      const leader = byId.get(leaderId);
+      const leaderNode = orgNode(`leader:legendary:${leaderId}`, 'leader', leader?.fullName ?? 'Líder', { subtitle: 'Líder', leaderId });
+      for (const led of ledBy.get(leaderId) ?? []) {
+        leaderNode.children.push(orgNode(`legendary:${led.id}`, 'person', led.fullName));
+      }
+      cityNode.children.push(leaderNode);
+    }
+
+    // "Sem gestor": sem Líder e que não lidera ninguém.
+    const semGestor = legendaries.filter((l) => !l.cityLeaderId && !leaderIds.has(l.id));
+    if (semGestor.length) {
+      const group = orgNode(`${cityNode.id}:no-leader`, 'group', 'Sem gestor');
+      for (const l of semGestor) group.children.push(orgNode(`legendary:${l.id}`, 'person', l.fullName));
+      cityNode.children.push(group);
     }
   }
 }

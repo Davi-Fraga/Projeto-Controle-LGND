@@ -284,10 +284,22 @@ export class LegendariosService {
 
   async deactivate(id: string, actorUserId?: string) {
     const before = await this.findExistingWithDeleted(id);
-    const after = await this.prisma.legendary.update({
-      where: { id },
-      data: { deletedAt: new Date(), status: LegendaryStatus.INACTIVE },
-      include: includeLegendario,
+    const after = await this.prisma.$transaction(async (tx: any) => {
+      // Transição (change hierarquia-limites-organograma): ao inativar um gestor, seus
+      // geridos voltam para "sem gestor" (vínculo nulo) para o admin redistribuir.
+      // Cidade: quem este legendário lidera.
+      await tx.legendary.updateMany({ where: { cityLeaderId: id }, data: { cityLeaderId: null } });
+      // Equipe: integrantes geridos por qualquer membership deste legendário.
+      const memberships = await tx.teamMembership.findMany({ where: { legendaryId: id }, select: { id: true } });
+      const membershipIds = memberships.map((m: any) => m.id);
+      if (membershipIds.length) {
+        await tx.teamMembership.updateMany({ where: { managerMembershipId: { in: membershipIds } }, data: { managerMembershipId: null } });
+      }
+      return tx.legendary.update({
+        where: { id },
+        data: { deletedAt: new Date(), status: LegendaryStatus.INACTIVE },
+        include: includeLegendario,
+      });
     });
 
     await this.audit.create({

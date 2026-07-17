@@ -15,6 +15,7 @@ O Organograma (changes `org-chart-*`, já entregues) é read-only e infere a est
 - Não fundir `coordinatorLegendaryId`/`deputyCoordinatorLegendaryId`.
 - Não reimplementar o controle de acesso/escopo (vem de `user-access-control`/02).
 - Distribuição automática total não é meta (no máximo sugestão de ponto de partida).
+- **UI de redistribuição manual e redesenho visual do Organograma: fora do escopo — feature completa separada.** Esta change entrega só o backend (hierarquia persistida, teto, endpoints de redistribuição, organograma derivado).
 
 ## Decisions
 
@@ -41,10 +42,14 @@ Provável: estado "sem gestor" sinalizado (campo nulo + flag/derivação), não 
 
 Migration nova adicionando os vínculos de gestão, preservando os campos atuais. Backfill conservador (se possível derivar vínculos existentes; senão, todos começam "sem gestor" para o admin distribuir). Implementar atrás de testes do teto, redistribuição, "sem gestor" e transições. Regenerar Prisma client (dev parado) após a migration.
 
-## Open Questions
+## Open Questions (resolvidas — aprovadas pelo Davi em 2026-07-17)
 
-- Modelagem exata do "gerido por" (campo em Legendary vs. tabela de associação) — decidir na inspeção do schema.
-- Estado "sem gestor": campo nulo + derivação, ou flag explícita?
-- Transição de saída/troca: automática (geridos → sem gestor) ou exige confirmação do admin?
-- Backfill: dá para derivar vínculos atuais de `TeamMembership`/cidade, ou começa tudo "sem gestor"?
-- Oferecer ou não a sugestão de distribuição automática nesta entrega?
+- **Modelo do "gerido por": ✅ campos self-relation.** `TeamMembership.managerMembershipId` (integrante → sub-coordenador, ambos memberships da mesma equipe) e `Legendary.cityLeaderId` (legendário → Líder, ambos legendários). Não fundir os campos de coordenação existentes.
+- **"Sem gestor": ✅ campo nulo / derivado.** Sem flag extra. Cidades: `cityLeaderId` nulo = sem Líder. Equipes: `managerMembershipId` nulo = gerido direto pelo coordenador da equipe (membership implícita), não "sem gestor" — o "sem gestor" de fato é o caso das cidades.
+- **Transição: ✅ automática.** Ao sair/trocar/ficar indisponível um gestor (soft-delete, mudança de cidade, inatividade), o backend zera o vínculo dos geridos (→ nulo) para o admin redistribuir.
+- **Backfill: ✅ começa tudo "sem gestor".** Não há sub-estrutura persistida hoje (organograma é plano), então não há o que derivar; colunas nuláveis, linhas existentes ficam sem vínculo até o admin distribuir.
+- **Sugestão automática: ✅ fora desta entrega.** Distribuição 100% manual (fonte de verdade).
+
+### Teto de 10 — interpretação por hierarquia
+- **Cidade:** cada `cityLeaderId` (Líder) ≤ 10 legendários. Cidade com >10 exige mais Líderes (23 → ≥3).
+- **Equipe:** cada `managerMembershipId` (sub-coordenador) ≤ 10 integrantes; o coordenador da equipe ≤ 10 memberships diretas (`managerMembershipId` nulo). Admin (`isAdmin`) isento em ambos.

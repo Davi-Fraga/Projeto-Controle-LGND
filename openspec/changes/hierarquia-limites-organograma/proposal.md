@@ -26,6 +26,6 @@ O Organograma hoje é só visualização — a hierarquia real de quem gerencia 
 - **Affected code**:
   - Prisma: novos campos/tabelas para os vínculos de gestão (Sub-coordenador→Integrantes, Líder→Legendários) preservando `coordinatorLegendaryId`/`deputyCoordinatorLegendaryId`. Migration nova.
   - API: módulo(s) de Teams/Org-chart — validação do teto de 10 e do vínculo com a cidade em create/update/listagem/redistribuição; endpoint de redistribuição manual.
-  - Web: Organograma derivado dos vínculos + UI de redistribuição manual (mover pessoa entre gestores).
+  - Web: **fora do escopo desta change** — a UI de redistribuição manual e o redesenho visual do Organograma viram uma **feature completa separada**. Aqui o backend já expõe o Organograma derivado e os endpoints de redistribuição para essa UI consumir depois.
 - **Dependências**: depende de `controle-acessos-por-usuario` (02) para o escopo por cidade do Gestor de Cidade; provável mudança de schema.
 - **Risco**: médio/alto — muda modelo de dados e regras de consistência. Casos de "sem gestor" e transições (saída/troca de gestor) precisam de tratamento e testes explícitos.

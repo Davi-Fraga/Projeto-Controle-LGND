@@ -21,7 +21,9 @@ describe('LegendariosService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
+      teamMembership: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
       church: { findFirst: jest.fn() },
       profession: { findFirst: jest.fn() },
       expertise: { count: jest.fn() },
@@ -266,6 +268,8 @@ describe('LegendariosService', () => {
 
   it('soft deletes and marks as inactive', async () => {
     prisma.legendary.findUnique.mockResolvedValueOnce({ id: '1', fullName: 'Joao', expertises: [] });
+    // deactivate roda numa transação (libera geridos → sem gestor) e devolve o registro atualizado
+    prisma.$transaction.mockImplementationOnce(async (cb: any) => cb(prisma));
     prisma.legendary.update.mockResolvedValueOnce({
       id: '1',
       fullName: 'Joao',

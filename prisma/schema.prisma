@@ -322,6 +322,12 @@ model Legendary {
   isFromRotaDoCerrado   Boolean              @default(false)
   churchId              String?              @db.Uuid
   church                Church?              @relation(fields: [churchId], references: [id])
+  // Hierarquia de gestão por cidade (change hierarquia-limites-organograma): o Líder
+  // (outro legendário) responsável por este na sua cidade. Nulo = "sem gestor".
+  // Teto: um Líder gerencia no máximo 10 legendários (admin isento).
+  cityLeaderId          String?              @db.Uuid
+  cityLeader            Legendary?           @relation("CityLeader", fields: [cityLeaderId], references: [id])
+  ledLegendaries        Legendary[]          @relation("CityLeader")
   servesInChurch        Boolean              @default(false)
   churchRole            String?
   professionId          String?              @db.Uuid
@@ -387,6 +393,7 @@ model Legendary {
   @@index([city])
   @@index([status])
   @@index([churchId])
+  @@index([cityLeaderId])
   @@index([professionId])
   @@index([socialActionInterest])
   @@index([needsReview])
@@ -510,9 +517,19 @@ model TeamMembership {
   updatedAt   DateTime             @updatedAt
   deletedAt   DateTime?
 
+  // Hierarquia de gestão da equipe (change hierarquia-limites-organograma): o
+  // sub-coordenador (outra membership da MESMA equipe) que gerencia este integrante.
+  // Nulo = gerido direto pelo coordenador da equipe. Teto: um sub-coordenador
+  // gerencia no máximo 10 integrantes; o coordenador, no máximo 10 memberships
+  // diretas (managerMembershipId nulo). Admin isento.
+  managerMembershipId String?          @db.Uuid
+  manager             TeamMembership?  @relation("MembershipManager", fields: [managerMembershipId], references: [id])
+  managed             TeamMembership[] @relation("MembershipManager")
+
   @@index([teamId])
   @@index([legendaryId])
   @@index([status])
+  @@index([managerMembershipId])
 }
 
 model TopEvent {

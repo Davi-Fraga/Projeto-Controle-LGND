@@ -23,6 +23,7 @@ import { LegendaryFormsSyncModule } from './modules/legendary-forms-sync/legenda
 import { ReportsModule } from './modules/reports/reports.module';
 import { MapModule } from './modules/map/map.module';
 import { OrgChartModule } from './modules/org-chart/org-chart.module';
+import { ManagementModule } from './modules/management/management.module';
 import { CacheModule } from './common/cache/cache.module';
 import { AccessPolicyModule } from './common/access/access-policy.module';
 import { AccessControlModule } from './modules/access-control/access-control.module';
@@ -66,6 +67,7 @@ import { RateLimitGuard } from './common/guards/rate-limit.guard';
     ReportsModule,
     MapModule,
     OrgChartModule,
+    ManagementModule,
   ],
   providers: [
     {

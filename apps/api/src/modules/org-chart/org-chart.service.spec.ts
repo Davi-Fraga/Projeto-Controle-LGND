@@ -75,6 +75,28 @@ describe('OrgChartService', () => {
       expect(root.count).toBe(1);
     });
 
+    it('aninha integrantes sob o sub-coordenador (managerMembershipId) — hierarquia derivada', async () => {
+      prisma.team.findFirst.mockResolvedValueOnce({
+        id: 't3',
+        name: 'ADM',
+        coordinatorLegendaryId: 'c1',
+        coordinator: { fullName: 'Coordenador' },
+        deputyCoordinatorLegendaryId: null,
+        deputyCoordinator: null,
+        memberships: [
+          { id: 'sub', legendaryId: 'l1', legendary: { fullName: 'Sub' }, role: 'Sub-coordenador', managerMembershipId: null },
+          { id: 'int', legendaryId: 'l2', legendary: { fullName: 'Integrante' }, role: 'Integrante', managerMembershipId: 'sub' },
+        ],
+      });
+
+      const root = await service.getTeamChart('t3', user);
+      const coord = root.children.find((n) => n.id === 'leader:t3')!;
+      const sub = coord.children.find((n) => n.id === 'member:sub')!;
+      expect(sub.kind).toBe('leader'); // gerencia alguém → vira nó de liderança
+      expect(sub.children.find((n) => n.id === 'member:int')).toBeDefined();
+      expect(coord.children.find((n) => n.id === 'member:int')).toBeUndefined(); // não fica direto no coordenador
+    });
+
     it('strips the "TOP #<n> | " prefix from the team name label', async () => {
       prisma.team.findFirst.mockResolvedValueOnce({ id: 't9', name: 'TOP #1910 | Coordenação', coordinatorLegendaryId: null, coordinator: null, deputyCoordinatorLegendaryId: null, deputyCoordinator: null, memberships: [] });
       const root = await service.getTeamChart('t9', user);
@@ -150,6 +172,24 @@ describe('OrgChartService', () => {
       expect(root.id).toBe('city:goiania');
       expect(root.kind).toBe('city');
       expect(root.count).toBe(2); // both Goiânia spellings, Brasília excluded
+    });
+
+    it('mode=legendaries deriva cidade -> Líder -> geridos + nó "Sem gestor"', async () => {
+      prisma.legendary.findMany.mockResolvedValueOnce([
+        { id: 'lead', fullName: 'Líder', city: 'Goiânia', cityLeaderId: null },
+        { id: 'led', fullName: 'Gerido', city: 'Goiânia', cityLeaderId: 'lead' },
+        { id: 'solo', fullName: 'Sem gestor', city: 'Goiânia', cityLeaderId: null },
+      ]);
+
+      const root = await service.getCitiesChart('legendaries', 'goiania', user);
+
+      const leaderNode = root.children.find((n) => n.id === 'leader:legendary:lead')!;
+      expect(leaderNode.kind).toBe('leader');
+      expect(leaderNode.subtitle).toBe('Líder');
+      expect(leaderNode.children.find((n) => n.id === 'legendary:led')).toBeDefined();
+      const semGestor = root.children.find((n) => n.label === 'Sem gestor')!;
+      expect(semGestor.children.find((n) => n.id === 'legendary:solo')).toBeDefined();
+      expect(semGestor.children.find((n) => n.id === 'legendary:lead')).toBeUndefined(); // Líder não entra em "Sem gestor"
     });
 
     it('denies an out-of-scope city for a city-restricted user (IDOR)', async () => {

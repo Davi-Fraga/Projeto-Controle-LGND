@@ -27,6 +27,17 @@ export class ManagementService {
     if (!legendary) throw new NotFoundException('Legendário não encontrado.');
     if (!scope.isAdmin) await this.assertLegendaryInScope(scope, legendary.id);
 
+    // Fase 4 (change organograma-navegacao-escalavel): mover alguém que LIDERA outros
+    // reestrutura um subgrupo inteiro — é mudança estrutural crítica e exige a permissão
+    // `organogram.structure.change`, além do `group.reorder` que já guarda o endpoint.
+    // Admin é isento. A confirmação no front é UX; a barreira real é aqui.
+    if (!scope.isAdmin) {
+      const leadsOthers = await this.prisma.legendary.count({ where: { cityLeaderId: legendary.id, deletedAt: null } });
+      if (leadsOthers > 0 && !(user.permissions ?? []).includes('organogram.structure.change')) {
+        throw new ForbiddenException('Mover uma liderança é mudança estrutural crítica: exige a permissão organogram.structure.change.');
+      }
+    }
+
     if (dto.leaderId === null) {
       return this.persistCityLeader(legendary.id, null);
     }
@@ -91,6 +102,15 @@ export class ManagementService {
     });
     if (!membership) throw new NotFoundException('Membership não encontrada.');
     if (!scope.isAdmin) this.accessPolicy.assertTeamAllowed(scope, membership.teamId);
+
+    // Fase 4: mover uma membership que gerencia outras (sub-coordenador) reestrutura
+    // um subgrupo → mudança crítica, exige `organogram.structure.change`. Admin isento.
+    if (!scope.isAdmin) {
+      const managesOthers = await this.prisma.teamMembership.count({ where: { managerMembershipId: membership.id, deletedAt: null } });
+      if (managesOthers > 0 && !(user.permissions ?? []).includes('organogram.structure.change')) {
+        throw new ForbiddenException('Mover um sub-coordenador é mudança estrutural crítica: exige a permissão organogram.structure.change.');
+      }
+    }
 
     if (dto.managerMembershipId === null) {
       await this.assertCoordinatorHasRoom(membership);

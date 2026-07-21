@@ -20,7 +20,7 @@ export function SocialActionForm({ value, saving, onChange, onSubmit }: Props) {
       <div className="grid gap-5">
         <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Título do Projeto</span>
-          <input className="input" placeholder="Ex: Sopão Solidário da Manada" value={value.title} onChange={(event) => patch({ title: event.target.value })} />
+          <input className="input" placeholder="Ex.: Sopão Solidário da Manada" value={value.title} onChange={(event) => patch({ title: event.target.value })} />
         </label>
 
         <label className="block space-y-2">
@@ -31,7 +31,7 @@ export function SocialActionForm({ value, saving, onChange, onSubmit }: Props) {
         <div className="grid gap-4 md:grid-cols-3">
           <label className="block space-y-2">
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Local da Ação</span>
-            <input className="input" placeholder="Ex: Praça Central ou Asilo" value={value.location ?? ''} onChange={(event) => patch({ location: event.target.value })} />
+            <input className="input" placeholder="Ex.: Praça Central ou Asilo" value={value.location ?? ''} onChange={(event) => patch({ location: event.target.value })} />
           </label>
           <label className="block space-y-2">
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Cidade</span>
@@ -60,7 +60,7 @@ export function SocialActionForm({ value, saving, onChange, onSubmit }: Props) {
           </label>
           <label className="block space-y-2">
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">ID do Responsável (UUID)</span>
-            <input className="input" placeholder="Ex: a1b2c3d4..." value={value.responsibleLegendaryId} onChange={(event) => patch({ responsibleLegendaryId: event.target.value })} />
+            <input className="input" placeholder="Ex.: a1b2c3d4..." value={value.responsibleLegendaryId} onChange={(event) => patch({ responsibleLegendaryId: event.target.value })} />
           </label>
         </div>
 
@@ -86,4 +86,3 @@ export function SocialActionForm({ value, saving, onChange, onSubmit }: Props) {
     </div>
   );
 }
-

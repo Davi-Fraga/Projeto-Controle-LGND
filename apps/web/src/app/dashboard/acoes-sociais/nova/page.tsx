@@ -25,7 +25,7 @@ export default function NewSocialActionPage() {
       const response = await createSocialAction(payload);
       router.push(`/dashboard/acoes-sociais/${response.data.id}`);
     } catch {
-      setError('Nao foi possivel criar a acao social.');
+      setError('Não foi possível criar a ação social.');
     } finally {
       setSaving(false);
     }
@@ -58,4 +58,3 @@ export default function NewSocialActionPage() {
     </div>
   );
 }
-

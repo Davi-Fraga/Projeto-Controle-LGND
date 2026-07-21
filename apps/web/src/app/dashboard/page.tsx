@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { getCurrentUser } from '@/features/auth/actions';
 import { getDashboardSummary, type DashboardSummary } from '@/features/dashboard/api';
 import type { CurrentUser } from '@/features/auth/types';
+import { hasPermission } from '@/lib/permissions';
 import { DashboardCard } from '@/components/ui/DashboardCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
@@ -95,41 +96,53 @@ export default function DashboardPage() {
           Ações Rápidas
         </h2>
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-          <Link
-            href="/dashboard/legendarios/novo"
-            className="flex items-center justify-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500"
-          >
-            <Plus className="h-4 w-4" />
-            Legendário
-          </Link>
-          <Link
-            href="/dashboard/tops/novo"
-            className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
-          >
-            <Plus className="h-4 w-4" />
-            Novo TOP
-          </Link>
-          <Link
-            href="/dashboard/equipes/nova"
-            className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
-          >
-            <Plus className="h-4 w-4" />
-            Nova Equipe
-          </Link>
-          <Link
-            href="/dashboard/comunicacao/novo"
-            className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
-          >
-            <MessageSquarePlus className="h-4 w-4" />
-            Comunicação
-          </Link>
-          <Link
-            href="/dashboard/relatorios"
-            className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
-          >
-            <FileSpreadsheet className="h-4 w-4" />
-            Relatórios
-          </Link>
+          {/* Cada ação rápida só aparece com a permissão de criar correspondente
+              (usabilidade; o backend já barra). Gating alinhado às telas de lista. */}
+          {hasPermission(user, 'legendarios.create') && (
+            <Link
+              href="/dashboard/legendarios/novo"
+              className="flex items-center justify-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500"
+            >
+              <Plus className="h-4 w-4" />
+              Legendário
+            </Link>
+          )}
+          {hasPermission(user, 'tops.create') && (
+            <Link
+              href="/dashboard/tops/novo"
+              className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
+            >
+              <Plus className="h-4 w-4" />
+              Novo TOP
+            </Link>
+          )}
+          {hasPermission(user, 'teams.create') && (
+            <Link
+              href="/dashboard/equipes/nova"
+              className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
+            >
+              <Plus className="h-4 w-4" />
+              Nova Equipe
+            </Link>
+          )}
+          {hasPermission(user, 'communications.create') && (
+            <Link
+              href="/dashboard/comunicacao/novo"
+              className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
+            >
+              <MessageSquarePlus className="h-4 w-4" />
+              Comunicação
+            </Link>
+          )}
+          {hasPermission(user, 'reports.read') && (
+            <Link
+              href="/dashboard/relatorios"
+              className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Relatórios
+            </Link>
+          )}
         </div>
       </section>
 

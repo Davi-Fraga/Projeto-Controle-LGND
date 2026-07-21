@@ -133,6 +133,65 @@ describe('AccessControlService (por tela)', () => {
     });
   });
 
+  describe('toggles de ação por tela (organograma)', () => {
+    it('reporta os toggles do org-chart com seu estado (granted) a partir das efetivas', async () => {
+      prisma.user.findFirst.mockResolvedValue(
+        buildUser(
+          [],
+          [
+            // tela org-chart concedida via legado (VIEW) + um toggle concedido
+            { key: 'teams.read', effect: 'GRANT' },
+            { key: 'legendarios.read', effect: 'GRANT' },
+            { key: 'tops.read', effect: 'GRANT' },
+            { key: 'organogram.group.move', effect: 'GRANT' },
+          ],
+        ),
+      );
+
+      const acl = await service.getUserScreenAccess('u1');
+      const orgChart = acl.screens.find((s) => s.id === 'org-chart')!;
+      const byKey = Object.fromEntries(orgChart.actionToggles.map((t) => [t.key, t.granted]));
+
+      expect(byKey['organogram.group.move']).toBe(true);
+      expect(byKey['organogram.group.reorder']).toBe(false);
+      expect(byKey['organogram.structure.change']).toBe(false);
+    });
+
+    it('telas sem toggles reportam actionToggles vazio', async () => {
+      prisma.user.findFirst.mockResolvedValue(buildUser([]));
+      const acl = await service.getUserScreenAccess('u1');
+      expect(acl.screens.find((s) => s.id === 'churches')!.actionToggles).toEqual([]);
+    });
+
+    it('setScreenToggle concede um toggle declarado na tela', async () => {
+      prisma.user.findFirst.mockResolvedValue(buildUser([]));
+      prisma.permission.findMany.mockResolvedValue([{ key: 'organogram.group.move', id: 'p-move' }]);
+
+      await service.setScreenToggle('u1', 'org-chart', 'organogram.group.move', true, 'admin');
+
+      expect(prisma.userPermissionOverride.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ create: { userId: 'u1', permissionId: 'p-move', effect: 'GRANT' } }),
+      );
+      expect(audit.create).toHaveBeenCalled();
+    });
+
+    it('setScreenToggle rejeita um toggle não declarado na tela (fail-closed)', async () => {
+      prisma.user.findFirst.mockResolvedValue(buildUser([]));
+      await expect(
+        service.setScreenToggle('u1', 'org-chart', 'organogram.person.edit', true),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.userPermissionOverride.upsert).not.toHaveBeenCalled();
+    });
+
+    it('setScreenToggle rejeita tela desconhecida', async () => {
+      prisma.user.findFirst.mockResolvedValue(buildUser([]));
+      await expect(
+        service.setScreenToggle('u1', 'inexistente', 'organogram.group.move', true),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.userPermissionOverride.upsert).not.toHaveBeenCalled();
+    });
+  });
+
   describe('addScope — validação tela×escopo (inclui TOP)', () => {
     beforeEach(() => {
       prisma.user.findFirst.mockResolvedValue(buildUser([]));

@@ -9,7 +9,7 @@ import { FileSpreadsheet, Download, Search } from 'lucide-react';
 type ReportKey = 'legendarios' | 'city' | 'church' | 'team' | 'profession' | 'expertise' | 'social' | 'pendingReview' | 'topParticipants' | 'topServants' | 'topFamilies' | 'socialParticipants';
 
 const reports: Array<{ key: ReportKey; label: string }> = [
-  { key: 'legendarios', label: 'Todos Legendários' },
+  { key: 'legendarios', label: 'Todos os Legendários' },
   { key: 'city', label: 'Por Cidade' },
   { key: 'church', label: 'Por Igreja' },
   { key: 'team', label: 'Por Equipe' },

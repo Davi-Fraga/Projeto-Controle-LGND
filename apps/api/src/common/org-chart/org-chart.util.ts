@@ -8,7 +8,7 @@ export function orgNode(
   id: string,
   kind: OrgChartNodeKind,
   label: string,
-  extra: { subtitle?: string; leaderId?: string } = {},
+  extra: { subtitle?: string; leaderId?: string; refId?: string } = {},
 ): OrgChartNode {
   return {
     id,
@@ -18,6 +18,7 @@ export function orgNode(
     count: 0,
     ...(extra.subtitle ? { subtitle: extra.subtitle } : {}),
     ...(extra.leaderId ? { leaderId: extra.leaderId } : {}),
+    ...(extra.refId ? { refId: extra.refId } : {}),
   };
 }
 
@@ -28,6 +29,15 @@ export function annotateCounts(node: OrgChartNode): number {
   for (const child of node.children) descendants += annotateCounts(child);
   node.count = descendants;
   return descendants + (node.kind === 'person' ? 1 : 0);
+}
+
+// Projeta a árvore até `depth` níveis a partir deste nó, sem mutar a original.
+// depth 0 => só este nó com filhos podados; cada nó carrega hasChildren indicando
+// se tem filhos reais (para a UI oferecer expandir sob demanda no overview+detail).
+export function projectToDepth(node: OrgChartNode, depth: number): OrgChartNode {
+  const hasChildren = node.children.length > 0;
+  const children = depth > 0 ? node.children.map((child) => projectToDepth(child, depth - 1)) : [];
+  return { ...node, children, hasChildren };
 }
 
 export function normalizeCityKey(city: string): string {

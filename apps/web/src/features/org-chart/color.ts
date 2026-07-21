@@ -1,22 +1,23 @@
-// Deterministic color per leader: same leaderId -> same color, across sessions.
-// Subtree inheritance is resolved at layout time (a node without leaderId uses the
-// nearest ancestor's leaderId). Nodes with no leader anywhere use the neutral color.
+// Cor determinística por líder: mesmo leaderId -> mesma cor, entre sessões. A cor
+// serve só como ESPINHA fina de wayfinding (diferenciar subdivisões), nunca como
+// preenchimento. Por isso a paleta é de baixa saturação e lightness parecida — ela
+// deve sussurrar. O laranja fica RESERVADO ao estado ativo/selecionado (ACCENT).
 
-export const NEUTRAL_COLOR = '#52525b'; // zinc-600
+export const NEUTRAL_COLOR = '#5b5b66'; // espinha neutra (sem líder)
+export const ACCENT = '#f97316';        // laranja: só foco/seleção/rota ativa
 
+// Tons desbotados, mesma família de brilho — leem como "rotas de mapa", não neon.
 const PALETTE = [
-  '#f97316', // orange-500
-  '#3b82f6', // blue-500
-  '#22c55e', // green-500
-  '#a855f7', // purple-500
-  '#ef4444', // red-500
-  '#eab308', // yellow-500
-  '#14b8a6', // teal-500
-  '#ec4899', // pink-500
-  '#8b5cf6', // violet-500
-  '#06b6d4', // cyan-500
-  '#84cc16', // lime-500
-  '#f59e0b', // amber-500
+  '#6f8caf', // steel blue
+  '#5f9e8f', // sage/teal
+  '#a88bb0', // dusty mauve
+  '#b0906a', // muted ochre
+  '#8f9e6b', // muted olive
+  '#9a7b8e', // dusty rose
+  '#6f97a0', // muted cyan-gray
+  '#a0955f', // gold-olive
+  '#8b8fb0', // muted periwinkle
+  '#7fa08a', // muted green
 ];
 
 function hashString(value: string): number {

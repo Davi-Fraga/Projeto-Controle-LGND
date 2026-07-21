@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { normalizeName } from '@central-da-manada/shared';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
@@ -16,9 +17,25 @@ export class ChurchesService {
     private readonly geocoding: GeocodingService,
   ) {}
 
-  findAll() {
+  async findAll(user: AuthenticatedUser, search?: string) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    const and: any[] = [{ deletedAt: null }];
+    // Escopo é obrigatório: para não-admin combina por AND com a busca; a busca
+    // nunca amplia a visibilidade.
+    if (!scope.isAdmin) {
+      and.push(this.accessPolicy.buildChurchWhere(scope));
+    }
+    const term = normalizeName(search ?? '');
+    if (term) {
+      and.push({
+        OR: [
+          { normalizedName: { contains: term } },
+          { aliases: { some: { normalizedAlias: { contains: term } } } },
+        ],
+      });
+    }
     return this.prisma.church.findMany({
-      where: { deletedAt: null },
+      where: { AND: and },
       orderBy: [{ name: 'asc' }, { city: 'asc' }],
     });
   }
@@ -57,15 +74,30 @@ export class ChurchesService {
     return deleted;
   }
 
-  async spiritualLeadersView(user: AuthenticatedUser) {
+  async spiritualLeadersView(user: AuthenticatedUser, search?: string) {
     const scope = await this.accessPolicy.resolveScope(user);
-    const where: any = { deletedAt: null };
+    const and: any[] = [{ deletedAt: null }];
     if (!scope.isAdmin) {
-      Object.assign(where, this.accessPolicy.buildChurchWhere(scope));
+      and.push(this.accessPolicy.buildChurchWhere(scope));
+    }
+
+    // Igreja/alias comparam pelo termo normalizado (acento/caixa-insensível);
+    // nome do usuário líder e o texto livre legado comparam case-insensitive.
+    const raw = (search ?? '').trim();
+    const term = normalizeName(search ?? '');
+    if (term) {
+      and.push({
+        OR: [
+          { normalizedName: { contains: term } },
+          { aliases: { some: { normalizedAlias: { contains: term } } } },
+          { spiritualLeader: { name: { contains: raw, mode: 'insensitive' } } },
+          { spiritualLeaderName: { contains: raw, mode: 'insensitive' } },
+        ],
+      });
     }
 
     return this.prisma.church.findMany({
-      where,
+      where: { AND: and },
       select: {
         id: true,
         name: true,
@@ -83,9 +115,9 @@ export class ChurchesService {
   }
 
   async create(dto: CreateChurchDto, actorUserId?: string) {
-    const normalized = this.normalizeName(dto.name);
+    const normalized = normalizeName(dto.name);
     const churches = await this.prisma.church.findMany({ where: { deletedAt: null } });
-    const existing = churches.find((church: any) => this.normalizeName(church.name) === normalized);
+    const existing = churches.find((church: any) => normalizeName(church.name) === normalized);
     if (existing) return existing;
 
     if (dto.spiritualLeaderUserId) {
@@ -107,6 +139,7 @@ export class ChurchesService {
     const church = await this.prisma.church.create({
       data: {
         name: dto.name.trim(),
+        normalizedName: normalized,
         city: dto.city?.trim() || null,
         address: dto.address?.trim() || null,
         spiritualLeaderName: dto.spiritualLeaderName?.trim() || null,
@@ -155,6 +188,7 @@ export class ChurchesService {
       where: { id },
       data: {
         name: dto.name?.trim(),
+        normalizedName: dto.name !== undefined ? normalizeName(newName) : undefined,
         city: dto.city === null ? null : (dto.city !== undefined ? dto.city.trim() : undefined),
         address: dto.address === null ? null : (dto.address !== undefined ? dto.address.trim() : undefined),
         spiritualLeaderName: dto.spiritualLeaderName === null ? null : (dto.spiritualLeaderName !== undefined ? dto.spiritualLeaderName.trim() : undefined),
@@ -185,9 +219,5 @@ export class ChurchesService {
   private async validateSpiritualLeaderUser(userId: string) {
     const user = await this.prisma.user.findFirst({ where: { id: userId, deletedAt: null, isActive: true } });
     if (!user) throw new BadRequestException('Spiritual leader user not found or inactive.');
-  }
-
-  private normalizeName(value: string) {
-    return value.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().replace(/\s+/g, ' ').toLowerCase();
   }
 }

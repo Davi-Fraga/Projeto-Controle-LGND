@@ -13,7 +13,9 @@ export type SpiritualLeaderChurch = {
   _count: { legendarios: number };
 };
 
-export async function getSpiritualLeaderChurches(): Promise<SpiritualLeaderChurch[]> {
-  const response = await api<{ data: SpiritualLeaderChurch[] }>('/churches/spiritual-leaders');
+export async function getSpiritualLeaderChurches(search?: string): Promise<SpiritualLeaderChurch[]> {
+  const term = search?.trim();
+  const query = term ? `?search=${encodeURIComponent(term)}` : '';
+  const response = await api<{ data: SpiritualLeaderChurch[] }>(`/churches/spiritual-leaders${query}`);
   return response.data;
 }

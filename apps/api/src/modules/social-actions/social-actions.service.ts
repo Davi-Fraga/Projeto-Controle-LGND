@@ -69,8 +69,8 @@ export class SocialActionsService {
         data: participants.map((participant) => ({
           legendaryId: participant.legendaryId,
           type: LegendaryHistoryType.SOCIAL_ACTION_COMPLETED,
-          title: 'Participou de acao social concluida',
-          description: `Acao social concluida: ${after.title}.`,
+          title: 'Participou de ação social concluída',
+          description: `Ação social concluída: ${after.title}.`,
           actorUserId,
           socialActionId: id,
         })),
@@ -104,7 +104,7 @@ export class SocialActionsService {
     await this.ensureParticipantAvailable(id, dto.legendaryId);
     const participant = await this.prisma.socialActionParticipant.create({ data: { socialActionId: id, legendaryId: dto.legendaryId, role: dto.role?.trim() || null, status: dto.status, attended: dto.attended ?? false, notes: dto.notes?.trim() || null }, include: includeParticipant });
     await this.audit.create({ actorUserId, entityType: 'SocialActionParticipant', entityId: participant.id, action: 'add_participant', after: participant });
-    await this.createHistory(dto.legendaryId, LegendaryHistoryType.SOCIAL_ACTION_JOINED, 'Entrou em acao social', `Entrou na acao social ${action.title}.`, actorUserId, id);
+    await this.createHistory(dto.legendaryId, LegendaryHistoryType.SOCIAL_ACTION_JOINED, 'Entrou em ação social', `Entrou na ação social ${action.title}.`, actorUserId, id);
     return participant;
   }
 
@@ -129,7 +129,7 @@ export class SocialActionsService {
     const before = await this.findParticipant(id, participantId);
     const after = await this.prisma.socialActionParticipant.update({ where: { id: participantId }, data: { status: SocialActionParticipantStatus.CANCELLED, deletedAt: new Date() }, include: includeParticipant });
     await this.audit.create({ actorUserId, entityType: 'SocialActionParticipant', entityId: participantId, action: 'remove_participant', before, after });
-    await this.createHistory(before.legendaryId, LegendaryHistoryType.SOCIAL_ACTION_LEFT, 'Saiu de acao social', 'Participacao em acao social cancelada.', actorUserId, id);
+    await this.createHistory(before.legendaryId, LegendaryHistoryType.SOCIAL_ACTION_LEFT, 'Saiu de ação social', 'Participação em ação social cancelada.', actorUserId, id);
     return after;
   }
 

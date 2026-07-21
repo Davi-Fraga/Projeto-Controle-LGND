@@ -24,7 +24,7 @@ export function TopParticipantsTable({ topId }: { topId: string }) {
         setItems(r.data);
         setError(null);
       })
-      .catch(() => setError('Nao foi possivel carregar participantes do TOP.'));
+      .catch(() => setError('Não foi possível carregar participantes do TOP.'));
   }, [topId, refresh]);
 
   function done() {
@@ -39,7 +39,7 @@ export function TopParticipantsTable({ topId }: { topId: string }) {
       await cancelTopParticipant(topId, cancellingId);
       done();
     } catch {
-      setError('Nao foi possivel cancelar o participante.');
+      setError('Não foi possível cancelar o participante.');
     } finally {
       setCancellingId(null);
     }
@@ -82,7 +82,7 @@ export function TopParticipantsTable({ topId }: { topId: string }) {
       <ConfirmDialog
         isOpen={cancellingId !== null}
         title="Cancelar Inscrição"
-        description="Tem certeza que deseja cancelar a inscrição deste participante no TOP? O registro será marcado como CANCELLED."
+        description="Tem certeza que deseja cancelar a inscrição deste participante no TOP? O registro será marcado como cancelado."
         confirmLabel="Confirmar Cancelamento"
         cancelLabel="Voltar"
         onConfirm={handleConfirmCancel}

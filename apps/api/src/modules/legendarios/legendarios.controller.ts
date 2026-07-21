@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Permissions } from '../../common/decorators/permissions.decorator';
+import { AnyPermissions, Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -28,7 +28,7 @@ export class LegendariosController {
   }
 
   @Get(':id')
-  @Permissions('legendarios.read')
+  @AnyPermissions('legendarios.read', 'teams.members.read')
   async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return { data: await this.legendariosService.findOne(id, user) };
   }
@@ -52,8 +52,9 @@ export class LegendariosController {
   }
 
   @Patch(':id')
-  @Permissions('legendarios.update')
-  async update(@Param('id') id: string, @Body() dto: UpdateLegendarioDto, @CurrentUser() user: { sub: string }) {
+  @AnyPermissions('legendarios.update', 'organogram.person.edit')
+  async update(@Param('id') id: string, @Body() dto: UpdateLegendarioDto, @CurrentUser() user: AuthenticatedUser) {
+    await this.legendariosService.findOne(id, user);
     return { data: await this.legendariosService.update(id, dto, user.sub) };
   }
 

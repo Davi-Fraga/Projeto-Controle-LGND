@@ -68,11 +68,11 @@ export type TopServantPayload = {
 
 export type TopFamilyPayload = {
   name?: string;
-  representativeLegendaryId?: string;
-  representativeRole?: string;
-  deputyRepresentativeLegendaryId?: string;
-  deputyRepresentativeRole?: string;
-  notes?: string;
+  representativeLegendaryId?: string | null;
+  representativeRole?: string | null;
+  deputyRepresentativeLegendaryId?: string | null;
+  deputyRepresentativeRole?: string | null;
+  notes?: string | null;
   needsReview?: boolean;
 };
 

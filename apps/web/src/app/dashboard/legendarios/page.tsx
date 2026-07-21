@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { LegendaryStatus } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { hasPermission } from '@/lib/permissions';
@@ -17,28 +18,43 @@ import type { Church, Expertise, Legendary, Profession } from '@/features/legend
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ActionMenu } from '@/components/ui/ActionMenu';
-import { Search, MapPin, Eye, Edit2, UserMinus } from 'lucide-react';
+import { TeamFilter } from '@/features/teams/team-filter';
+import { Search, MapPin, Eye, Edit2, UserMinus, X } from 'lucide-react';
 
 export default function LegendariosPage() {
+  return (
+    <Suspense fallback={<LegendariosLoading />}>
+      <LegendariosContent />
+    </Suspense>
+  );
+}
+
+function LegendariosContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const churchIdParam = searchParams.get('churchId') ?? '';
+  const churchNameParam = searchParams.get('churchName') ?? '';
   const { user, loading: authLoading } = useRequireAuth();
   const [items, setItems] = useState<Legendary[]>([]);
   const [churches, setChurches] = useState<Church[]>([]);
   const [professions, setProfessions] = useState<Profession[]>([]);
   const [expertises, setExpertises] = useState<Expertise[]>([]);
+  const [teamLabel, setTeamLabel] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 500);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState(() => ({
     status: '',
     city: '',
-    churchId: '',
+    churchId: churchIdParam,
+    teamId: '',
     professionId: '',
     expertiseId: '',
     socialActionInterest: '',
     isFromRotaDoCerrado: '',
     needsReview: '',
-  });
+  }));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Guarda anti-race: só a resposta da requisição mais recente é aplicada.
@@ -58,6 +74,15 @@ export default function LegendariosPage() {
   }, []);
 
   useEffect(() => {
+    setFilters((current) => (
+      current.churchId === churchIdParam
+        ? current
+        : { ...current, churchId: churchIdParam }
+    ));
+    setPage(1);
+  }, [churchIdParam]);
+
+  useEffect(() => {
     if (authLoading) return;
 
     const requestId = ++requestIdRef.current;
@@ -69,6 +94,7 @@ export default function LegendariosPage() {
       status: (filters.status as LegendaryStatus) || undefined,
       city: filters.city || undefined,
       churchId: filters.churchId || undefined,
+      teamId: filters.teamId || undefined,
       professionId: filters.professionId || undefined,
       expertiseId: filters.expertiseId || undefined,
       socialActionInterest: filters.socialActionInterest === '' ? undefined : filters.socialActionInterest === 'true',
@@ -96,6 +122,29 @@ export default function LegendariosPage() {
     setFilters((current) => ({ ...current, [key]: value }));
     setPage(1);
   }
+
+  function updateChurchFilter(value: string) {
+    updateFilter('churchId', value);
+
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) {
+      const churchName = churches.find((church) => church.id === value)?.name;
+      params.set('churchId', value);
+      if (churchName) params.set('churchName', churchName);
+      else params.delete('churchName');
+    } else {
+      params.delete('churchId');
+      params.delete('churchName');
+    }
+
+    const query = params.toString();
+    router.replace(query ? `/dashboard/legendarios?${query}` : '/dashboard/legendarios');
+  }
+
+  const selectedChurch = churches.find((church) => church.id === filters.churchId);
+  const activeChurchLabel = (filters.churchId === churchIdParam ? churchNameParam : '')
+    || selectedChurch?.name
+    || 'Igreja selecionada';
 
   async function handleConfirmDeactivate() {
     if (!deactivatingId) return;
@@ -154,10 +203,29 @@ export default function LegendariosPage() {
             ))}
           </select>
           
-          <select className="input" value={filters.churchId} onChange={(event) => updateFilter('churchId', event.target.value)}>
+          <select
+            aria-label="Filtrar por igreja"
+            className="input"
+            value={filters.churchId}
+            onChange={(event) => updateChurchFilter(event.target.value)}
+          >
             <option value="">Todas as igrejas</option>
+            {filters.churchId && !selectedChurch ? (
+              <option value={filters.churchId}>{activeChurchLabel}</option>
+            ) : null}
             {churches.map((church) => <option key={church.id} value={church.id}>{church.name}</option>)}
           </select>
+
+          {hasPermission(user, 'teams.read') ? (
+            <TeamFilter
+              value={filters.teamId}
+              selectedLabel={teamLabel}
+              onChange={(value, label) => {
+                setTeamLabel(label);
+                updateFilter('teamId', value);
+              }}
+            />
+          ) : null}
           
           <select className="input" value={filters.professionId} onChange={(event) => updateFilter('professionId', event.target.value)}>
             <option value="">Todas as profissões</option>
@@ -186,6 +254,19 @@ export default function LegendariosPage() {
             <option value="false">Sem pendência</option>
           </select>
         </div>
+        {filters.churchId ? (
+          <div className="mt-3 inline-flex min-h-8 items-center gap-2 rounded-md border border-orange-500/30 bg-orange-500/10 px-3 text-xs font-semibold text-orange-300">
+            <span>Igreja: {activeChurchLabel}</span>
+            <button
+              type="button"
+              aria-label="Limpar filtro de igreja"
+              className="inline-flex h-6 w-6 items-center justify-center rounded text-orange-300 transition-colors hover:bg-orange-500/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+              onClick={() => updateChurchFilter('')}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {error && (
@@ -298,6 +379,17 @@ export default function LegendariosPage() {
         onCancel={() => setDeactivatingId(null)}
         variant="danger"
       />
+    </div>
+  );
+}
+
+function LegendariosLoading() {
+  return (
+    <div className="flex h-[50vh] items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
+        <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Carregando...</span>
+      </div>
     </div>
   );
 }

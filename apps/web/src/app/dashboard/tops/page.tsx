@@ -90,7 +90,7 @@ export default function TopsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-wide text-white uppercase">TOPs</h1>
-          <p className="text-sm text-zinc-400">Eventos de acampamento principal do Legendários.</p>
+          <p className="text-sm text-zinc-400">Eventos de acampamento principal dos Legendários.</p>
         </div>
         {hasPermission(user, 'tops.create') && (
           <Link href="/dashboard/tops/novo" className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">

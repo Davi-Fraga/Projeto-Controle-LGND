@@ -33,6 +33,8 @@ describe('LegendariosService', () => {
     accessPolicy = {
       resolveScope: jest.fn(),
       buildLegendaryWhere: jest.fn(),
+      buildLegendaryDetailWhere: jest.fn(),
+      buildTeamMembershipWhere: jest.fn(),
     };
     service = new LegendariosService(prisma, audit, accessPolicy);
   });
@@ -77,7 +79,7 @@ describe('LegendariosService', () => {
 
   it('findOne OCULTA email/birthDate para papel escopado (não-admin)', async () => {
     accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: ['church-1'], teamIds: [], legendaryIds: [] });
-    accessPolicy.buildLegendaryWhere.mockReturnValueOnce({ OR: [{ churchId: { in: ['church-1'] } }] });
+    accessPolicy.buildLegendaryDetailWhere.mockReturnValueOnce({ OR: [{ churchId: { in: ['church-1'] } }] });
     prisma.legendary.findFirst.mockResolvedValueOnce({ id: '1', fullName: 'Joao', email: 'joao@x.com', birthDate: new Date('1990-01-01'), expertises: [] });
 
     const result: any = await service.findOne('1', restrictedUser);
@@ -98,6 +100,58 @@ describe('LegendariosService', () => {
 
     const [findManyCall] = prisma.legendary.findMany.mock.calls;
     expect(findManyCall[0].where.AND).toContainEqual(scopeFilter);
+  });
+
+  it('filters by active membership in an authorized team and preserves geographic scope', async () => {
+    const scopeFilter = { OR: [{ city: { in: ['Caldas Novas'] } }] };
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: ['team-1'], legendaryIds: [] });
+    accessPolicy.buildLegendaryWhere.mockReturnValueOnce(scopeFilter);
+    accessPolicy.buildTeamMembershipWhere.mockReturnValueOnce({ teamId: { in: ['team-1'] } });
+    prisma.legendary.findMany.mockResolvedValueOnce([]);
+    prisma.legendary.count.mockResolvedValueOnce(0);
+
+    await service.findAll({ page: 2, perPage: 10, search: 'joao', teamId: 'team-1' } as any, restrictedUser);
+
+    const call = prisma.legendary.findMany.mock.calls[0][0];
+    expect(call.where.AND).toContainEqual(scopeFilter);
+    expect(call.where.OR).toContainEqual({ searchText: { contains: 'joao' } });
+    expect(call.where.teamMemberships).toEqual({
+      some: {
+        teamId: { in: ['team-1'] },
+        status: 'ACTIVE',
+        deletedAt: null,
+        team: { deletedAt: null },
+      },
+    });
+    expect(call.skip).toBe(10);
+  });
+
+  it('uses an impossible membership filter for a team outside the user scope', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: ['church-1'], teamIds: ['team-1'], legendaryIds: [] });
+    accessPolicy.buildLegendaryWhere.mockReturnValueOnce({ churchId: { in: ['church-1'] } });
+    accessPolicy.buildTeamMembershipWhere.mockReturnValueOnce({ teamId: { in: [] } });
+    prisma.legendary.findMany.mockResolvedValueOnce([]);
+    prisma.legendary.count.mockResolvedValueOnce(0);
+
+    await service.findAll({ page: 1, perPage: 10, teamId: 'team-2' } as any, restrictedUser);
+
+    expect(prisma.legendary.findMany.mock.calls[0][0].where.teamMemberships.some.teamId).toEqual({ in: [] });
+  });
+
+  it('allows an admin to filter by any team while keeping active memberships only', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] });
+    accessPolicy.buildTeamMembershipWhere.mockReturnValueOnce({ teamId: 'team-1' });
+    prisma.legendary.findMany.mockResolvedValueOnce([]);
+    prisma.legendary.count.mockResolvedValueOnce(0);
+
+    await service.findAll({ page: 1, perPage: 10, teamId: 'team-1' } as any, adminUser);
+
+    expect(prisma.legendary.findMany.mock.calls[0][0].where.teamMemberships.some).toEqual({
+      teamId: 'team-1',
+      status: 'ACTIVE',
+      deletedAt: null,
+      team: { deletedAt: null },
+    });
   });
 
   it('busca textual filtra por searchText normalizado e NÃO inclui clause de phone (regressão do bug "retorna todos")', async () => {
@@ -162,12 +216,47 @@ describe('LegendariosService', () => {
     );
   });
 
+  it('options intersecta a busca com o escopo do AccessPolicyService para usuário restrito', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: ['church-1'], teamIds: [], legendaryIds: [] });
+    const scopeFilter = { churchId: { in: ['church-1'] } };
+    accessPolicy.buildLegendaryWhere.mockReturnValueOnce(scopeFilter);
+    prisma.legendary.findMany.mockResolvedValueOnce([]);
+
+    await service.options({ search: 'joão', limit: 5, activeOnly: true } as any, restrictedUser);
+
+    const call = prisma.legendary.findMany.mock.calls[0][0];
+    expect(accessPolicy.buildLegendaryWhere).toHaveBeenCalled();
+    expect(call.where.AND).toContainEqual(scopeFilter);
+    expect(call.where.OR).toContainEqual({ searchText: { contains: 'joao' } });
+  });
+
   it('findOne returns 404 when legendary is outside scope', async () => {
     accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: [], legendaryIds: [] });
-    accessPolicy.buildLegendaryWhere.mockReturnValueOnce({ id: { in: [] } });
+    accessPolicy.buildLegendaryDetailWhere.mockReturnValueOnce({ id: { in: [] } });
     prisma.legendary.findFirst.mockResolvedValueOnce(null);
 
     await expect(service.findOne('legendary-1', restrictedUser)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('findOne uses the detail filter for a member of an authorized team', async () => {
+    const detailFilter = {
+      teamMemberships: {
+        some: {
+          teamId: { in: ['team-1'] },
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+      },
+    };
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: ['team-1'], legendaryIds: [] });
+    accessPolicy.buildLegendaryDetailWhere.mockReturnValueOnce(detailFilter);
+    prisma.legendary.findFirst.mockResolvedValueOnce({ id: '1', fullName: 'Joao', expertises: [] });
+
+    await service.findOne('1', restrictedUser);
+
+    expect(prisma.legendary.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: '1', deletedAt: null, AND: [detailFilter] },
+    }));
   });
 
   it('findOne succeeds for admin regardless of scope', async () => {

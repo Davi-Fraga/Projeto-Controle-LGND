@@ -1,6 +1,7 @@
 import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from './permissions.guard';
 import { EffectivePermissionsService } from '../access/effective-permissions.service';
+import { ANY_PERMISSIONS_KEY, PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 
 function makeContext(user: unknown) {
   return {
@@ -26,6 +27,48 @@ describe('PermissionsGuard', () => {
   it('blocks users whose effective permissions miss a required one', async () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(['legendarios.create']),
+    } as unknown as Reflector;
+    const effective = {
+      resolveKeys: jest.fn().mockResolvedValue(['legendarios.read']),
+    } as unknown as EffectivePermissionsService;
+    const guard = new PermissionsGuard(reflector, effective);
+
+    await expect(guard.canActivate(makeContext({ sub: 'u1' }))).resolves.toBe(false);
+  });
+
+  it('allows users with any one of the alternative permissions', async () => {
+    const reflector = {
+      getAllAndOverride: jest.fn((key) => key === ANY_PERMISSIONS_KEY
+        ? ['legendarios.read', 'teams.members.read']
+        : undefined),
+    } as unknown as Reflector;
+    const effective = {
+      resolveKeys: jest.fn().mockResolvedValue(['teams.members.read']),
+    } as unknown as EffectivePermissionsService;
+    const guard = new PermissionsGuard(reflector, effective);
+
+    await expect(guard.canActivate(makeContext({ sub: 'u1' }))).resolves.toBe(true);
+  });
+
+  it('blocks users missing every alternative permission', async () => {
+    const reflector = {
+      getAllAndOverride: jest.fn((key) => key === ANY_PERMISSIONS_KEY
+        ? ['legendarios.read', 'teams.members.read']
+        : undefined),
+    } as unknown as Reflector;
+    const effective = {
+      resolveKeys: jest.fn().mockResolvedValue(['teams.read']),
+    } as unknown as EffectivePermissionsService;
+    const guard = new PermissionsGuard(reflector, effective);
+
+    await expect(guard.canActivate(makeContext({ sub: 'u1' }))).resolves.toBe(false);
+  });
+
+  it('preserves all-of requirements when alternative permissions are absent', async () => {
+    const reflector = {
+      getAllAndOverride: jest.fn((key) => key === PERMISSIONS_KEY
+        ? ['legendarios.read', 'legendarios.update']
+        : undefined),
     } as unknown as Reflector;
     const effective = {
       resolveKeys: jest.fn().mockResolvedValue(['legendarios.read']),

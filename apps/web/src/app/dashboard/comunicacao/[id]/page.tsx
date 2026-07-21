@@ -45,7 +45,7 @@ export default function CommunicationDetailPage() {
       setMessage(response.data);
       setError(null);
     } catch {
-      setError('Nao foi possivel salvar.');
+      setError('Não foi possível salvar.');
     }
   }
 
@@ -55,7 +55,7 @@ export default function CommunicationDetailPage() {
       setMessage(response.data);
       await load();
     } catch {
-      setError(kind === 'send' ? 'Nao foi possivel enviar.' : 'Nao foi possivel cancelar.');
+      setError(kind === 'send' ? 'Não foi possível enviar.' : 'Não foi possível cancelar.');
     }
   }
 
@@ -130,7 +130,7 @@ export default function CommunicationDetailPage() {
           <div className="mt-2"><StatusBadge status={message.status} /></div>
         </div>
         <div className="rounded-xl border border-zinc-800 bg-[#111113] p-5 shadow-lg">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Total Destinatários</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Total de destinatários</p>
           <div className="mt-2 text-2xl font-black text-white">{recipients.length}</div>
         </div>
         <div className="rounded-xl border border-zinc-800 bg-[#111113] p-5 shadow-lg">
@@ -186,7 +186,7 @@ export default function CommunicationDetailPage() {
                 <tr className="border-b border-zinc-800 bg-zinc-950/80 text-xs font-bold tracking-wider text-zinc-400 uppercase">
                   <th className="px-5 py-3">Legendário</th>
                   <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3 text-right">Ações de Forçamento</th>
+                  <th className="px-5 py-3 text-right">Ações manuais</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-850">
@@ -205,13 +205,13 @@ export default function CommunicationDetailPage() {
                             className="flex h-7 items-center rounded bg-zinc-800 px-3 text-[10px] font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-700"
                             onClick={() => updateRecipient(recipient.id, 'read')}
                           >
-                            Forçar Lido
+                            Marcar como lido
                           </button>
                           <button
                             className="flex h-7 items-center rounded bg-zinc-800 px-3 text-[10px] font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-700"
                             onClick={() => updateRecipient(recipient.id, 'confirm')}
                           >
-                            Forçar Confirmado
+                            Marcar como confirmado
                           </button>
                         </div>
                       </td>
@@ -232,4 +232,3 @@ export default function CommunicationDetailPage() {
     </div>
   );
 }
-

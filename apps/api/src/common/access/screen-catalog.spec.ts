@@ -1,4 +1,4 @@
-import { SCREEN_CATALOG } from './screen-catalog';
+import { SCREEN_CATALOG, getScreen, permissionsForLevel, screenActionToggles } from './screen-catalog';
 
 // Criar/excluir/restaurar de entidade de topo é ação administrativa: NÃO pode
 // constar em nenhum conjunto concedível por tela (só o admin as tem via base).
@@ -28,5 +28,41 @@ describe('screen-catalog', () => {
     expect(grantable.has('teams.members.add')).toBe(true);
     expect(grantable.has('tops.participants.add')).toBe(true);
     expect(grantable.has('tops.families.create')).toBe(true); // família dentro do TOP do escopo
+  });
+});
+
+// change organograma-navegacao-escalavel (decisão Q1): o modelo de tela ganha
+// TOGGLES de ação, concedidos separadamente de VIEW/EDIT. Isso permite conceder
+// "editar pessoa sem mover" — o que NONE/VIEW/EDIT sozinho não expressa.
+describe('screen-catalog action toggles (organograma)', () => {
+  it('org-chart declara toggles de ação, separados de VIEW/EDIT (editar sem mover)', () => {
+    const orgChart = getScreen('org-chart');
+    expect(orgChart).toBeDefined();
+
+    const toggles = screenActionToggles(orgChart!);
+    expect(toggles).toEqual(
+      expect.arrayContaining([
+        'organogram.group.reorder',
+        'organogram.group.move',
+        'organogram.structure.change',
+      ]),
+    );
+
+    // Conceder EDIT NÃO concede os toggles: quem edita não ganha mover por tabela.
+    const byEdit = new Set(permissionsForLevel(orgChart!, 'EDIT'));
+    for (const toggle of toggles) {
+      expect(byEdit.has(toggle)).toBe(false);
+    }
+  });
+
+  it('não adiciona toggles às demais telas (extensão aditiva)', () => {
+    for (const screen of SCREEN_CATALOG.filter((s) => s.id !== 'org-chart')) {
+      expect(screenActionToggles(screen)).toEqual([]);
+    }
+  });
+
+  it('org-chart concede organogram.person.edit no nível EDIT (Fase 2)', () => {
+    const orgChart = getScreen('org-chart')!;
+    expect(permissionsForLevel(orgChart, 'EDIT')).toContain('organogram.person.edit');
   });
 });

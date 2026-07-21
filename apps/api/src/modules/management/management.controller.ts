@@ -12,14 +12,17 @@ import { ManagementService } from './management.service';
 export class ManagementController {
   constructor(private readonly management: ManagementService) {}
 
+  // Mover pessoa entre gestores dentro da subdivisão (change organograma-navegacao-
+  // escalavel, Fase 3): guardado pela permissão estrutural `organogram.group.reorder`.
+  // O service revalida teto de 10, ciclo, escopo e audita (não muda essas regras).
   @Post('city/assign-leader')
-  @Permissions('legendarios.update')
+  @Permissions('organogram.group.reorder')
   async assignCityLeader(@Body() dto: AssignCityLeaderDto, @CurrentUser() user: AuthenticatedUser) {
     return { data: await this.management.assignCityLeader(dto, user) };
   }
 
   @Post('team/assign-manager')
-  @Permissions('teams.update')
+  @Permissions('organogram.group.reorder')
   async assignTeamManager(@Body() dto: AssignTeamManagerDto, @CurrentUser() user: AuthenticatedUser) {
     return { data: await this.management.assignTeamManager(dto, user) };
   }

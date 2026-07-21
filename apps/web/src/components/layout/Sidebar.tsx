@@ -45,7 +45,7 @@ const MENU_ITEMS: MenuItem[] = [
   },
   { href: '/dashboard/mapa', label: 'Mapa', icon: Map, permission: 'map.read' },
   { href: '/dashboard/tops', label: 'TOPs', icon: MapPin, permission: 'tops.read' },
-  { href: '/dashboard/organograma', label: 'Organograma', icon: Network, anyPermission: ['teams.read', 'legendarios.read', 'tops.read'] },
+  { href: '/dashboard/organograma', label: 'Organograma', icon: Network, anyPermission: ['organogram.read', 'teams.read', 'legendarios.read', 'tops.read'] },
   { href: '/dashboard/acoes-sociais', label: 'Ações Sociais', icon: HeartHandshake, permission: 'tops.read' },
   { href: '/dashboard/comunicacao', label: 'Comunicação', icon: MessageSquare, permission: 'communications.read' },
   { href: '/dashboard/relatorios', label: 'Relatórios', icon: FileText, permission: 'reports.read' },

@@ -20,6 +20,14 @@ export function setScreenLevel(userId: string, screenId: string, level: ScreenAc
   });
 }
 
+// Liga/desliga um toggle de ação de uma tela (à parte do nível VIEW/EDIT).
+export function setScreenToggle(userId: string, screenId: string, toggleKey: string, on: boolean) {
+  return api<ScreenAccessResponse>(`/access-control/users/${userId}/screens/${screenId}/toggles`, {
+    method: 'PUT',
+    body: JSON.stringify({ toggleKey, on }),
+  });
+}
+
 export function addUserScope(userId: string, type: ScopeTypeValue, value: string) {
   return api<ScreenAccessResponse>(`/access-control/users/${userId}/scopes`, {
     method: 'POST',

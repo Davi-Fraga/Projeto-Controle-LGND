@@ -102,6 +102,19 @@ const permissions = [
   'reports.export',
   'reports.contacts.export',
   'audit.read',
+  // Organograma (change organograma-navegacao-escalavel). Reconciliado com o modelo
+  // de acesso por TELA (SCREEN_CATALOG): a tela 'org-chart' mapeia estas permissions.
+  //  - VIEW  da tela: organogram.read (entrar/navegar/ver detalhe da pessoa)
+  //  - EDIT  da tela: organogram.person.edit (editar dados cadastrais)
+  //  - toggles de AÇÃO (concedidos além do EDIT): group.reorder < group.move < structure.change
+  // Abas (Equipes/Cidades/TOPs/Coordenadores) NÃO são permissões: derivam do UserScope
+  // (escopo de dados). Administrar quem acessa = tela Controle de Acessos existente.
+  // Migração legado->novo acontece editando o view/edit da tela no catálogo (Fase 4).
+  'organogram.read',
+  'organogram.person.edit',
+  'organogram.group.reorder',
+  'organogram.group.move',
+  'organogram.structure.change',
 ];
 
 async function main() {

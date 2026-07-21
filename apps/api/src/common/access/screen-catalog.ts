@@ -10,6 +10,10 @@ export type ScreenDef = {
   edit: string[];
   // Tipos de escopo aplicáveis a esta tela (vazio = sem recorte de dados).
   scopeTypes: UserScopeType[];
+  // Toggles de AÇÃO concedidos separadamente de VIEW/EDIT (change organograma-
+  // navegacao-escalavel, decisão Q1): permite conceder ações finas — ex.: editar
+  // pessoa sem poder mover. NÃO entram em permissionsForLevel; são concedidos à parte.
+  actionToggles?: string[];
 };
 
 export const SCREEN_CATALOG: ScreenDef[] = [
@@ -84,9 +88,15 @@ export const SCREEN_CATALOG: ScreenDef[] = [
   {
     id: 'org-chart',
     label: 'Organograma',
+    // view segue em LEGADO durante o rollout (D7): migra para organogram.read só na
+    // Fase 4 (senão quebra quem já tem a tela via permissões legado). O EDIT já usa
+    // organogram.person.edit (Fase 2): conceder a tela em EDIT libera editar pessoa,
+    // sem os toggles de mover/estrutural — "editar sem mover". Abas derivam do UserScope (Q2).
     view: ['teams.read', 'legendarios.read', 'tops.read'],
-    edit: [],
+    edit: ['organogram.person.edit'],
     scopeTypes: [UserScopeType.CITY, UserScopeType.TEAM],
+    // Toggles de ação (Q1): concedidos à parte do EDIT — reordenar < mover < estrutural.
+    actionToggles: ['organogram.group.reorder', 'organogram.group.move', 'organogram.structure.change'],
   },
   {
     id: 'families',
@@ -150,4 +160,9 @@ export function getScreen(id: string): ScreenDef | undefined {
 // Conjunto de permissions de uma tela para um nível: VIEW = view; EDIT = view ∪ edit.
 export function permissionsForLevel(screen: ScreenDef, level: 'VIEW' | 'EDIT'): string[] {
   return level === 'EDIT' ? [...screen.view, ...screen.edit] : [...screen.view];
+}
+
+// Toggles de ação da tela (vazio quando não há). Concedidos à parte de VIEW/EDIT.
+export function screenActionToggles(screen: ScreenDef): string[] {
+  return screen.actionToggles ?? [];
 }

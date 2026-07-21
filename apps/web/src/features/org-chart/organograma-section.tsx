@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { OrgChartNode } from '@central-da-manada/shared';
 import { teamDisplayName } from '@central-da-manada/shared';
 import { Network } from 'lucide-react';
@@ -18,8 +18,10 @@ const SCOPES: { value: Scope; label: string }[] = [
   { value: 'tops', label: 'TOPs' },
 ];
 
-export function OrganogramaSection() {
+export function OrganogramaSection({ canEditPerson, canReorder, canStructureChange }: { canEditPerson: boolean; canReorder: boolean; canStructureChange: boolean }) {
   const [scope, setScope] = useState<Scope>('equipes');
+  // Incrementa para forçar refetch da árvore após uma movimentação estrutural (Fase 3).
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Secondary selectors
   const [teamOptions, setTeamOptions] = useState<OptionItem[]>([]);
@@ -35,18 +37,35 @@ export function OrganogramaSection() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load option lists for the scopes that need a secondary selector.
+  // Carrega as options de todos os escopos no início. Elas JÁ vêm escopadas pelo
+  // UserScope no backend (getTeam/City/Top…Options), então servem para derivar
+  // quais ABAS o usuário pode ver (decisão Q2: abas via escopo, não por permissão).
+  const [optionsReady, setOptionsReady] = useState(false);
   useEffect(() => {
-    if (scope === 'equipes' && teamOptions.length === 0) {
-      getTeamOrgChartOptions().then((r) => setTeamOptions(r.data)).catch(() => {});
-    }
-    if (scope === 'tops' && topOptions.length === 0) {
-      getTopOrgChartOptions().then((r) => setTopOptions(r.data)).catch(() => {});
-    }
-    if (scope === 'cidades' && cityOptions.length === 0) {
-      getCityOrgChartOptions().then((r) => setCityOptions(r.data)).catch(() => {});
-    }
-  }, [scope, teamOptions.length, topOptions.length, cityOptions.length]);
+    Promise.allSettled([
+      getTeamOrgChartOptions().then((r) => setTeamOptions(r.data)),
+      getTopOrgChartOptions().then((r) => setTopOptions(r.data)),
+      getCityOrgChartOptions().then((r) => setCityOptions(r.data)),
+    ]).finally(() => setOptionsReady(true));
+  }, []);
+
+  // Abas visíveis conforme o escopo do usuário. Equipes/Coordenadores dependem de
+  // acesso a equipes; Cidades, de cidades; TOPs, de TOPs. Fallback: se nada
+  // resolveu ainda (ou o usuário não tem nenhum), mostra tudo para não travar.
+  const visibleScopes = useMemo(() => {
+    if (!optionsReady) return SCOPES;
+    const allowed = new Set<Scope>();
+    if (teamOptions.length > 0) { allowed.add('equipes'); allowed.add('coordenadores'); }
+    if (cityOptions.length > 0) allowed.add('cidades');
+    if (topOptions.length > 0) allowed.add('tops');
+    const filtered = SCOPES.filter((s) => allowed.has(s.value));
+    return filtered.length > 0 ? filtered : SCOPES;
+  }, [optionsReady, teamOptions.length, cityOptions.length, topOptions.length]);
+
+  // Se o escopo atual deixou de ser visível, cai para a primeira aba disponível.
+  useEffect(() => {
+    if (!visibleScopes.some((s) => s.value === scope)) setScope(visibleScopes[0].value);
+  }, [visibleScopes, scope]);
 
   // Fetch the tree for global scopes.
   useEffect(() => {
@@ -81,7 +100,7 @@ export function OrganogramaSection() {
     return () => {
       active = false;
     };
-  }, [scope, teamId, citiesMode, city]);
+  }, [scope, teamId, citiesMode, city, reloadKey]);
 
   const showTeamPicker = scope === 'equipes';
   const showTopPicker = scope === 'tops';
@@ -95,14 +114,14 @@ export function OrganogramaSection() {
     <div className="space-y-4">
       {/* Scope selector */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/80 p-1">
-          {SCOPES.map((item) => (
+        <div className="inline-flex rounded-lg border border-[#26262c] bg-[#111114] p-0.5">
+          {visibleScopes.map((item) => (
             <button
               key={item.value}
               type="button"
               onClick={() => setScope(item.value)}
-              className={`rounded-md px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${
-                scope === item.value ? 'bg-orange-600 text-white' : 'text-zinc-400 hover:text-zinc-200'
+              className={`rounded-md px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] transition-colors ${
+                scope === item.value ? 'bg-[#1e1e24] text-[#f97316]' : 'text-[#7c7c86] hover:text-[#cfcfd4]'
               }`}
             >
               {item.label}
@@ -115,7 +134,7 @@ export function OrganogramaSection() {
           <select
             value={teamId}
             onChange={(e) => setTeamId(e.target.value)}
-            className="h-9 rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-200 focus:border-orange-500 focus:outline-none"
+            className="h-9 rounded-lg border border-[#26262c] bg-[#111114] px-3 text-[13px] text-[#dcdce0] focus:border-[#f97316]/60 focus:outline-none"
           >
             <option value="">Selecione uma equipe…</option>
             {teamOptions.map((o) => (
@@ -128,7 +147,7 @@ export function OrganogramaSection() {
           <select
             value={topId}
             onChange={(e) => setTopId(e.target.value)}
-            className="h-9 rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-200 focus:border-orange-500 focus:outline-none"
+            className="h-9 rounded-lg border border-[#26262c] bg-[#111114] px-3 text-[13px] text-[#dcdce0] focus:border-[#f97316]/60 focus:outline-none"
           >
             <option value="">Selecione um TOP…</option>
             {topOptions.map((o) => (
@@ -141,7 +160,7 @@ export function OrganogramaSection() {
           <select
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            className="h-9 rounded-lg border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-200 focus:border-orange-500 focus:outline-none"
+            className="h-9 rounded-lg border border-[#26262c] bg-[#111114] px-3 text-[13px] text-[#dcdce0] focus:border-[#f97316]/60 focus:outline-none"
           >
             <option value="">Selecione uma cidade…</option>
             {cityOptions.map((o) => (
@@ -151,12 +170,12 @@ export function OrganogramaSection() {
         ) : null}
 
         {showCitiesToggle ? (
-          <div className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/80 p-1">
+          <div className="inline-flex rounded-lg border border-[#26262c] bg-[#111114] p-0.5">
             <button
               type="button"
               onClick={() => setCitiesMode('legendaries')}
-              className={`rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${
-                citiesMode === 'legendaries' ? 'bg-orange-600 text-white' : 'text-zinc-400 hover:text-zinc-200'
+              className={`rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] transition-colors ${
+                citiesMode === 'legendaries' ? 'bg-[#1e1e24] text-[#f97316]' : 'text-[#7c7c86] hover:text-[#cfcfd4]'
               }`}
             >
               Por legendário
@@ -164,8 +183,8 @@ export function OrganogramaSection() {
             <button
               type="button"
               onClick={() => setCitiesMode('churches')}
-              className={`rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${
-                citiesMode === 'churches' ? 'bg-orange-600 text-white' : 'text-zinc-400 hover:text-zinc-200'
+              className={`rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] transition-colors ${
+                citiesMode === 'churches' ? 'bg-[#1e1e24] text-[#f97316]' : 'text-[#7c7c86] hover:text-[#cfcfd4]'
               }`}
             >
               Por igreja
@@ -179,10 +198,10 @@ export function OrganogramaSection() {
         needsTop ? (
           <Placeholder text="Selecione um TOP para ver o organograma." />
         ) : (
-          <TopOrgChartView topId={topId} />
+          <TopOrgChartView topId={topId} canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} />
         )
       ) : (
-        <div className="h-[70vh] w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#0d0d0f]">
+        <div className="h-[74vh] w-full overflow-hidden rounded-xl border border-[#1e1e24] bg-[#0b0b0d]">
           {needsTeam ? (
             <Centered>Selecione uma equipe para ver o organograma.</Centered>
           ) : needsCity ? (
@@ -197,7 +216,7 @@ export function OrganogramaSection() {
               <p className="text-sm">Nenhum dado para esta visão ainda.</p>
             </div>
           ) : root ? (
-            <OrgChartTree root={root} />
+            <OrgChartTree root={root} canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} onDataChanged={() => setReloadKey((k) => k + 1)} />
           ) : null}
         </div>
       )}

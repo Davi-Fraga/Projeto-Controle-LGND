@@ -160,6 +160,12 @@ export type ScreenScopeEntry = {
   label?: string | null;
 };
 
+// Um toggle de ação de uma tela (concedido à parte de VIEW/EDIT), com seu estado.
+export type ScreenActionToggle = {
+  key: string;
+  granted: boolean;
+};
+
 // Estado de acesso de UMA tela para um usuário (o admin opera por tela, não por permission).
 export type ScreenAccessEntry = {
   id: string;
@@ -171,6 +177,8 @@ export type ScreenAccessEntry = {
   scopeTypes: UserScopeType[];
   // escopos atuais do usuário cujo tipo é aplicável a esta tela
   scopes: ScreenScopeEntry[];
+  // toggles de ação concedíveis à parte do nível (ex.: organograma: reordenar/mover/estrutural)
+  actionToggles: ScreenActionToggle[];
 };
 
 export type UserScreenAccessControl = {
@@ -551,6 +559,13 @@ export type OrgChartNode = {
   leaderId?: string;
   count: number;
   children: OrgChartNode[];
+  // Referência do Legendário que o nó representa (person/leader), para o painel de
+  // detalhe (Fase 2). Ausente em nós estruturais (root/group/city).
+  refId?: string;
+  // Overview+detail (change organograma-navegacao-escalavel): quando a árvore é
+  // projetada por profundidade, um nó na fronteira tem os filhos podados
+  // (children = []) mas hasChildren = true, para a UI oferecer expandir sob demanda.
+  hasChildren?: boolean;
 };
 
 export type TopPreRegistration = {

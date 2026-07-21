@@ -2,7 +2,7 @@
 
 import { FormEvent, ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LegendaryStatus } from '@central-da-manada/shared';
+import { cleanPhone, LegendaryStatus, maskPhoneInput } from '@central-da-manada/shared';
 import { getTopOptions, getTopFamilyOptions, getTeamsOptionsList } from '@/features/tops/api';
 import type { OptionItem } from '@/features/tops/types';
 import {
@@ -55,7 +55,7 @@ export function LegendarioForm({ legendario }: Props) {
       ? {
           fullName: legendario.fullName,
           lgndNumber: legendario.lgndNumber ?? '',
-          phone: legendario.phone ?? '',
+          phone: maskPhoneInput(legendario.phone ?? ''),
           city: legendario.city ?? '',
           isFromRotaDoCerrado: legendario.isFromRotaDoCerrado,
           churchId: legendario.churchId ?? '',
@@ -193,7 +193,7 @@ export function LegendarioForm({ legendario }: Props) {
       const cleanedPayload = {
         ...payload,
         lgndNumber: payload.lgndNumber || undefined,
-        phone: payload.phone || undefined,
+        phone: cleanPhone(payload.phone ?? null) ?? undefined,
         city: payload.city || undefined,
         churchId: payload.churchId || undefined,
         churchRole: payload.churchRole || undefined,
@@ -240,7 +240,13 @@ export function LegendarioForm({ legendario }: Props) {
           <input className="input" value={payload.lgndNumber} onChange={(event) => updateField('lgndNumber', event.target.value)} />
         </Field>
         <Field label="Telefone / WhatsApp">
-          <input className="input" value={payload.phone} onChange={(event) => updateField('phone', event.target.value)} />
+          <input
+            className="input"
+            inputMode="tel"
+            autoComplete="tel"
+            value={payload.phone}
+            onChange={(event) => updateField('phone', maskPhoneInput(event.target.value))}
+          />
         </Field>
         <Field label="Cidade">
           <input className="input" value={payload.city} onChange={(event) => updateField('city', event.target.value)} />

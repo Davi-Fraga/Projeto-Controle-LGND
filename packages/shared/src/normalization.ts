@@ -66,6 +66,61 @@ export function cleanPhone(t: string | null): string | null {
   return d || null;
 }
 
+const FORMATTED_PHONE_PATTERN = /^\(\d{2}\) \d{4,5}-\d{4}$/;
+
+/**
+ * Formata um telefone para exibição usando a normalização canônica. Valores
+ * incompletos ou não reconhecidos são preservados para não esconder dados
+ * legados potencialmente úteis.
+ */
+export function formatPhone(value: string): string;
+export function formatPhone(value: null): null;
+export function formatPhone(value: undefined): undefined;
+export function formatPhone(value: string | null | undefined): string | null | undefined;
+export function formatPhone(value: string | null | undefined): string | null | undefined {
+  if (value == null) return value;
+  const normalized = cleanPhone(value);
+  return normalized && FORMATTED_PHONE_PATTERN.test(normalized) ? normalized : value;
+}
+
+/** Formata CPF completo para exibição; valores incompletos são preservados. */
+export function formatCpf(value: string): string;
+export function formatCpf(value: null): null;
+export function formatCpf(value: undefined): undefined;
+export function formatCpf(value: string | null | undefined): string | null | undefined;
+export function formatCpf(value: string | null | undefined): string | null | undefined {
+  if (value == null) return value;
+  const digits = value.replace(/\D/g, '');
+  if (digits.length !== 11) return value;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+}
+
+/** Máscara incremental reutilizável para telefone brasileiro fixo ou celular. */
+export function maskPhoneInput(value: string): string {
+  let digits = value.replace(/\D/g, '');
+  if (digits.startsWith('55') && digits.length >= 12) digits = digits.slice(2);
+  digits = digits.slice(0, 11);
+
+  if (!digits) return '';
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+/** Máscara incremental reutilizável para CPF, sem validar dígitos verificadores. */
+export function maskCpfInput(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) {
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  }
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+}
+
 /** Número de legendário: apenas dígitos (âncora da chave de dedup). */
 export function cleanLgnd(n: string | null): string | null {
   const d = (n || '').replace(/\D/g, '');

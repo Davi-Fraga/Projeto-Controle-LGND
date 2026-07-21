@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Building2, MapPin, Phone, User, X } from 'lucide-react';
+import { formatPhone } from '@central-da-manada/shared';
 import { getChurch, type ChurchDetail } from './api';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -60,7 +61,7 @@ export function ChurchDetailModal({ churchId, onClose }: { churchId: string | nu
               <dl className="grid gap-3 sm:grid-cols-2">
                 <Info label="Cidade" value={detail.city} icon={<MapPin className="h-3.5 w-3.5 text-zinc-500" />} />
                 <Info label="Líder espiritual" value={detail.spiritualLeaderName} icon={<User className="h-3.5 w-3.5 text-zinc-500" />} />
-                <Info label="Telefone do líder" value={detail.spiritualLeaderPhone} icon={<Phone className="h-3.5 w-3.5 text-zinc-500" />} />
+                <Info label="Telefone do líder" value={formatPhone(detail.spiritualLeaderPhone)} icon={<Phone className="h-3.5 w-3.5 text-zinc-500" />} />
                 <Info
                   label="Coordenadas"
                   value={detail.latitude != null && detail.longitude != null ? `${detail.latitude}, ${detail.longitude}` : null}

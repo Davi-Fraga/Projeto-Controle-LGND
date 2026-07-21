@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { X, Pencil, ExternalLink, Lock, MapPin, Phone, Building2, Briefcase, ArrowRightLeft, Undo2 } from 'lucide-react';
-import type { Legendary } from '@central-da-manada/shared';
+import { formatPhone, type Legendary } from '@central-da-manada/shared';
 import { getLegendario } from '@/features/legendarios/api';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -160,7 +160,7 @@ export function PersonPanel({
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Status</span>
               <StatusBadge status={legendary.status} />
             </div>
-            <Row icon={<Phone className="h-3.5 w-3.5" />} label="Telefone" value={legendary.phone || '—'} />
+            <Row icon={<Phone className="h-3.5 w-3.5" />} label="Telefone" value={formatPhone(legendary.phone) || '—'} />
             <Row icon={<MapPin className="h-3.5 w-3.5" />} label="Cidade" value={legendary.city || '—'} />
             <Row icon={<Building2 className="h-3.5 w-3.5" />} label="Igreja" value={legendary.church?.name || '—'} />
             <Row icon={<Briefcase className="h-3.5 w-3.5" />} label="Profissão" value={legendary.profession?.name || '—'} />

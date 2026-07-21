@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { LegendaryStatus } from '@central-da-manada/shared';
+import { formatPhone, LegendaryStatus } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { hasPermission } from '@/lib/permissions';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -316,7 +316,7 @@ function LegendariosContent() {
                         {item.needsReview ? <span className="mt-1 inline-flex rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">Revisar</span> : null}
                       </div>
                     </td>
-                    <td className="px-6 py-4.5 text-zinc-300 font-medium">{item.phone || '-'}</td>
+                    <td className="px-6 py-4.5 text-zinc-300 font-medium">{formatPhone(item.phone) || '-'}</td>
                     <td className="px-6 py-4.5 text-zinc-300 font-medium">
                       <div className="flex items-center gap-1">
                         <MapPin className="h-3.5 w-3.5 text-zinc-500" />

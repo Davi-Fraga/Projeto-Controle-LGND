@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Building2, Edit2, Eye, MapPin, Phone, Search, Trash2, User } from 'lucide-react';
+import { formatPhone } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useDebouncedSearch } from '@/hooks/use-debounced-search';
 import { hasPermission } from '@/lib/permissions';
@@ -157,7 +158,7 @@ export default function IgrejasPage() {
                     </td>
                     <td className="px-6 py-4 text-zinc-300">
                       {church.spiritualLeaderPhone ? (
-                        <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-zinc-500" />{church.spiritualLeaderPhone}</span>
+                        <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-zinc-500" />{formatPhone(church.spiritualLeaderPhone)}</span>
                       ) : '—'}
                     </td>
                     <td className="px-6 py-4">

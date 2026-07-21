@@ -132,6 +132,23 @@ describe('TeamsService', () => {
     expect(result.data).toEqual([]);
   });
 
+  it('findMembers busca telefone nos formatos legado e canônico sem cláusula vazia', async () => {
+    accessPolicy.resolveScope.mockResolvedValue({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] });
+    prisma.team.findFirst.mockResolvedValue({ id: 'team-1', name: 'Midia', _count: { memberships: 0 } });
+    prisma.teamMembership.findMany.mockResolvedValue([]);
+    prisma.teamMembership.count.mockResolvedValue(0);
+
+    await service.findMembers('team-1', { page: 1, perPage: 10, search: '64992485187' }, adminUser);
+
+    const or = prisma.teamMembership.findMany.mock.calls[0][0].where.legendary.OR;
+    expect(or).toContainEqual({ phone: { contains: '64992485187', mode: 'insensitive' } });
+    expect(or).toContainEqual({ phone: { contains: '(64) 99248-5187', mode: 'insensitive' } });
+
+    await service.findMembers('team-1', { page: 1, perPage: 10, search: 'João' }, adminUser);
+    const textOr = prisma.teamMembership.findMany.mock.calls[1][0].where.legendary.OR;
+    expect(textOr.some((clause: any) => clause.phone?.contains === '')).toBe(false);
+  });
+
   it('creates a team', async () => {
     prisma.team.findFirst.mockResolvedValueOnce(null);
     prisma.team.create.mockResolvedValueOnce({

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { LegendaryHistoryType, LegendaryStatus, TeamMembershipStatus } from '@central-da-manada/shared';
+import { cleanPhone, LegendaryHistoryType, LegendaryStatus, TeamMembershipStatus } from '@central-da-manada/shared';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
@@ -415,7 +415,7 @@ export class LegendariosService {
     const data: any = {};
     if ('fullName' in dto) data.fullName = dto.fullName?.trim();
     if ('lgndNumber' in dto) data.lgndNumber = dto.lgndNumber?.trim() || null;
-    if ('phone' in dto) data.phone = dto.phone ? this.normalizePhone(dto.phone) : null;
+    if ('phone' in dto) data.phone = cleanPhone(dto.phone ?? null);
     if ('city' in dto) data.city = dto.city?.trim() || null;
 
     // Recalcula searchText quando algum campo buscável muda, mesclando com os valores atuais.
@@ -474,6 +474,10 @@ export class LegendariosService {
     const or: any[] = [];
     if (term) or.push({ searchText: { contains: term } });
     if (digits) or.push({ phone: { contains: digits } });
+    const canonicalPhone = cleanPhone(search);
+    if (canonicalPhone && canonicalPhone !== digits) {
+      or.push({ phone: { contains: canonicalPhone } });
+    }
     return or.length ? or : undefined;
   }
 

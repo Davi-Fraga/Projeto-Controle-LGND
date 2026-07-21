@@ -1,4 +1,14 @@
-import { canonCity, cityKey, cleanLgnd, cleanPhone, normalizeName } from '@central-da-manada/shared';
+import {
+  canonCity,
+  cityKey,
+  cleanLgnd,
+  cleanPhone,
+  formatCpf,
+  formatPhone,
+  maskCpfInput,
+  maskPhoneInput,
+  normalizeName,
+} from '@central-da-manada/shared';
 
 /**
  * Baseline que FIXA o comportamento da normalização extraída de
@@ -32,6 +42,46 @@ describe('legendary normalization (shared)', () => {
     it('retorna null quando vazio', () => {
       expect(cleanPhone(null)).toBeNull();
       expect(cleanPhone('')).toBeNull();
+    });
+  });
+
+  describe('contact formatting', () => {
+    it.each([
+      ['64992485187', '(64) 99248-5187'],
+      ['5564992485187', '(64) 99248-5187'],
+      ['(42) 99947-1325', '(42) 99947-1325'],
+      ['+55 64 99988-7766', '(64) 99988-7766'],
+      ['6432217788', '(64) 3221-7788'],
+    ])('formata telefone legado %s', (value, expected) => {
+      expect(formatPhone(value)).toBe(expected);
+    });
+
+    it('preserva valores não reconhecidos e ausência de valor', () => {
+      expect(formatPhone('ramal 123')).toBe('ramal 123');
+      expect(formatPhone('6499')).toBe('6499');
+      expect(formatPhone(null)).toBeNull();
+      expect(formatPhone(undefined)).toBeUndefined();
+    });
+
+    it('formata CPF completo e preserva valor incompleto na exibição', () => {
+      expect(formatCpf('12345678901')).toBe('123.456.789-01');
+      expect(formatCpf('123.456.789-01')).toBe('123.456.789-01');
+      expect(formatCpf('123')).toBe('123');
+      expect(formatCpf(null)).toBeNull();
+    });
+
+    it('aplica máscaras incrementais reutilizáveis e limita o tamanho', () => {
+      expect(maskPhoneInput('6')).toBe('(6');
+      expect(maskPhoneInput('64992485187')).toBe('(64) 99248-5187');
+      expect(maskPhoneInput('6432217788')).toBe('(64) 3221-7788');
+      expect(maskPhoneInput('5564992485187')).toBe('(64) 99248-5187');
+      expect(maskPhoneInput('64992485187999')).toBe('(64) 99248-5187');
+      expect(maskPhoneInput('')).toBe('');
+
+      expect(maskCpfInput('1')).toBe('1');
+      expect(maskCpfInput('12345678901')).toBe('123.456.789-01');
+      expect(maskCpfInput('123.456.789-0199')).toBe('123.456.789-01');
+      expect(maskCpfInput('')).toBe('');
     });
   });
 

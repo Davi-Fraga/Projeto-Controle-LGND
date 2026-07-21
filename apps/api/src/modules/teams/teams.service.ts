@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { LegendaryHistoryType, TeamMembershipStatus, TeamStatus } from '@central-da-manada/shared';
+import { cleanPhone, LegendaryHistoryType, TeamMembershipStatus, TeamStatus } from '@central-da-manada/shared';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
@@ -213,11 +213,14 @@ export class TeamsService {
     };
 
     if (query.search) {
+      const digits = query.search.replace(/\D/g, '');
+      const canonicalPhone = cleanPhone(query.search);
+      const phoneTerms = [...new Set([digits, canonicalPhone].filter(Boolean))];
       where.legendary = {
         OR: [
           { fullName: { contains: query.search, mode: 'insensitive' } },
           { lgndNumber: { contains: query.search, mode: 'insensitive' } },
-          { phone: { contains: query.search.replace(/\D/g, ''), mode: 'insensitive' } },
+          ...phoneTerms.map((term) => ({ phone: { contains: term, mode: 'insensitive' } })),
         ],
       };
     }

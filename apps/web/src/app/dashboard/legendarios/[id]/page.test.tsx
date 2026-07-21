@@ -56,6 +56,11 @@ const legendary = {
   servesInChurch: false,
   expertises: [],
   topServants: [],
+  phone: '64992485187',
+  spiritualLeaderName: 'Pastor João',
+  spiritualLeaderPhone: '5564992485187',
+  relativeName: 'Maria Silva',
+  relativePhone: '+55 64 99988-7766',
 };
 
 describe('LegendarioDetalhePage from a team', () => {
@@ -75,6 +80,8 @@ describe('LegendarioDetalhePage from a team', () => {
     );
     expect(screen.queryByRole('link', { name: 'Editar Cadastro' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Historico canCreate/)).not.toBeInTheDocument();
+    expect(screen.getAllByText('(64) 99248-5187')).toHaveLength(2);
+    expect(screen.getByText('(64) 99988-7766')).toBeInTheDocument();
   });
 
   it('shows edit and history only when the effective permissions allow them', async () => {

@@ -22,8 +22,8 @@ vi.mock('@/features/churches/api', () => ({
   deleteChurch: (id: string) => mocks.deleteChurch(id),
 }));
 
-function church(id: string, name: string) {
-  return { id, name, city: 'Goiânia', spiritualLeaderName: null, spiritualLeaderPhone: null, latitude: null, longitude: null };
+function church(id: string, name: string, spiritualLeaderPhone: string | null = null) {
+  return { id, name, city: 'Goiânia', spiritualLeaderName: null, spiritualLeaderPhone, latitude: null, longitude: null };
 }
 
 describe('IgrejasPage', () => {
@@ -33,11 +33,12 @@ describe('IgrejasPage', () => {
   });
 
   it('carrega e lista as igrejas do backend', async () => {
-    mocks.getChurches.mockResolvedValue({ data: [church('c1', 'Igreja Central'), church('c2', 'Igreja da Paz')] });
+    mocks.getChurches.mockResolvedValue({ data: [church('c1', 'Igreja Central', '5564992485187'), church('c2', 'Igreja da Paz')] });
     render(<IgrejasPage />);
 
     expect(await screen.findByText('Igreja Central')).toBeInTheDocument();
     expect(screen.getByText('Igreja da Paz')).toBeInTheDocument();
+    expect(screen.getByText('(64) 99248-5187')).toBeInTheDocument();
     expect(mocks.getChurches).toHaveBeenCalledWith('');
   });
 

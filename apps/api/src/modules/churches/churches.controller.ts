@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChurchesService } from './churches.service';
 import { CreateChurchDto } from './dto/create-church.dto';
 import { GeocodeQueryDto } from './dto/geocode-query.dto';
+import { ListChurchesQueryDto } from './dto/list-churches-query.dto';
 import { UpdateChurchDto } from './dto/update-church.dto';
 
 @Controller('churches')
@@ -15,14 +16,14 @@ export class ChurchesController {
 
   @Get()
   @Permissions('churches.read')
-  async findAll() {
-    return { data: await this.churchesService.findAll() };
+  async findAll(@CurrentUser() user: AuthenticatedUser, @Query() query: ListChurchesQueryDto) {
+    return { data: await this.churchesService.findAll(user, query.search) };
   }
 
   @Get('spiritual-leaders')
   @Permissions('churches.read')
-  async spiritualLeaders(@CurrentUser() user: AuthenticatedUser) {
-    return { data: await this.churchesService.spiritualLeadersView(user) };
+  async spiritualLeaders(@CurrentUser() user: AuthenticatedUser, @Query() query: ListChurchesQueryDto) {
+    return { data: await this.churchesService.spiritualLeadersView(user, query.search) };
   }
 
   // Rota estática declarada antes de qualquer rota parametrizada (`:id`).

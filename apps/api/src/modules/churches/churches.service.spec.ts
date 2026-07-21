@@ -67,6 +67,117 @@ describe('ChurchesService geocoding integration', () => {
     });
   });
 
+  describe('normalizedName', () => {
+    it('persiste normalizedName sem acento, minúsculo e com espaços colapsados ao criar', async () => {
+      geocoding.geocode.mockResolvedValueOnce(null);
+
+      await service.create({ name: '  São   José ' } as any, 'actor');
+
+      expect(prisma.church.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ name: 'São   José', normalizedName: 'sao jose' }) }),
+      );
+    });
+
+    it('recalcula normalizedName quando o nome muda na edição', async () => {
+      prisma.church.findFirst.mockResolvedValueOnce({ id: 'church-1', name: 'Antiga', city: 'Goiânia', spiritualLeaderUserId: null });
+      geocoding.geocode.mockResolvedValueOnce(null);
+
+      await service.update('church-1', { name: 'Ígreja Nôva' } as any, 'actor');
+
+      expect(prisma.church.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ name: 'Ígreja Nôva', normalizedName: 'igreja nova' }) }),
+      );
+    });
+
+    it('não altera normalizedName quando o nome não é enviado na edição', async () => {
+      prisma.church.findFirst.mockResolvedValueOnce({ id: 'church-1', name: 'Antiga', city: 'Goiânia', spiritualLeaderUserId: null });
+
+      await service.update('church-1', { notes: 'nota' } as any, 'actor');
+
+      expect(prisma.church.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ normalizedName: undefined }) }),
+      );
+    });
+  });
+
+  describe('findAll (busca escopada)', () => {
+    const lastWhere = () => prisma.church.findMany.mock.calls.at(-1)[0].where;
+
+    it('busca por nome normalizado sem acento e por alias, sem filtro de escopo para admin', async () => {
+      accessPolicy.resolveScope.mockResolvedValue({ isAdmin: true });
+
+      await service.findAll({} as any, 'São   José');
+
+      expect(accessPolicy.buildChurchWhere).not.toHaveBeenCalled();
+      expect(lastWhere().AND).toEqual([
+        { deletedAt: null },
+        {
+          OR: [
+            { normalizedName: { contains: 'sao jose' } },
+            { aliases: { some: { normalizedAlias: { contains: 'sao jose' } } } },
+          ],
+        },
+      ]);
+    });
+
+    it('combina o escopo por AND com a busca para usuário restrito', async () => {
+      accessPolicy.resolveScope.mockResolvedValue({ isAdmin: false });
+      accessPolicy.buildChurchWhere.mockReturnValue({ id: { in: ['c1'] } });
+
+      await service.findAll({} as any, 'central');
+
+      expect(lastWhere().AND).toEqual([
+        { deletedAt: null },
+        { id: { in: ['c1'] } },
+        {
+          OR: [
+            { normalizedName: { contains: 'central' } },
+            { aliases: { some: { normalizedAlias: { contains: 'central' } } } },
+          ],
+        },
+      ]);
+    });
+
+    it('termo só com espaços equivale a ausência de busca (só escopo/deletedAt)', async () => {
+      accessPolicy.resolveScope.mockResolvedValue({ isAdmin: true });
+
+      await service.findAll({} as any, '   ');
+
+      expect(lastWhere().AND).toEqual([{ deletedAt: null }]);
+    });
+  });
+
+  describe('spiritualLeadersView (busca escopada)', () => {
+    const lastWhere = () => prisma.church.findMany.mock.calls.at(-1)[0].where;
+
+    it('busca por igreja/alias (normalizado) e por nome do líder/legado (case-insensitive)', async () => {
+      accessPolicy.resolveScope.mockResolvedValue({ isAdmin: true });
+
+      await service.spiritualLeadersView({} as any, 'Amilton');
+
+      expect(lastWhere().AND).toEqual([
+        { deletedAt: null },
+        {
+          OR: [
+            { normalizedName: { contains: 'amilton' } },
+            { aliases: { some: { normalizedAlias: { contains: 'amilton' } } } },
+            { spiritualLeader: { name: { contains: 'Amilton', mode: 'insensitive' } } },
+            { spiritualLeaderName: { contains: 'Amilton', mode: 'insensitive' } },
+          ],
+        },
+      ]);
+    });
+
+    it('usuário restrito sem termo recebe apenas o filtro de escopo', async () => {
+      accessPolicy.resolveScope.mockResolvedValue({ isAdmin: false });
+      accessPolicy.buildChurchWhere.mockReturnValue({ id: { in: ['c1'] } });
+
+      await service.spiritualLeadersView({} as any);
+
+      expect(lastWhere().AND).toEqual([{ deletedAt: null }, { id: { in: ['c1'] } }]);
+    });
+  });
+
   describe('update', () => {
     const before = { id: 'church-1', name: 'Antiga', city: 'Goiânia', latitude: -10, longitude: -20, spiritualLeaderUserId: null };
 

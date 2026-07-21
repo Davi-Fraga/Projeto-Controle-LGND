@@ -1,44 +1,35 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { Building2, User, Phone, Users, Mail, MapPin, ShieldCheck } from 'lucide-react';
+import { Building2, User, Phone, Users, Mail, MapPin, Search, ShieldCheck } from 'lucide-react';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useDebouncedSearch } from '@/hooks/use-debounced-search';
 import { getSpiritualLeaderChurches } from '@/features/spiritual-leaders/api';
 import type { SpiritualLeaderChurch } from '@/features/spiritual-leaders/api';
 
 export default function LideresEspirituaisPage() {
   const { loading: authLoading } = useRequireAuth();
-  const [churches, setChurches] = useState<SpiritualLeaderChurch[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    search,
+    setSearch,
+    debounced,
+    data: churches,
+    initialLoading,
+    searching,
+    error,
+  } = useDebouncedSearch<SpiritualLeaderChurch[]>(getSpiritualLeaderChurches, [], { enabled: !authLoading });
 
-  useEffect(() => {
-    if (authLoading) return;
-    getSpiritualLeaderChurches()
-      .then(setChurches)
-      .catch(() => setError('Não foi possível carregar as igrejas.'))
-      .finally(() => setLoading(false));
-  }, [authLoading]);
-
+  // Resumos recalculados a partir do conjunto filtrado atual (não de totais globais).
   const totalMembers = churches.reduce((sum, c) => sum + c._count.legendarios, 0);
   const withLeader = churches.filter((c) => c.spiritualLeaderUserId || c.spiritualLeaderName).length;
 
-  if (authLoading || loading) {
+  if (authLoading || initialLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
           <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Carregando...</span>
         </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-semibold text-rose-400">
-        {error}
       </div>
     );
   }
@@ -51,6 +42,31 @@ export default function LideresEspirituaisPage() {
         <p className="text-sm text-zinc-400">Igrejas, seus líderes espirituais e legendários vinculados.</p>
       </div>
 
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por igreja ou nome do líder..."
+          className="input w-full"
+          style={{ paddingLeft: '2.5rem' }}
+          aria-label="Buscar líderes espirituais"
+        />
+        {searching && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+            Buscando...
+          </span>
+        )}
+      </div>
+
+      {error && (
+        <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-semibold text-rose-400">
+          Não foi possível carregar as igrejas. Tente novamente.
+        </div>
+      )}
+
       {/* Summary */}
       <div className="grid gap-4 sm:grid-cols-3">
         <SummaryCard icon={<Building2 className="h-5 w-5 text-orange-500" />} label="Igrejas" value={churches.length} />
@@ -62,8 +78,16 @@ export default function LideresEspirituaisPage() {
       {churches.length === 0 ? (
         <div className="rounded-xl border border-zinc-800 bg-[#111113] p-10 text-center shadow-lg">
           <Building2 className="mx-auto h-8 w-8 text-zinc-600" />
-          <p className="mt-3 text-sm font-semibold text-zinc-400">Nenhuma igreja vinculada ao seu acesso.</p>
-          <p className="mt-1 text-xs text-zinc-500">As igrejas que você lidera aparecerão aqui.</p>
+          {debounced.trim() ? (
+            <p className="mt-3 text-sm font-semibold text-zinc-400">
+              Nenhuma igreja encontrada para “{debounced.trim()}”.
+            </p>
+          ) : (
+            <>
+              <p className="mt-3 text-sm font-semibold text-zinc-400">Nenhuma igreja vinculada ao seu acesso.</p>
+              <p className="mt-1 text-xs text-zinc-500">As igrejas que você lidera aparecerão aqui.</p>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">

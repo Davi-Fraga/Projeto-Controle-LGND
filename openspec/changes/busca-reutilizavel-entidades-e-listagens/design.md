@@ -84,6 +84,8 @@ O inventário auditado nesta mudança é:
 
 Cada change posterior deverá confirmar o endpoint de opções, a regra de escopo, a preservação do valor em edição e os testes críticos do domínio. O inventário é uma fotografia verificável da base no momento desta proposta; novos pontos encontrados durante implementação devem ser adicionados antes de encerrar a tarefa correspondente.
 
+**Revisão final (2026-07-21):** nova varredura por `AsyncCombobox`, `getLegendarioOptions`/`fetchLegendarioOptions`/`LegendarioCombobox`, cargas de listagem e campos de UUID manual. Nenhum ponto ausente: os consumidores remanescentes (`communications/communication-form`, `tops/*`, `features/access-control/access-control-panel`, seletores de Igreja/Usuário em `legendarios`/`churches`, entrada manual em `acoes-sociais/[id]`) já constam nos grupos posteriores. Migrados neste change: `features/users/user-form` e `usuarios/convidar` (adaptador canônico `LegendarioCombobox`) + as listagens `igrejas` e `lideres-espirituais` (busca escopada). `teams/team-filter` permanece como referência já migrada. Demais consumidores permanecem sem alteração de runtime.
+
 ## Risks / Trade-offs
 
 - [Migration com nomes existentes] → fazer backfill dentro da nova migration antes de tornar `normalizedName` obrigatório e validar uma amostra com acentos/espaços.

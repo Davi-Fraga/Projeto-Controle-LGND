@@ -4,8 +4,7 @@ import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { SystemRole } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { AsyncCombobox, type ComboboxOption } from '@/components/ui/AsyncCombobox';
-import { getLegendarioOptions } from '@/features/legendarios/api';
+import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
 import { createInvite } from '@/features/invites/api';
 import { Copy, Check } from 'lucide-react';
 
@@ -28,20 +27,10 @@ export default function ConvidarUsuarioPage() {
   const [email, setEmail] = useState('');
   const [roles, setRoles] = useState<string[]>([SystemRole.MEMBER]);
   const [legendaryId, setLegendaryId] = useState('');
-  const [legendaryLabel, setLegendaryLabel] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-
-  async function fetchLegendarioOptions(search: string): Promise<ComboboxOption[]> {
-    const response = await getLegendarioOptions(search, 20);
-    return response.data.map((option) => {
-      const fullName = option.metadata?.fullName ?? option.label;
-      const parts = [option.metadata?.city ?? undefined, option.metadata?.lgndNumber ? `LGND ${option.metadata.lgndNumber}` : undefined].filter(Boolean) as string[];
-      return { value: option.value, label: fullName, sublabel: parts.join(' · ') || undefined };
-    });
-  }
 
   function toggleRole(role: string) {
     setRoles((current) => (current.includes(role) ? current.filter((r) => r !== role) : [...current, role]));
@@ -91,7 +80,7 @@ export default function ConvidarUsuarioPage() {
             </button>
           </div>
           <div className="flex gap-3 pt-1">
-            <button onClick={() => { setLink(null); setEmail(''); setRoles([SystemRole.MEMBER]); setLegendaryId(''); setLegendaryLabel(''); }} className="text-xs font-bold uppercase tracking-wider text-zinc-400 hover:text-zinc-200">
+            <button onClick={() => { setLink(null); setEmail(''); setRoles([SystemRole.MEMBER]); setLegendaryId(''); }} className="text-xs font-bold uppercase tracking-wider text-zinc-400 hover:text-zinc-200">
               Gerar outro convite
             </button>
             <Link href="/dashboard/usuarios" className="text-xs font-bold uppercase tracking-wider text-zinc-400 hover:text-zinc-200">Voltar</Link>
@@ -108,13 +97,9 @@ export default function ConvidarUsuarioPage() {
             </label>
             <label className="block space-y-2">
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Legendário vinculado (opcional)</span>
-              <AsyncCombobox
+              <LegendarioCombobox
                 value={legendaryId}
-                selectedLabel={legendaryLabel}
-                onChange={(value, label) => { setLegendaryId(value); setLegendaryLabel(value ? label : ''); }}
-                fetchOptions={fetchLegendarioOptions}
-                placeholder="Buscar por nome, cidade ou LGND..."
-                noneLabel="Nenhum"
+                onChange={(value) => setLegendaryId(value)}
               />
             </label>
           </section>

@@ -41,7 +41,7 @@ export default function SocialActionDetailPage() {
       await load();
       setError(null);
     } catch {
-      setError('Nao foi possivel adicionar participante.');
+      setError('Não foi possível adicionar participante.');
     }
   }
 
@@ -56,7 +56,7 @@ export default function SocialActionDetailPage() {
   }
 
   async function finish() {
-    await completeSocialAction(params.id, resultSummary || 'Acao social concluida.');
+    await completeSocialAction(params.id, resultSummary || 'Ação social concluída.');
     await load();
   }
 
@@ -151,7 +151,7 @@ export default function SocialActionDetailPage() {
             />
             <input
               className="input text-xs"
-              placeholder="Função (Ex: Líder, Apoio)"
+              placeholder="Função (ex.: Líder, Apoio)"
               value={newParticipant.role}
               onChange={(event) => setNewParticipant((current) => ({ ...current, role: event.target.value }))}
             />
@@ -289,4 +289,3 @@ export default function SocialActionDetailPage() {
     </div>
   );
 }
-

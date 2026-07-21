@@ -160,14 +160,14 @@ export class LegendariosService {
       action: 'create',
       after: this.toResponse(legendario),
     }, db);
-    await this.createHistory(legendario.id, LegendaryHistoryType.LEGENDARY_CREATED, 'Legendario criado', 'Cadastro do Legendario criado.', actorUserId, undefined, db);
+    await this.createHistory(legendario.id, LegendaryHistoryType.LEGENDARY_CREATED, 'Legendário criado', 'Cadastro do legendário criado.', actorUserId, undefined, db);
 
     if (dto.firstTopIsExternal) {
       await this.createHistory(
         legendario.id,
         LegendaryHistoryType.MANUAL_NOTE,
         'Primeira Montanha (Outra Rota)',
-        `Subiu a primeira montanha em outra rota/TOP de origem: ${dto.firstTopExternalText}.${dto.firstTopNotes ? ` Obs: ${dto.firstTopNotes}` : ''}`,
+        `Subiu a primeira montanha em outra rota/TOP de origem: ${dto.firstTopExternalText}.${dto.firstTopNotes ? ` Obs.: ${dto.firstTopNotes}` : ''}`,
         actorUserId,
         undefined,
         db
@@ -179,7 +179,7 @@ export class LegendariosService {
         legendario.id,
         LegendaryHistoryType.TOP_PARTICIPATED,
         'Primeira Montanha',
-        `Subiu a primeira montanha no TOP #${topEvent?.number} - ${topEvent?.name} na Família ${family?.name || ''}.${dto.firstTopNotes ? ` Obs: ${dto.firstTopNotes}` : ''}`,
+        `Subiu a primeira montanha no TOP #${topEvent?.number} - ${topEvent?.name} na Família ${family?.name || ''}.${dto.firstTopNotes ? ` Obs.: ${dto.firstTopNotes}` : ''}`,
         actorUserId,
         { topEventId: dto.firstTopEventId, topFamilyId: dto.firstTopFamilyId },
         db
@@ -243,7 +243,7 @@ export class LegendariosService {
         after: { needsReview: after.needsReview },
       });
     }
-    await this.createHistory(id, LegendaryHistoryType.LEGENDARY_UPDATED, 'Legendario atualizado', 'Cadastro do Legendario atualizado.', actorUserId);
+    await this.createHistory(id, LegendaryHistoryType.LEGENDARY_UPDATED, 'Legendário atualizado', 'Cadastro do legendário atualizado.', actorUserId);
 
     if (dto.expertiseIds) {
       await this.audit.create({

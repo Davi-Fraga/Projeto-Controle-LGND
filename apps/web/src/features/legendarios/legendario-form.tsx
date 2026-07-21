@@ -338,7 +338,7 @@ export function LegendarioForm({ legendario }: Props) {
             <Field label="Informe a rota/TOP de origem">
               <input
                 className="input"
-                placeholder="Ex: Rota do Sol - TOP #3"
+                placeholder="Ex.: Rota do Sol - TOP #3"
                 value={payload.firstTopExternalText}
                 onChange={(event) => updateField('firstTopExternalText', event.target.value)}
                 required
@@ -347,7 +347,7 @@ export function LegendarioForm({ legendario }: Props) {
             <Field label="Observações do TOP Externo (Opcional)">
               <input
                 className="input"
-                placeholder="Ex: Detalhes da subida..."
+                placeholder="Ex.: Detalhes da subida..."
                 value={payload.firstTopNotes}
                 onChange={(event) => updateField('firstTopNotes', event.target.value)}
               />
@@ -411,10 +411,10 @@ export function LegendarioForm({ legendario }: Props) {
 
       {/* Serviço / Service Section */}
       <section className="rounded-xl border border-zinc-800 bg-[#111113] p-5 space-y-4 shadow-lg">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Serviço / Service</h2>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Serviço em TOP</h2>
 
         <Checkbox
-          label="Já serviu como service?"
+          label="Já serviu em algum TOP?"
           checked={payload.alreadyServedAsService}
           onChange={(checked) => {
             updateField('alreadyServedAsService', checked);
@@ -464,7 +464,7 @@ export function LegendarioForm({ legendario }: Props) {
             <Field label="Função (Opcional)">
               <input
                 className="input"
-                placeholder="Ex: Cozinheiro, Apoio..."
+                placeholder="Ex.: Cozinheiro, Apoio..."
                 value={payload.serviceRole}
                 onChange={(event) => updateField('serviceRole', event.target.value)}
               />

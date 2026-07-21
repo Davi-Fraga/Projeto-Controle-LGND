@@ -15,7 +15,7 @@ export type ActionMenuItem = {
   disabled?: boolean;
 };
 
-export function ActionMenu({ items, label = 'Acoes' }: { items: ActionMenuItem[]; label?: string }) {
+export function ActionMenu({ items, label = 'Ações' }: { items: ActionMenuItem[]; label?: string }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });

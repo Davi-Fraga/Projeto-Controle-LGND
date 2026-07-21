@@ -274,7 +274,7 @@ export class TeamsService {
     });
 
     await this.audit.create({ actorUserId, entityType: 'TeamMembership', entityId: membershipId, action: 'update_member', before, after });
-    if (dto.role && before.role !== after.role) await this.createHistory(after.legendaryId, LegendaryHistoryType.TEAM_ROLE_CHANGED, 'Funcao em equipe alterada', `Funcao alterada para ${after.role}.`, actorUserId, { teamId });
+    if (dto.role && before.role !== after.role) await this.createHistory(after.legendaryId, LegendaryHistoryType.TEAM_ROLE_CHANGED, 'Função em equipe alterada', `Função alterada para ${after.role}.`, actorUserId, { teamId });
     return after;
   }
 

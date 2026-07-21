@@ -54,10 +54,10 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
     refresh();
     getTopParticipantOptions(topId, { limit: 100 })
       .then((response) => setParticipants(response.data))
-      .catch(() => setLoadError('Nao foi possivel carregar participantes para familias.'));
+      .catch(() => setLoadError('Não foi possível carregar participantes para famílias.'));
     getLegendarioOptions({ limit: 100 })
       .then((response) => setLegendarios(response.data))
-      .catch(() => setLoadError('Nao foi possivel carregar Legendarios para familias.'));
+      .catch(() => setLoadError('Não foi possível carregar Legendários para famílias.'));
   }, [topId]);
 
   async function refresh() {
@@ -68,7 +68,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
       const entries = await Promise.all(response.data.map(async (family) => [family.id, (await getTopFamilyMembers(topId, family.id)).data] as const));
       setMembersByFamily(Object.fromEntries(entries));
     } catch {
-      setLoadError('Nao foi possivel carregar familias do TOP.');
+      setLoadError('Não foi possível carregar famílias do TOP.');
     }
   }
 
@@ -84,11 +84,11 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
       await refresh();
     } catch (error) {
       if (error instanceof ApiError && error.status === 403) {
-        setLoadError('Voce nao tem permissao para editar familias deste TOP.');
+        setLoadError('Você não tem permissão para editar famílias deste TOP.');
       } else if (error instanceof ApiError && (error.status === 400 || error.status === 409)) {
-        setLoadError('Nao foi possivel salvar a familia. Verifique o nome e os representantes selecionados.');
+        setLoadError('Não foi possível salvar a família. Verifique o nome e os representantes selecionados.');
       } else {
-        setLoadError('Nao foi possivel salvar a familia. Tente novamente.');
+        setLoadError('Não foi possível salvar a família. Tente novamente.');
       }
     } finally {
       setBusy(false);
@@ -121,7 +121,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
       await deactivateTopFamily(topId, familyId);
       await refresh();
     } catch {
-      setLoadError('Nao foi possivel inativar a familia.');
+      setLoadError('Não foi possível inativar a família.');
     }
   }
 
@@ -130,7 +130,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
       await transferTopFamilyMember(topId, familyId, memberId, targetFamilyId);
       await refresh();
     } catch {
-      setLoadError('Nao foi possivel transferir o membro.');
+      setLoadError('Não foi possível transferir o membro.');
     }
   }
 
@@ -139,7 +139,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
       await deactivateTopFamilyMember(topId, familyId, memberId);
       await refresh();
     } catch {
-      setLoadError('Nao foi possivel remover o membro da familia.');
+      setLoadError('Não foi possível remover o membro da família.');
     }
   }
 
@@ -245,7 +245,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
               <div>
                 <h4 className="text-sm font-bold text-white uppercase tracking-wide">{family.name}</h4>
                 {family.needsReview ? <span className="mt-1 inline-flex rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">Revisar</span> : null}
-                <p className="text-xs text-zinc-500 mt-1 font-semibold">Rep: <span className="text-zinc-300">{family.representative?.fullName ?? '-'}</span>{family.representativeRole ? <span className="text-orange-400"> - {family.representativeRole}</span> : null}</p>
+                <p className="text-xs text-zinc-500 mt-1 font-semibold">Rep.: <span className="text-zinc-300">{family.representative?.fullName ?? '-'}</span>{family.representativeRole ? <span className="text-orange-400"> - {family.representativeRole}</span> : null}</p>
                 <p className="text-xs text-zinc-500 font-semibold">Sub: <span className="text-zinc-300">{family.deputyRepresentative?.fullName ?? '-'}</span>{family.deputyRepresentativeRole ? <span className="text-orange-400"> - {family.deputyRepresentativeRole}</span> : null}</p>
               </div>
               {(permissions.update || permissions.delete) ? (

@@ -31,7 +31,7 @@ export default function NewCommunicationPage() {
       const response = await createCommunication(payload);
       router.push(`/dashboard/comunicacao/${response.data.id}`);
     } catch {
-      setError('Nao foi possivel salvar o comunicado.');
+      setError('Não foi possível salvar o comunicado.');
     } finally {
       setSaving(false);
     }
@@ -64,4 +64,3 @@ export default function NewCommunicationPage() {
     </div>
   );
 }
-

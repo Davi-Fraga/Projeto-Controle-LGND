@@ -24,7 +24,7 @@ export function TopServantsTable({ topId }: { topId: string }) {
         setItems(r.data);
         setError(null);
       })
-      .catch(() => setError('Nao foi possivel carregar servos do TOP.'));
+      .catch(() => setError('Não foi possível carregar servos do TOP.'));
   }, [topId, refresh]);
 
   function done() {
@@ -39,7 +39,7 @@ export function TopServantsTable({ topId }: { topId: string }) {
       await cancelTopServant(topId, cancellingId);
       done();
     } catch {
-      setError('Nao foi possivel cancelar a alocacao do servo.');
+      setError('Não foi possível cancelar a alocação do servo.');
     } finally {
       setCancellingId(null);
     }
@@ -140,7 +140,7 @@ export function TopServantsTable({ topId }: { topId: string }) {
       <ConfirmDialog
         isOpen={cancellingId !== null}
         title="Cancelar Alocação de Servo"
-        description="Tem certeza que deseja cancelar a alocação deste servo no TOP? O registro será marcado como CANCELLED."
+        description="Tem certeza que deseja cancelar a alocação deste servo no TOP? O registro será marcado como cancelado."
         confirmLabel="Confirmar Cancelamento"
         cancelLabel="Voltar"
         onConfirm={handleConfirmCancel}

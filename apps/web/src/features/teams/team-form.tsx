@@ -25,7 +25,7 @@ export function TeamForm({ team }: Props) {
   useEffect(() => {
     searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' })
       .then((response) => setLegendarios(response.data))
-      .catch(() => setError('Nao foi possivel carregar Legendarios.'));
+      .catch(() => setError('Não foi possível carregar Legendérios.'));
   }, []);
 
   function setField<T extends keyof TeamPayload>(field: T, value: TeamPayload[T]) {
@@ -47,7 +47,7 @@ export function TeamForm({ team }: Props) {
       const response = team ? await updateTeam(team.id, cleaned) : await createTeam(cleaned);
       router.push(`/dashboard/equipes/${response.data.id}`);
     } catch {
-      setError('Nao foi possivel salvar a equipe. Verifique os dados informados.');
+      setError('Não foi possível salvar a equipe. Verifique os dados informados.');
     } finally {
       setLoading(false);
     }
@@ -115,4 +115,3 @@ export function TeamForm({ team }: Props) {
     </form>
   );
 }
-

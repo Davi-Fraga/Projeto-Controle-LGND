@@ -61,7 +61,7 @@ describe('TopFamiliesSection', () => {
       />,
     );
 
-    await waitFor(() => expect(screen.queryByText('Nao foi possivel carregar familias do TOP.')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Não foi possível carregar famílias do TOP.')).not.toBeInTheDocument());
     expect(screen.queryByRole('button', { name: /Criar Familia/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Adicionar Membro/i })).not.toBeInTheDocument();
   });

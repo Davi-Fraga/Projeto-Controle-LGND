@@ -30,7 +30,7 @@ export function TopForm({ top }: { top?: TopEvent }) {
   });
 
   useEffect(() => {
-    searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' }).then((r) => setLegendarios(r.data)).catch(() => setError('Nao foi possivel carregar Legendarios.'));
+    searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' }).then((r) => setLegendarios(r.data)).catch(() => setError('Não foi possível carregar Legendários.'));
   }, []);
 
   function setField<T extends keyof TopPayload>(field: T, value: TopPayload[T]) { setPayload((current) => ({ ...current, [field]: value })); }
@@ -53,7 +53,7 @@ export function TopForm({ top }: { top?: TopEvent }) {
       };
       const result = top ? await updateTop(top.id, cleaned) : await createTop(cleaned);
       router.push(`/dashboard/tops/${result.data.id}`);
-    } catch { setError('Nao foi possivel salvar o TOP. Verifique os dados.'); }
+    } catch { setError('Não foi possível salvar o TOP. Verifique os dados.'); }
     finally { setLoading(false); }
   }
 

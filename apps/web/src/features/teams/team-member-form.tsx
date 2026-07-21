@@ -29,7 +29,7 @@ export function TeamMemberForm({ teamId, member, onSaved, onCancel }: Props) {
   useEffect(() => {
     searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' })
       .then((response) => setLegendarios(response.data))
-      .catch(() => setError('Nao foi possivel carregar Legendarios.'));
+      .catch(() => setError('Não foi possível carregar Legendários.'));
   }, []);
 
   function setField<T extends keyof TeamMemberPayload>(field: T, value: TeamMemberPayload[T]) {
@@ -52,7 +52,7 @@ export function TeamMemberForm({ teamId, member, onSaved, onCancel }: Props) {
       else await addTeamMember(teamId, cleaned);
       onSaved();
     } catch {
-      setError('Nao foi possivel salvar o membro da equipe.');
+      setError('Não foi possível salvar o membro da equipe.');
     } finally {
       setLoading(false);
     }
@@ -71,7 +71,7 @@ export function TeamMemberForm({ teamId, member, onSaved, onCancel }: Props) {
           </select>
         </label>
         <label>
-          <span className="mb-1 block text-sm font-medium">Funcao</span>
+          <span className="mb-1 block text-sm font-medium">Função</span>
           <input className="input" value={payload.role} onChange={(event) => setField('role', event.target.value)} required />
         </label>
         {member ? (
@@ -83,7 +83,7 @@ export function TeamMemberForm({ teamId, member, onSaved, onCancel }: Props) {
           </label>
         ) : null}
         <label>
-          <span className="mb-1 block text-sm font-medium">Inicio</span>
+          <span className="mb-1 block text-sm font-medium">Início</span>
           <input className="input" type="date" value={payload.startedAt} onChange={(event) => setField('startedAt', event.target.value)} />
         </label>
         {member ? (
@@ -93,7 +93,7 @@ export function TeamMemberForm({ teamId, member, onSaved, onCancel }: Props) {
           </label>
         ) : null}
         <label className="md:col-span-2">
-          <span className="mb-1 block text-sm font-medium">Observacoes</span>
+          <span className="mb-1 block text-sm font-medium">Observações</span>
           <textarea className="input min-h-24 py-2" value={payload.notes} onChange={(event) => setField('notes', event.target.value)} />
         </label>
       </div>

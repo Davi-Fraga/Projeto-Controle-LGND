@@ -2,15 +2,37 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { addTopFamilyMember, createTopFamily, deactivateTopFamily, deactivateTopFamilyMember, getLegendarioOptions, getTopFamilies, getTopFamilyMembers, getTopParticipantOptions, transferTopFamilyMember, updateTopFamily } from './api';
-import type { OptionItem, TopFamily, TopFamilyMember } from './types';
+import type { OptionItem, TopFamily, TopFamilyMember, TopFamilyPayload } from './types';
 import { Edit2, ShieldAlert, Heart } from 'lucide-react';
 import { ActionMenu } from '@/components/ui/ActionMenu';
+import { ApiError } from '@/lib/api';
 
 type FamilyForm = { name: string; representativeLegendaryId: string; representativeRole: string; deputyRepresentativeLegendaryId: string; deputyRepresentativeRole: string; notes: string; needsReview: boolean };
 
 const emptyForm: FamilyForm = { name: '', representativeLegendaryId: '', representativeRole: '', deputyRepresentativeLegendaryId: '', deputyRepresentativeRole: '', notes: '', needsReview: false };
 
-export function TopFamiliesSection({ topId }: { topId: string }) {
+export type FamilyPermissions = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+  addMember: boolean;
+  transferMember: boolean;
+  removeMember: boolean;
+};
+
+export function buildFamilyPayload(form: FamilyForm, editing: boolean): TopFamilyPayload {
+  const emptyOptionalValue = editing ? null : undefined;
+  return {
+    ...form,
+    representativeLegendaryId: form.representativeLegendaryId || emptyOptionalValue,
+    representativeRole: form.representativeRole || emptyOptionalValue,
+    deputyRepresentativeLegendaryId: form.deputyRepresentativeLegendaryId || emptyOptionalValue,
+    deputyRepresentativeRole: form.deputyRepresentativeRole || emptyOptionalValue,
+    notes: form.notes || emptyOptionalValue,
+  };
+}
+
+export function TopFamiliesSection({ topId, permissions }: { topId: string; permissions: FamilyPermissions }) {
   const [families, setFamilies] = useState<TopFamily[]>([]);
   const [membersByFamily, setMembersByFamily] = useState<Record<string, TopFamilyMember[]>>({});
   const [participants, setParticipants] = useState<OptionItem[]>([]);
@@ -53,13 +75,21 @@ export function TopFamiliesSection({ topId }: { topId: string }) {
   async function submitFamily(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
-    const payload = { ...form, representativeLegendaryId: form.representativeLegendaryId || undefined, representativeRole: form.representativeRole || undefined, deputyRepresentativeLegendaryId: form.deputyRepresentativeLegendaryId || undefined, deputyRepresentativeRole: form.deputyRepresentativeRole || undefined, notes: form.notes || undefined };
+    const payload = buildFamilyPayload(form, Boolean(editingId));
     try {
       if (editingId) await updateTopFamily(topId, editingId, payload);
       else await createTopFamily(topId, payload);
       setForm(emptyForm);
       setEditingId(null);
       await refresh();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) {
+        setLoadError('Voce nao tem permissao para editar familias deste TOP.');
+      } else if (error instanceof ApiError && (error.status === 400 || error.status === 409)) {
+        setLoadError('Nao foi possivel salvar a familia. Verifique o nome e os representantes selecionados.');
+      } else {
+        setLoadError('Nao foi possivel salvar a familia. Tente novamente.');
+      }
     } finally {
       setBusy(false);
     }
@@ -130,6 +160,7 @@ export function TopFamiliesSection({ topId }: { topId: string }) {
       ) : null}
 
       {/* Form: Create/Edit Family */}
+      {(permissions.create || (Boolean(editingId) && permissions.update)) ? (
       <form onSubmit={submitFamily} className="grid gap-3 rounded-xl border border-zinc-800 bg-zinc-900/10 p-4 md:grid-cols-6 items-end">
         <div className="md:col-span-1 block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Nome da Família</span>
@@ -169,8 +200,10 @@ export function TopFamiliesSection({ topId }: { topId: string }) {
           {editingId ? 'Salvar Família' : 'Criar Família'}
         </button>
       </form>
+      ) : null}
 
       {/* Form: Add Participant to Family */}
+      {permissions.addMember ? (
       <form onSubmit={addMember} className="grid gap-3 rounded-xl border border-zinc-800 bg-zinc-900/10 p-4 md:grid-cols-5 items-end">
         <div className="block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Selecionar Família</span>
@@ -202,6 +235,7 @@ export function TopFamiliesSection({ topId }: { topId: string }) {
           Adicionar Membro
         </button>
       </form>
+      ) : null}
 
       {/* Grid of Family Panels */}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -214,12 +248,14 @@ export function TopFamiliesSection({ topId }: { topId: string }) {
                 <p className="text-xs text-zinc-500 mt-1 font-semibold">Rep: <span className="text-zinc-300">{family.representative?.fullName ?? '-'}</span>{family.representativeRole ? <span className="text-orange-400"> - {family.representativeRole}</span> : null}</p>
                 <p className="text-xs text-zinc-500 font-semibold">Sub: <span className="text-zinc-300">{family.deputyRepresentative?.fullName ?? '-'}</span>{family.deputyRepresentativeRole ? <span className="text-orange-400"> - {family.deputyRepresentativeRole}</span> : null}</p>
               </div>
-              <ActionMenu
-                items={[
-                  { label: 'Editar', onClick: () => editFamily(family), icon: <Edit2 className="h-3.5 w-3.5" /> },
-                  { label: 'Inativar', onClick: () => void deactivateFamily(family.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true },
-                ]}
-              />
+              {(permissions.update || permissions.delete) ? (
+                <ActionMenu
+                  items={[
+                    ...(permissions.update ? [{ label: 'Editar', onClick: () => editFamily(family), icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
+                    ...(permissions.delete ? [{ label: 'Inativar', onClick: () => void deactivateFamily(family.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true as const }] : []),
+                  ]}
+                />
+              ) : null}
             </div>
 
             <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
@@ -232,21 +268,25 @@ export function TopFamiliesSection({ topId }: { topId: string }) {
                     {member.sourceNotes ? <span className="block text-[11px] text-orange-300/80">Origem: {member.sourceNotes}</span> : null}
                   </span>
                   <div className="flex gap-2 items-center">
-                    <select
-                      className="rounded bg-zinc-850 border border-zinc-800 px-2 py-1 text-[10px] text-zinc-300 outline-none"
-                      defaultValue=""
-                      onChange={(event) => event.target.value && void transferMember(family.id, member.id, event.target.value)}
-                    >
-                      <option value="">Transferir</option>
-                      {families.filter((item) => item.id !== family.id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => void removeMember(family.id, member.id)}
-                      className="rounded border border-rose-900/30 bg-rose-950/10 px-2 py-1 text-[10px] text-rose-400 hover:bg-rose-950/30"
-                    >
-                      Remover
-                    </button>
+                    {permissions.transferMember ? (
+                      <select
+                        className="rounded bg-zinc-850 border border-zinc-800 px-2 py-1 text-[10px] text-zinc-300 outline-none"
+                        defaultValue=""
+                        onChange={(event) => event.target.value && void transferMember(family.id, member.id, event.target.value)}
+                      >
+                        <option value="">Transferir</option>
+                        {families.filter((item) => item.id !== family.id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                      </select>
+                    ) : null}
+                    {permissions.removeMember ? (
+                      <button
+                        type="button"
+                        onClick={() => void removeMember(family.id, member.id)}
+                        className="rounded border border-rose-900/30 bg-rose-950/10 px-2 py-1 text-[10px] text-rose-400 hover:bg-rose-950/30"
+                      >
+                        Remover
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ))}

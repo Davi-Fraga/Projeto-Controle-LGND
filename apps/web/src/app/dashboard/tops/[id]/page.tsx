@@ -11,11 +11,12 @@ import { TopTeamsTable } from '@/features/tops/top-teams-table';
 import type { TopEvent } from '@/features/tops/types';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { hasPermission } from '@/lib/permissions';
 
 export default function TopDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { loading: authLoading } = useRequireAuth();
+  const { user, loading: authLoading } = useRequireAuth();
   const [top, setTop] = useState<TopEvent | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -86,7 +87,17 @@ export default function TopDetailPage() {
           <TopServantsTable topId={top.id} />
         </div>
         <div className="rounded-xl border border-zinc-800 bg-[#111113] p-5 shadow-lg">
-          <TopFamiliesSection topId={top.id} />
+          <TopFamiliesSection
+            topId={top.id}
+            permissions={{
+              create: hasPermission(user, 'tops.families.create'),
+              update: hasPermission(user, 'tops.families.update'),
+              delete: hasPermission(user, 'tops.families.delete'),
+              addMember: hasPermission(user, 'tops.families.members.add'),
+              transferMember: hasPermission(user, 'tops.families.members.transfer'),
+              removeMember: hasPermission(user, 'tops.families.members.remove'),
+            }}
+          />
         </div>
       </div>
     </div>

@@ -19,6 +19,7 @@ describe('TopsService', () => {
       legendary: { findFirst: jest.fn() },
       team: { findFirst: jest.fn() },
       topTeam: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
+      topFamily: { findFirst: jest.fn(), update: jest.fn() },
       topParticipant: { findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn(), create: jest.fn(), update: jest.fn() },
       topServant: { findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn(), create: jest.fn(), update: jest.fn() },
     };
@@ -76,6 +77,61 @@ describe('TopsService', () => {
     prisma.topServant.findFirst.mockResolvedValueOnce(null);
     prisma.topParticipant.findFirst.mockResolvedValueOnce({ id: 'p1' });
     await expect(service.addServant('top-1', { legendaryId: 'l1', status: TopServantStatus.REGISTERED })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+
+  it('clears optional family fields when update sends null', async () => {
+    const before = {
+      id: 'family-1',
+      topEventId: 'top-1',
+      name: 'Familia Leoes',
+      representativeLegendaryId: 'legendary-1',
+      representativeRole: 'DOC',
+      deputyRepresentativeLegendaryId: 'legendary-2',
+      deputyRepresentativeRole: 'Apoio',
+      notes: 'Observacao anterior',
+      needsReview: false,
+      _count: { members: 0 },
+    };
+    const after = {
+      ...before,
+      representativeLegendaryId: null,
+      representativeRole: null,
+      deputyRepresentativeLegendaryId: null,
+      deputyRepresentativeRole: null,
+      notes: null,
+    };
+
+    prisma.topEvent.findFirst.mockResolvedValue({ id: 'top-1', _count: {} });
+    prisma.topFamily.findFirst.mockResolvedValue(before);
+    prisma.topFamily.update.mockResolvedValue(after);
+
+    await expect(service.updateFamily('top-1', 'family-1', {
+      representativeLegendaryId: null,
+      representativeRole: null,
+      deputyRepresentativeLegendaryId: null,
+      deputyRepresentativeRole: null,
+      notes: null,
+    }, 'actor-1')).resolves.toMatchObject({
+      representativeLegendaryId: null,
+      representativeRole: null,
+      deputyRepresentativeLegendaryId: null,
+      deputyRepresentativeRole: null,
+      notes: null,
+    });
+
+    expect(prisma.topFamily.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'family-1' },
+      data: expect.objectContaining({
+        topEventId: 'top-1',
+        representativeLegendaryId: null,
+        representativeRole: null,
+        deputyRepresentativeLegendaryId: null,
+        deputyRepresentativeRole: null,
+        notes: null,
+      }),
+    }));
+    expect(prisma.legendary.findFirst).not.toHaveBeenCalled();
   });
 
   it('cancels participant and servant', async () => {

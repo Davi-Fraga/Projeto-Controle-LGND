@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Building2, User, Phone, Users, Mail, MapPin, Search, ShieldCheck } from 'lucide-react';
+import { formatPhone } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useDebouncedSearch } from '@/hooks/use-debounced-search';
 import { getSpiritualLeaderChurches } from '@/features/spiritual-leaders/api';
@@ -127,7 +128,7 @@ export default function LideresEspirituaisPage() {
                 )}
 
                 {church.spiritualLeaderPhone && (
-                  <InfoRow icon={<Phone className="h-3.5 w-3.5" />} value={church.spiritualLeaderPhone} />
+                  <InfoRow icon={<Phone className="h-3.5 w-3.5" />} value={formatPhone(church.spiritualLeaderPhone)} />
                 )}
               </div>
 

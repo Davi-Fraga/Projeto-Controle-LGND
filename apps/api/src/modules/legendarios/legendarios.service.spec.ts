@@ -178,6 +178,18 @@ describe('LegendariosService', () => {
     expect(or).toContainEqual({ phone: { contains: '6199999' } });
   });
 
+  it('busca telefone completo nos formatos legado e canônico', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] });
+    prisma.legendary.findMany.mockResolvedValueOnce([]);
+    prisma.legendary.count.mockResolvedValueOnce(0);
+
+    await service.findAll({ page: 1, perPage: 10, search: '64992485187' }, adminUser);
+
+    const or = prisma.legendary.findMany.mock.calls[0][0].where.OR;
+    expect(or).toContainEqual({ phone: { contains: '64992485187' } });
+    expect(or).toContainEqual({ phone: { contains: '(64) 99248-5187' } });
+  });
+
   it('define searchText normalizado (sem acento/caixa) ao criar', async () => {
     prisma.legendary.findUnique.mockResolvedValueOnce(null);
     prisma.legendary.create.mockResolvedValueOnce({ id: '1', fullName: 'João Silva', expertises: [] });
@@ -288,7 +300,9 @@ describe('LegendariosService', () => {
       expertiseIds: [],
     });
 
-    expect(prisma.legendary.create).toHaveBeenCalled();
+    expect(prisma.legendary.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ phone: '(61) 99999-9999' }) }),
+    );
     expect(result.phone).toBe('61999999999');
     expect(audit.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'create' }), expect.anything());
   });

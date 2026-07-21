@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { formatPhone } from '@central-da-manada/shared';
 import { getLegendario } from '@/features/legendarios/api';
 import { LegendarioHistorySection } from '@/features/legendarios/legendario-history-section';
 import type { Legendary } from '@/features/legendarios/types';
@@ -52,9 +53,9 @@ export default function LegendarioDetalhePage() {
     ['Líder espiritual?', legendario.isSpiritualLeader ? 'Sim' : 'Não'],
     ['Liderança', legendario.leadershipRole || '-'],
     ['Líder espiritual (nome)', legendario.spiritualLeaderName || '-'],
-    ['Líder espiritual (contato)', legendario.spiritualLeaderPhone || '-'],
+    ['Líder espiritual (contato)', formatPhone(legendario.spiritualLeaderPhone) || '-'],
     ['Esposa/Mãe (nome)', legendario.relativeName || '-'],
-    ['Esposa/Mãe (contato)', legendario.relativePhone || '-'],
+    ['Esposa/Mãe (contato)', formatPhone(legendario.relativePhone) || '-'],
     ['Esposa/Mãe (e-mail)', legendario.relativeEmail || '-'],
     ['Habilidades', legendario.skillsText || '-'],
     ['Última sincronização', fmtDate(legendario.lastFormsSyncAt)],
@@ -90,7 +91,7 @@ export default function LegendarioDetalhePage() {
         <Info
           title="Dados Principais"
           rows={[
-            ['Telefone', legendario.phone || '-'],
+            ['Telefone', formatPhone(legendario.phone) || '-'],
             ['Cidade', legendario.city || '-'],
             ['Status', <StatusBadge key="status" status={legendario.status} />],
             ['Rota do Cerrado', legendario.isFromRotaDoCerrado ? 'Sim' : 'Não'],

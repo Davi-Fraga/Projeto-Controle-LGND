@@ -1,14 +1,14 @@
 ## Why
 
-Telefones aparecem em formatos inconsistentes na interface — `64992485187`, `(42) 99947-1325`, `5564...` — porque só o caminho de **sync/import** normaliza (via `cleanPhone`, que já produz `(DD) NNNNN-NNNN`), enquanto os **formulários manuais** salvam o texto cru e **nenhum ponto de exibição** formata. O resultado é um banco misto (canônico do sync + arbitrário do manual/legado) e uma UI inconsistente. Queremos **uma máscara única e consistente** de telefone (e de CPF, para quando houver campo) na exibição e na digitação, reusando o utilitário que já existe.
+Telefones aparecem em formatos inconsistentes na interface — `64992485187`, `(42) 99947-1325`, `5564...` — porque só o caminho de **sync/import** normaliza (via `cleanPhone`, que já produz o formato brasileiro com DDD), enquanto os **formulários manuais** salvam o texto cru e **nenhum ponto de exibição** formata. O resultado é um banco misto (canônico do sync + arbitrário do manual/legado) e uma UI inconsistente. Queremos **uma máscara única e consistente** de telefone (e de CPF, para quando houver campo) na exibição e na digitação, reusando o utilitário que já existe.
 
-Nota de investigação: `cleanPhone` (em `packages/shared/src/normalization.ts`) já é a fonte da verdade do formato `(DD) NNNNN-NNNN` (remove DDI 55, zeros à esquerda, trata 10/11 dígitos). Esta change **não reinventa** — envolve/estende esse util e o aplica onde falta. **Não existe campo de CPF** hoje no schema; a máscara de CPF entra como utilitário reutilizável, aplicável onde/quando um campo de CPF existir.
+Nota de investigação: `cleanPhone` (em `packages/shared/src/normalization.ts`) já é a fonte da verdade dos formatos de celular `(DD) NNNNN-NNNN` e fixo `(DD) NNNN-NNNN` (remove DDI 55, zeros à esquerda, trata 10/11 dígitos). Esta change **não reinventa** — envolve/estende esse util e o aplica onde falta. **Não existe campo de CPF** hoje no schema; a máscara de CPF entra como utilitário reutilizável, aplicável onde/quando um campo de CPF existir.
 
 ## What Changes
 
 - **Utilitário único de formatação** em `packages/shared` (reuso/co-localizado com `cleanPhone`): `formatPhone` (exibição, tolerante a qualquer formato de entrada, retorna o valor original quando não reconhece) e `formatCpf` (`XXX.XXX.XXX-XX`) + helpers de máscara de digitação. **Não duplicar** máscara por tela.
 - **Exibição normalizada em todos os pontos de telefone** — listas e detalhes de Legendários, Igrejas, Líderes Espirituais, painel do organograma, pré-inscrições — passam a exibir via `formatPhone`. Cobre 100% dos dados atuais, sem tocar no armazenamento.
-- **Escrita normalizada nos formulários manuais** — ao salvar Legendário/Igreja, o telefone passa por `cleanPhone` (mesma normalização do sync), e o campo ganha **máscara de digitação** `(XX) XXXXX-XXXX`. Dado novo/editado nasce canônico; o banco converge com o uso.
+- **Escrita normalizada nos formulários manuais** — ao salvar Legendário/Igreja, o telefone passa por `cleanPhone` (mesma normalização do sync), e o campo ganha **máscara de digitação adaptativa** para 10/11 dígitos. Dado novo/editado nasce canônico; o banco converge com o uso.
 - **CPF**: `formatCpf` + máscara de digitação disponíveis para reuso; aplicados onde existir campo de CPF (hoje **nenhum** — util pronto para uso futuro).
 - **Sem reescrita do banco em massa** nesta change (decisão de segurança — ver design). Um backfill idempotente com dry-run/preview + backup fica **fora de escopo/opcional**, só se depois for desejado.
 

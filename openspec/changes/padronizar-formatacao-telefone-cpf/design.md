@@ -1,6 +1,6 @@
 ## Context
 
-O formato canônico de telefone `(DD) NNNNN-NNNN` e a normalização (`cleanPhone`) **já existem** em `packages/shared/src/normalization.ts` e são usados no sync do Forms e no import. O gap é: (1) formulários manuais salvam cru; (2) nenhum ponto de **exibição** formata; (3) não há **máscara de digitação**; (4) **não existe campo de CPF** no schema. O banco atual é misto (canônico do sync + arbitrário do manual/legado).
+Os formatos canônicos de celular `(DD) NNNNN-NNNN` e fixo `(DD) NNNN-NNNN`, via `cleanPhone`, **já existem** em `packages/shared/src/normalization.ts` e são usados no sync do Forms e no import. O gap é: (1) formulários manuais salvam cru; (2) nenhum ponto de **exibição** formata; (3) não há **máscara de digitação**; (4) **não existe campo de CPF** no schema. O banco atual é misto (canônico do sync + arbitrário do manual/legado).
 
 ## Goals / Non-Goals
 
@@ -21,13 +21,13 @@ O formato canônico de telefone `(DD) NNNNN-NNNN` e a normalização (`cleanPhon
 
 ### D1 — Reusar `cleanPhone` como base; `formatPhone` para exibição
 
-**Escolha:** `formatPhone(value)` = aplica `cleanPhone`; se resultar no padrão `(DD) NNNNN-NNNN`, exibe; se `cleanPhone` não reconhecer (retorna só dígitos), exibe o original. Assim exibição e escrita usam **a mesma** normalização — zero divergência.
+**Escolha:** `formatPhone(value)` = aplica `cleanPhone`; se resultar em celular `(DD) NNNNN-NNNN` ou fixo `(DD) NNNN-NNNN`, exibe; se `cleanPhone` não reconhecer (retorna só dígitos), exibe o original. Assim exibição e escrita usam **a mesma** normalização — zero divergência.
 **Por quê:** fonte única do formato; tolerante a legado; não-destrutivo (nunca "quebra" um número estranho, só o mostra como está).
 **Alternativa descartada:** novo formatador paralelo — duplicaria a regra e divergiria do sync.
 
 ### D2 — Máscara de digitação reutilizável (um hook/componente, não por tela)
 
-**Escolha:** um input mascarado reutilizável (formata enquanto digita para `(XX) XXXXX-XXXX`; para CPF `XXX.XXX.XXX-XX`), usado por `legendario-form`/`church-form`. Na submissão, o valor passa por `cleanPhone` antes de ir à API (e o backend também normaliza no service, como defesa).
+**Escolha:** helpers de máscara reutilizáveis (telefone adaptativo: `(XX) XXXX-XXXX` ou `(XX) XXXXX-XXXX`; CPF `XXX.XXX.XXX-XX`), usados por `legendario-form`/`church-form`. Na submissão, o valor passa por `cleanPhone` antes de ir à API (e o backend também normaliza no service, como defesa).
 **Por quê:** o requisito "reutilizável, não duplicar" — um só ponto de máscara; a máscara é só apresentação, a verdade é `cleanPhone`.
 
 ### D3 — Normalizar exibição + escrita; NÃO reescrever o banco (recomendação)
@@ -40,6 +40,11 @@ O formato canônico de telefone `(DD) NNNNN-NNNN` e a normalização (`cleanPhon
 
 **Escolha:** entregar `formatCpf` + máscara de CPF reutilizáveis; **não** adicionar campo de CPF (não existe hoje). Aplicar automaticamente onde/quando um campo de CPF surgir.
 **Por quê:** o pedido é "onde houver campo de CPF"; hoje não há. Evita escopo extra (mexer no schema) e deixa a peça pronta.
+
+### D5 — Preservar a busca numérica nos dois formatos de armazenamento
+
+**Escolha:** a busca de Legendários mantém a cláusula por dígitos para registros legados e adiciona a variante canônica retornada por `cleanPhone` quando houver um telefone completo.
+**Por quê:** a escrita manual passará a persistir pontuação. Sem a segunda variante, um registro novo ou editado deixaria de ser localizado pela busca numérica atual.
 
 ## Risks / Trade-offs
 

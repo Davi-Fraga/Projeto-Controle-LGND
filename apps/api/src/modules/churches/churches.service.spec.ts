@@ -25,6 +25,16 @@ describe('ChurchesService geocoding integration', () => {
   });
 
   describe('create', () => {
+    it('normaliza o telefone do líder antes de persistir', async () => {
+      geocoding.geocode.mockResolvedValueOnce(null);
+
+      await service.create({ name: 'Igreja Central', spiritualLeaderPhone: '5564992485187' } as any, 'actor');
+
+      expect(prisma.church.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ spiritualLeaderPhone: '(64) 99248-5187' }) }),
+      );
+    });
+
     it('geocodifica quando não recebe coordenadas', async () => {
       geocoding.geocode.mockResolvedValueOnce({ lat: -16.68, lng: -49.26, displayName: 'Goiânia' });
 
@@ -63,6 +73,24 @@ describe('ChurchesService geocoding integration', () => {
 
       expect(prisma.church.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ latitude: null, longitude: null }) }),
+      );
+    });
+  });
+
+  describe('phone normalization', () => {
+    it('normaliza o telefone do líder na edição e preserva null explícito', async () => {
+      prisma.church.findFirst.mockResolvedValueOnce({ id: 'church-1', name: 'Igreja', city: 'Goiânia', address: null, spiritualLeaderUserId: null });
+
+      await service.update('church-1', { spiritualLeaderPhone: '+55 64 99988-7766' } as any, 'actor');
+
+      expect(prisma.church.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ spiritualLeaderPhone: '(64) 99988-7766' }) }),
+      );
+
+      prisma.church.findFirst.mockResolvedValueOnce({ id: 'church-1', name: 'Igreja', city: 'Goiânia', address: null, spiritualLeaderUserId: null });
+      await service.update('church-1', { spiritualLeaderPhone: null } as any, 'actor');
+      expect(prisma.church.update).toHaveBeenLastCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ spiritualLeaderPhone: null }) }),
       );
     });
   });

@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { normalizeName } from '@central-da-manada/shared';
+import { cleanPhone, normalizeName } from '@central-da-manada/shared';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
@@ -143,7 +143,7 @@ export class ChurchesService {
         city: dto.city?.trim() || null,
         address: dto.address?.trim() || null,
         spiritualLeaderName: dto.spiritualLeaderName?.trim() || null,
-        spiritualLeaderPhone: dto.spiritualLeaderPhone?.trim() || null,
+        spiritualLeaderPhone: cleanPhone(dto.spiritualLeaderPhone ?? null),
         spiritualLeaderUserId: dto.spiritualLeaderUserId || null,
         latitude,
         longitude,
@@ -192,7 +192,9 @@ export class ChurchesService {
         city: dto.city === null ? null : (dto.city !== undefined ? dto.city.trim() : undefined),
         address: dto.address === null ? null : (dto.address !== undefined ? dto.address.trim() : undefined),
         spiritualLeaderName: dto.spiritualLeaderName === null ? null : (dto.spiritualLeaderName !== undefined ? dto.spiritualLeaderName.trim() : undefined),
-        spiritualLeaderPhone: dto.spiritualLeaderPhone === null ? null : (dto.spiritualLeaderPhone !== undefined ? dto.spiritualLeaderPhone.trim() : undefined),
+        spiritualLeaderPhone: dto.spiritualLeaderPhone === null
+          ? null
+          : (dto.spiritualLeaderPhone !== undefined ? cleanPhone(dto.spiritualLeaderPhone) : undefined),
         spiritualLeaderUserId: dto.spiritualLeaderUserId !== undefined ? (dto.spiritualLeaderUserId ?? null) : undefined,
         latitude,
         longitude,

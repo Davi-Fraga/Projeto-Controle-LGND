@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Church } from '@central-da-manada/shared';
+import { cleanPhone, maskPhoneInput, type Church } from '@central-da-manada/shared';
 import { createChurch, geocodeChurch, updateChurch, type ChurchPayload } from './api';
 import { getUsers, type UserSummary } from '@/features/users/api';
 
@@ -28,7 +28,7 @@ export function ChurchForm({ church }: Props) {
     city: church?.city ?? '',
     address: church?.address ?? '',
     spiritualLeaderName: church?.spiritualLeaderName ?? '',
-    spiritualLeaderPhone: church?.spiritualLeaderPhone ?? '',
+    spiritualLeaderPhone: maskPhoneInput(church?.spiritualLeaderPhone ?? ''),
     spiritualLeaderUserId: church?.spiritualLeaderUserId ?? '',
     latitude: church?.latitude != null ? String(church.latitude) : '',
     longitude: church?.longitude != null ? String(church.longitude) : '',
@@ -86,7 +86,7 @@ export function ChurchForm({ church }: Props) {
       city: form.city.trim() || null,
       address: form.address.trim() || null,
       spiritualLeaderName: form.spiritualLeaderName.trim() || null,
-      spiritualLeaderPhone: form.spiritualLeaderPhone.trim() || null,
+      spiritualLeaderPhone: cleanPhone(form.spiritualLeaderPhone),
       spiritualLeaderUserId: form.spiritualLeaderUserId || null,
       latitude: form.latitude.trim() === '' ? null : Number(form.latitude),
       longitude: form.longitude.trim() === '' ? null : Number(form.longitude),
@@ -145,7 +145,13 @@ export function ChurchForm({ church }: Props) {
         </label>
         <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Telefone do Líder</span>
-          <input className="input" value={form.spiritualLeaderPhone} onChange={(e) => setField('spiritualLeaderPhone', e.target.value)} />
+          <input
+            className="input"
+            inputMode="tel"
+            autoComplete="tel"
+            value={form.spiritualLeaderPhone}
+            onChange={(e) => setField('spiritualLeaderPhone', maskPhoneInput(e.target.value))}
+          />
         </label>
         <label className="md:col-span-2 block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Usuário vinculado (acesso de líder espiritual)</span>

@@ -99,6 +99,24 @@ describe('LegendariosPage church deep-link', () => {
     });
   });
 
+  it('formata telefone legado na listagem', async () => {
+    mocks.getLegendarios.mockResolvedValueOnce({
+      data: [{
+        id: 'legendary-1',
+        fullName: 'Joao Silva',
+        phone: '64992485187',
+        status: 'ACTIVE',
+        expertises: [],
+        needsReview: false,
+      }],
+      meta: { page: 1, perPage: 10, total: 1, totalPages: 1 },
+    });
+
+    render(<LegendariosPage />);
+
+    expect(await screen.findByText('(64) 99248-5187')).toBeInTheDocument();
+  });
+
   it('updates the URL when selecting a church and removes the filter when clearing it', async () => {
     render(<LegendariosPage />);
 

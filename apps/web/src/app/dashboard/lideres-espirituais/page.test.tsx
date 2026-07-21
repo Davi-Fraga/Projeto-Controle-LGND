@@ -28,8 +28,8 @@ describe('LideresEspirituaisPage', () => {
         name: 'Igreja ADEG',
         city: 'Goiania',
         spiritualLeaderUserId: null,
-        spiritualLeaderName: null,
-        spiritualLeaderPhone: null,
+        spiritualLeaderName: 'Pastor João',
+        spiritualLeaderPhone: '64992485187',
         spiritualLeader: null,
         _count: { legendarios: 2 },
       },
@@ -92,5 +92,11 @@ describe('LideresEspirituaisPage', () => {
       'href',
       '/dashboard/legendarios?churchId=22222222-2222-4222-8222-222222222222&churchName=Igreja%20do%20Aprisco',
     );
+  });
+
+  it('formata o telefone do líder espiritual', async () => {
+    render(<LideresEspirituaisPage />);
+
+    expect(await screen.findByText('(64) 99248-5187')).toBeInTheDocument();
   });
 });

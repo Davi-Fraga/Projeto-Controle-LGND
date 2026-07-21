@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import type { TopPreRegistration } from '@central-da-manada/shared';
+import { formatPhone, type TopPreRegistration } from '@central-da-manada/shared';
 import {
   approvePreRegistration,
   getPendingCount,
@@ -114,7 +114,7 @@ export default function TopPreRegistrationsPage() {
             header: 'Contato',
             accessor: (i) => (
               <div className="flex flex-col">
-                {i.phone ? <span>{i.phone}</span> : null}
+                {i.phone ? <span>{formatPhone(i.phone)}</span> : null}
                 {i.email ? <span className="text-xs text-zinc-500">{i.email}</span> : null}
                 {!i.phone && !i.email ? <span className="text-zinc-600">—</span> : null}
               </div>

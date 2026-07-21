@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { LegendaryHistoryType, LegendaryStatus } from '@central-da-manada/shared';
+import { LegendaryHistoryType, LegendaryStatus, TeamMembershipStatus } from '@central-da-manada/shared';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
@@ -62,6 +62,16 @@ export class LegendariosService {
     if (!scope.isAdmin) {
       where.AND = [...(where.AND ?? []), this.accessPolicy.buildLegendaryWhere(scope)];
     }
+    if (query.teamId) {
+      where.teamMemberships = {
+        some: {
+          ...this.accessPolicy.buildTeamMembershipWhere(scope, query.teamId),
+          status: TeamMembershipStatus.ACTIVE,
+          deletedAt: null,
+          team: { deletedAt: null },
+        },
+      };
+    }
 
     const orderBy = { [query.orderBy ?? 'fullName']: query.orderDirection ?? 'asc' };
     const [items, total] = await Promise.all([
@@ -83,7 +93,7 @@ export class LegendariosService {
     const scope = await this.accessPolicy.resolveScope(user);
     const where: any = { id, deletedAt: null };
     if (!scope.isAdmin) {
-      where.AND = [this.accessPolicy.buildLegendaryWhere(scope)];
+      where.AND = [this.accessPolicy.buildLegendaryDetailWhere(scope)];
     }
 
     const legendario = await this.prisma.legendary.findFirst({

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import type { TeamMembership } from '@central-da-manada/shared';
 import { deactivateTeamMember, getTeamMembers } from './api';
 import { TeamMemberForm } from './team-member-form';
@@ -89,7 +90,14 @@ export function TeamMembersTable({ teamId }: Props) {
                 members.map((member) => (
                   <tr key={member.id} className="hover:bg-zinc-900/20 transition-colors">
                     <td className="px-6 py-4 font-bold text-white">
-                      {member.legendary?.fullName ?? '-'}
+                      {member.legendary ? (
+                        <Link
+                          href={`/dashboard/legendarios/${member.legendaryId}?fromTeamId=${teamId}`}
+                          className="transition-colors hover:text-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+                        >
+                          {member.legendary.fullName}
+                        </Link>
+                      ) : '-'}
                     </td>
                     <td className="px-6 py-4 text-zinc-300 font-medium">
                       {member.role === 'COORDINATOR' ? 'Coordenador' : member.role === 'DEPUTY_COORDINATOR' ? 'Subcoordenador' : member.role === 'MEMBER' ? 'Membro' : member.role}
@@ -140,4 +148,3 @@ export function TeamMembersTable({ teamId }: Props) {
     </section>
   );
 }
-

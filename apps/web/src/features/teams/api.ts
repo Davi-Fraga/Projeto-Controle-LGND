@@ -26,6 +26,18 @@ export function getTeam(id: string) {
   return api<TeamResponse>(`/teams/${id}`);
 }
 
+export type TeamOption = {
+  id: string;
+  label: string;
+  value: string;
+  metadata?: { status?: string };
+};
+
+export function getTeamOptions(search: string, limit = 20) {
+  const query = buildQuery({ search: search.trim() || undefined, limit });
+  return api<{ data: TeamOption[] }>(`/teams/options?${query}`);
+}
+
 export function createTeam(payload: TeamPayload) {
   return api<TeamResponse>('/teams', { method: 'POST', body: JSON.stringify(payload) });
 }

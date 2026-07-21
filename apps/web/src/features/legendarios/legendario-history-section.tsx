@@ -5,7 +5,7 @@ import { LegendaryHistoryType } from '@central-da-manada/shared';
 import { addLegendarioHistoryNote, getLegendarioHistory } from './api';
 import type { LegendaryHistory } from './types';
 
-export function LegendarioHistorySection({ legendarioId }: { legendarioId: string }) {
+export function LegendarioHistorySection({ legendarioId, canCreate = false }: { legendarioId: string; canCreate?: boolean }) {
   const [items, setItems] = useState<LegendaryHistory[]>([]);
   const [type, setType] = useState('');
   const [title, setTitle] = useState('');
@@ -46,24 +46,26 @@ export function LegendarioHistorySection({ legendarioId }: { legendarioId: strin
         </select>
       </div>
 
-      <form onSubmit={addNote} className="grid gap-3 md:grid-cols-[1.2fr_2fr_auto] bg-zinc-900/10 border border-zinc-800/40 rounded-xl p-4">
-        <input
-          className="input text-xs"
-          placeholder="Título da anotação"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          required
-        />
-        <input
-          className="input text-xs"
-          placeholder="Descrição detalhada..."
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-        />
-        <button className="flex h-11 items-center justify-center rounded-lg bg-orange-600 px-4 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
-          Adicionar Nota
-        </button>
-      </form>
+      {canCreate ? (
+        <form onSubmit={addNote} className="grid gap-3 md:grid-cols-[1.2fr_2fr_auto] bg-zinc-900/10 border border-zinc-800/40 rounded-xl p-4">
+          <input
+            className="input text-xs"
+            placeholder="Título da anotação"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            required
+          />
+          <input
+            className="input text-xs"
+            placeholder="Descrição detalhada..."
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+          <button className="flex h-11 items-center justify-center rounded-lg bg-orange-600 px-4 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500">
+            Adicionar Nota
+          </button>
+        </form>
+      ) : null}
 
       <div className="space-y-3">
         {items.map((item) => (
@@ -97,4 +99,3 @@ export function LegendarioHistorySection({ legendarioId }: { legendarioId: strin
     </div>
   );
 }
-

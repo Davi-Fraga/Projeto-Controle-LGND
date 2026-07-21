@@ -83,6 +83,34 @@ describe('TeamsService', () => {
     expect(accessPolicy.buildTeamWhere).not.toHaveBeenCalled();
   });
 
+  it('options applies the team scope for a restricted user', async () => {
+    const scopeFilter = { id: { in: ['team-1'] } };
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: ['team-1'], legendaryIds: [] });
+    accessPolicy.buildTeamWhere.mockReturnValueOnce(scopeFilter);
+    prisma.team.findMany.mockResolvedValueOnce([{ id: 'team-1', name: 'Midia', status: TeamStatus.ACTIVE }]);
+
+    const result = await service.options({ search: 'mid', limit: 5 }, coordinatorUser);
+
+    expect(prisma.team.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        name: { contains: 'mid', mode: 'insensitive' },
+        AND: [scopeFilter],
+      }),
+      take: 5,
+    }));
+    expect(result).toEqual([expect.objectContaining({ value: 'team-1', label: 'Midia' })]);
+  });
+
+  it('options keeps administrators unrestricted', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] });
+    prisma.team.findMany.mockResolvedValueOnce([]);
+
+    await service.options({ limit: 20 }, adminUser);
+
+    expect(accessPolicy.buildTeamWhere).not.toHaveBeenCalled();
+    expect(prisma.team.findMany.mock.calls[0][0].where.AND).toBeUndefined();
+  });
+
   it('findMembers returns 404 when teamId is outside scope', async () => {
     accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: ['other-team'], legendaryIds: [] });
 

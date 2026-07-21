@@ -90,10 +90,15 @@ export class TeamsService {
     return this.toTeamResponse(team);
   }
 
-  async options(query: OptionsQueryDto) {
+  async options(query: OptionsQueryDto, user: AuthenticatedUser) {
     const where: any = { deletedAt: null };
     if (query.activeOnly !== false) where.status = TeamStatus.ACTIVE;
     if (query.search) where.name = { contains: query.search, mode: 'insensitive' };
+
+    const scope = await this.accessPolicy.resolveScope(user);
+    if (!scope.isAdmin) {
+      where.AND = [...(where.AND ?? []), this.accessPolicy.buildTeamWhere(scope)];
+    }
 
     const items = await this.prisma.team.findMany({
       where,

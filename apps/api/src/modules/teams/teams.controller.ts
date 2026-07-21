@@ -25,8 +25,8 @@ export class TeamsController {
 
   @Get('options')
   @Permissions('teams.read')
-  async options(@Query() query: OptionsQueryDto) {
-    return { data: await this.teamsService.options(query) };
+  async options(@Query() query: OptionsQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.teamsService.options(query, user) };
   }
 
   @Get(':id')

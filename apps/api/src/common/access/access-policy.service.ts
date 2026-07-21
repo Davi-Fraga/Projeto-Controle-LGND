@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { UserScopeType } from '@central-da-manada/shared';
+import { TeamMembershipStatus, UserScopeType } from '@central-da-manada/shared';
 import { AuthenticatedUser } from '../decorators/current-user.decorator';
 import { normalizeCityKey } from '../org-chart/org-chart.util';
 import { hasAdminRole } from './access.constants';
@@ -74,6 +74,41 @@ export class AccessPolicyService {
     }
 
     return OR.length ? { OR } : { id: { in: [] } };
+  }
+
+  buildTeamMembershipWhere(scope: AccessScope, teamId?: string) {
+    if (scope.isAdmin) {
+      return teamId ? { teamId } : {};
+    }
+
+    const allowedTeamIds = teamId
+      ? scope.teamIds.filter((allowedId) => allowedId === teamId)
+      : scope.teamIds;
+
+    return { teamId: { in: allowedTeamIds } };
+  }
+
+  buildLegendaryDetailWhere(scope: AccessScope) {
+    if (scope.isAdmin) return {};
+
+    const geographic = this.buildLegendaryWhere(scope);
+    if (!scope.teamIds.length) return geographic;
+
+    return {
+      OR: [
+        geographic,
+        {
+          teamMemberships: {
+            some: {
+              ...this.buildTeamMembershipWhere(scope),
+              status: TeamMembershipStatus.ACTIVE,
+              deletedAt: null,
+              team: { deletedAt: null },
+            },
+          },
+        },
+      ],
+    };
   }
 
   buildTeamWhere(scope: AccessScope) {

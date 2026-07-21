@@ -143,6 +143,65 @@ describe('AccessPolicyService', () => {
     expect(where).toEqual({ id: { in: [] } });
   });
 
+  it('allows detail through an active membership without widening the list', () => {
+    const scope = {
+      isAdmin: false,
+      churchIds: [],
+      teamIds: ['team-1'],
+      legendaryIds: [],
+      cityKeys: [],
+      legendaryCities: [],
+      topIds: [],
+    };
+
+    expect(service.buildLegendaryWhere(scope)).toEqual({ id: { in: [] } });
+    expect(service.buildLegendaryDetailWhere(scope)).toEqual({
+      OR: [
+        { id: { in: [] } },
+        {
+          teamMemberships: {
+            some: {
+              teamId: { in: ['team-1'] },
+              status: 'ACTIVE',
+              deletedAt: null,
+              team: { deletedAt: null },
+            },
+          },
+        },
+      ],
+    });
+  });
+
+  it('keeps detail closed without geographic or team scope', () => {
+    const scope = {
+      isAdmin: false,
+      churchIds: [],
+      teamIds: [],
+      legendaryIds: [],
+      cityKeys: [],
+      legendaryCities: [],
+      topIds: [],
+    };
+
+    expect(service.buildLegendaryDetailWhere(scope)).toEqual({ id: { in: [] } });
+  });
+
+  it('builds an impossible membership filter for an out-of-scope team', () => {
+    const scope = {
+      isAdmin: false,
+      churchIds: [],
+      teamIds: ['team-1'],
+      legendaryIds: [],
+      cityKeys: [],
+      legendaryCities: [],
+      topIds: [],
+    };
+
+    expect(service.buildTeamMembershipWhere(scope, 'team-2')).toEqual({
+      teamId: { in: [] },
+    });
+  });
+
   describe('city scope', () => {
     it('resolves multiple city scopes into concrete legendary cities', async () => {
       prisma.church.findMany.mockResolvedValueOnce([]);

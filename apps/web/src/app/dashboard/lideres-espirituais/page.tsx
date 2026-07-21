@@ -110,7 +110,7 @@ export default function LideresEspirituaisPage() {
               {/* Action */}
               <div className="mt-4 border-t border-zinc-800/60 pt-3">
                 <Link
-                  href="/dashboard/legendarios"
+                  href={`/dashboard/legendarios?churchId=${church.id}&churchName=${encodeURIComponent(church.name)}`}
                   className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-orange-500 hover:text-orange-400 transition-colors"
                 >
                   <Users className="h-3.5 w-3.5" /> Ver legendários

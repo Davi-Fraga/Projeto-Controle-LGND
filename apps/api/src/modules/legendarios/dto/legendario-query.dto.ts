@@ -22,6 +22,10 @@ export class LegendarioQueryDto extends PaginationDto {
 
   @IsOptional()
   @IsUUID()
+  teamId?: string;
+
+  @IsOptional()
+  @IsUUID()
   professionId?: string;
 
   @IsOptional()

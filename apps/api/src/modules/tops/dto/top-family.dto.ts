@@ -14,11 +14,11 @@ export class CreateTopFamilyDto {
 
 export class UpdateTopFamilyDto {
   @IsOptional() @IsString() name?: string;
-  @IsOptional() @IsUUID() representativeLegendaryId?: string;
-  @IsOptional() @IsString() representativeRole?: string;
-  @IsOptional() @IsUUID() deputyRepresentativeLegendaryId?: string;
-  @IsOptional() @IsString() deputyRepresentativeRole?: string;
-  @IsOptional() @IsString() notes?: string;
+  @IsOptional() @IsUUID() representativeLegendaryId?: string | null;
+  @IsOptional() @IsString() representativeRole?: string | null;
+  @IsOptional() @IsUUID() deputyRepresentativeLegendaryId?: string | null;
+  @IsOptional() @IsString() deputyRepresentativeRole?: string | null;
+  @IsOptional() @IsString() notes?: string | null;
   @IsOptional() @Type(() => Boolean) @IsBoolean() needsReview?: boolean;
 }
 

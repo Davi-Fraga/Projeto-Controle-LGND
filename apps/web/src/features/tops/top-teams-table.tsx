@@ -23,7 +23,7 @@ export function TopTeamsTable({ topId }: { topId: string }) {
         setItems(r.data);
         setError(null);
       })
-      .catch(() => setError('Nao foi possivel carregar equipes vinculadas ao TOP.'));
+      .catch(() => setError('Não foi possível carregar equipes vinculadas ao TOP.'));
   }, [topId, refresh]);
 
   function done() {
@@ -38,7 +38,7 @@ export function TopTeamsTable({ topId }: { topId: string }) {
       await removeTopTeam(topId, removingId);
       done();
     } catch {
-      setError('Nao foi possivel remover a equipe do TOP.');
+      setError('Não foi possível remover a equipe do TOP.');
     } finally {
       setRemovingId(null);
     }

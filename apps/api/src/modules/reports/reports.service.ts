@@ -99,10 +99,10 @@ export class ReportsService {
       this.prisma.topFamilyMember.findMany({ where: { deletedAt: null, needsReview: true }, include: { topFamily: true, topParticipant: { include: { legendary: true } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
     ]);
     return [
-      ...legendarios.map((item: any) => ({ tipo: 'Legendario', id: item.id, nome: item.fullName, contexto: item.city ?? '', motivo: 'Marcado para revisar', observacao: item.notes ?? '' })),
-      ...tops.map((item: any) => ({ tipo: 'TOP', id: item.id, nome: `${item.name} #${item.number}`, contexto: item.city, motivo: item.familyCoordinatorLegendaryId ? 'Marcado para revisar' : 'Sem coordenador de familias', observacao: '' })),
-      ...families.map((item: any) => ({ tipo: 'Familia', id: item.id, nome: item.name, contexto: item.topEvent?.name ?? '', motivo: item.representativeLegendaryId ? 'Marcada para revisar' : 'Sem representante', observacao: item.notes ?? '' })),
-      ...members.map((item: any) => ({ tipo: 'Membro de familia', id: item.id, nome: item.topParticipant?.legendary?.fullName ?? '', contexto: item.topFamily?.name ?? '', motivo: 'Marcado para revisar', observacao: item.sourceNotes ?? item.notes ?? '' })),
+      ...legendarios.map((item: any) => ({ tipo: 'Legendário', id: item.id, nome: item.fullName, contexto: item.city ?? '', motivo: 'Marcado para revisar', observacao: item.notes ?? '' })),
+      ...tops.map((item: any) => ({ tipo: 'TOP', id: item.id, nome: `${item.name} #${item.number}`, contexto: item.city, motivo: item.familyCoordinatorLegendaryId ? 'Marcado para revisar' : 'Sem coordenador de famílias', observacao: '' })),
+      ...families.map((item: any) => ({ tipo: 'Família', id: item.id, nome: item.name, contexto: item.topEvent?.name ?? '', motivo: item.representativeLegendaryId ? 'Marcada para revisar' : 'Sem representante', observacao: item.notes ?? '' })),
+      ...members.map((item: any) => ({ tipo: 'Membro de família', id: item.id, nome: item.topParticipant?.legendary?.fullName ?? '', contexto: item.topFamily?.name ?? '', motivo: 'Marcado para revisar', observacao: item.sourceNotes ?? item.notes ?? '' })),
     ];
   }
 
@@ -127,7 +127,7 @@ export class ReportsService {
     const where: any = { deletedAt: null };
     if (scopeFilter) where.AND = [scopeFilter];
     const items = await this.prisma.legendary.groupBy({ by: [field], where, _count: { _all: true } });
-    return items.map((item: any) => ({ value: item[field] ?? 'Nao informado', count: item._count._all })).sort((a: any, b: any) => b.count - a.count);
+    return items.map((item: any) => ({ value: item[field] ?? 'Não informado', count: item._count._all })).sort((a: any, b: any) => b.count - a.count);
   }
 
   private legendaryRow(item: any) { return { ...item, phone: undefined, expertises: item.expertises.map((entry: any) => entry.expertise) }; }

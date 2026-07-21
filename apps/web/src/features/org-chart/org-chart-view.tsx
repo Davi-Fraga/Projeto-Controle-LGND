@@ -64,7 +64,7 @@ export function OrgChartView({ topId, canEditPerson, canReorder, canStructureCha
         ) : isEmpty ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-zinc-500">
             <Network className="h-8 w-8" />
-            <p className="text-sm">Nenhum dado para esta visão ainda.</p>
+            <p className="text-sm">Ainda não há dados para esta visão.</p>
           </div>
         ) : root ? (
           // Move (Fase 3) não se aplica à visão de TOP (não é hierarquia de cidade);

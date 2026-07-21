@@ -31,10 +31,10 @@ export function TopServantForm({
   useEffect(() => {
     searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' })
       .then((r) => setPeople(r.data))
-      .catch(() => setError('Nao foi possivel carregar Legendarios.'));
+      .catch(() => setError('Não foi possível carregar Legendários.'));
     getTopTeams(topId)
       .then((r) => setTeams(r.data))
-      .catch(() => setError('Nao foi possivel carregar equipes do TOP.'));
+      .catch(() => setError('Não foi possível carregar equipes do TOP.'));
   }, [topId]);
 
   async function submit(e: FormEvent) {
@@ -81,7 +81,7 @@ export function TopServantForm({
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Função</span>
-          <input className="input" placeholder="Ex: Apoio, Cozinheiro" value={payload.role} onChange={(e) => setPayload({ ...payload, role: e.target.value })} />
+          <input className="input" placeholder="Ex.: Apoio, Cozinheiro" value={payload.role} onChange={(e) => setPayload({ ...payload, role: e.target.value })} />
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Status</span>

@@ -49,7 +49,7 @@ export function CommunicationForm({ value, saving, onChange, onSubmit }: Props) 
       <div className="grid gap-5">
         <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Título / Assunto</span>
-          <input className="input" placeholder="Ex: Aviso Importante sobre o próximo TOP" value={value.title} onChange={(event) => patch({ title: event.target.value })} />
+          <input className="input" placeholder="Ex.: Aviso Importante sobre o próximo TOP" value={value.title} onChange={(event) => patch({ title: event.target.value })} />
         </label>
 
         <label className="block space-y-2">

@@ -124,9 +124,9 @@ export default function LegendarioDetalhePage() {
           }
         />
         <Info
-          title="Serviço / Service"
+          title="Serviço em TOP"
           rows={[
-            ['Já serviu como service?', legendario.topServants && legendario.topServants.length > 0 ? 'Sim' : 'Não'],
+            ['Já serviu em algum TOP?', legendario.topServants && legendario.topServants.length > 0 ? 'Sim' : 'Não'],
             ...(legendario.topServants && legendario.topServants.length > 0
               ? legendario.topServants.map((s, idx) => [
                   `Serviço #${idx + 1}`,
@@ -144,7 +144,7 @@ export default function LegendarioDetalhePage() {
                     )}
                     {s.notes && (
                       <p className="text-xs text-zinc-400 font-medium">
-                        Obs: <span className="text-zinc-300 font-semibold">{s.notes}</span>
+                        Obs.: <span className="text-zinc-300 font-semibold">{s.notes}</span>
                       </p>
                     )}
                   </div>,

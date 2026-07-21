@@ -11,6 +11,7 @@ function toLocalDate(value: string) {
   return value.slice(0, 16);
 }
 
+
 export default function EditSocialActionPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -43,7 +44,7 @@ export default function EditSocialActionPage() {
       await updateSocialAction(params.id, payload);
       router.push(`/dashboard/acoes-sociais/${params.id}`);
     } catch {
-      setError('Nao foi possivel salvar a acao social.');
+      setError('Não foi possível salvar a ação social.');
     } finally {
       setSaving(false);
     }
@@ -76,4 +77,3 @@ export default function EditSocialActionPage() {
     </div>
   );
 }
-

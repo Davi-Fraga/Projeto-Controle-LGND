@@ -55,6 +55,7 @@ export class OrgChartService {
       const node = orgNode(`member:${m.id}`, kids.length ? 'leader' : 'person', m.legendary?.fullName ?? 'Sem nome', {
         subtitle: m.role || (kids.length ? 'Sub-coordenador' : undefined),
         leaderId: branchLeaderId,
+        refId: m.legendaryId,
       });
       for (const child of kids) node.children.push(buildMemberNode(child));
       return node;
@@ -62,11 +63,11 @@ export class OrgChartService {
     const topMemberNodes = (childrenOf.get('ROOT') ?? []).map(buildMemberNode);
 
     if (team.coordinatorLegendaryId) {
-      const coordNode = orgNode(`leader:${team.id}`, 'leader', team.coordinator?.fullName ?? 'Coordenador', { subtitle: 'Coordenador', leaderId: branchLeaderId });
+      const coordNode = orgNode(`leader:${team.id}`, 'leader', team.coordinator?.fullName ?? 'Coordenador', { subtitle: 'Coordenador', leaderId: branchLeaderId, refId: team.coordinatorLegendaryId ?? undefined });
       coordNode.children.push(...topMemberNodes);
       root.children.push(coordNode);
       if (team.deputyCoordinatorLegendaryId) {
-        root.children.push(orgNode(`deputy:${team.id}`, 'leader', team.deputyCoordinator?.fullName ?? 'Vice-coordenador', { subtitle: 'Vice-coordenador', leaderId: branchLeaderId }));
+        root.children.push(orgNode(`deputy:${team.id}`, 'leader', team.deputyCoordinator?.fullName ?? 'Vice-coordenador', { subtitle: 'Vice-coordenador', leaderId: branchLeaderId, refId: team.deputyCoordinatorLegendaryId ?? undefined }));
       }
     } else {
       root.children.push(...topMemberNodes);
@@ -96,7 +97,7 @@ export class OrgChartService {
     for (const team of teams) {
       if (directorTeam && team.id === directorTeam.id) continue; // already the root
       if (!team.coordinator) continue;
-      root.children.push(orgNode(`coordinator:${team.id}`, 'leader', team.coordinator.fullName, { subtitle: teamDisplayName(team.name), leaderId: team.coordinatorLegendaryId ?? undefined }));
+      root.children.push(orgNode(`coordinator:${team.id}`, 'leader', team.coordinator.fullName, { subtitle: teamDisplayName(team.name), leaderId: team.coordinatorLegendaryId ?? undefined, refId: team.coordinatorLegendaryId ?? undefined }));
     }
     annotateCounts(root);
     return root;
@@ -193,7 +194,7 @@ export class OrgChartService {
       return;
     }
     for (const legendary of legendaries) {
-      const personNode = orgNode(`legendary:${legendary.id}`, 'person', legendary.fullName);
+      const personNode = orgNode(`legendary:${legendary.id}`, 'person', legendary.fullName, { refId: legendary.id });
       // churches mode: city -> church -> legendary
       if (legendary.churchId && legendary.church) {
         const churchId = `church:${legendary.churchId}`;
@@ -232,16 +233,16 @@ export class OrgChartService {
     // Sem nenhum Líder atribuído nesta cidade → lista plana (comportamento anterior),
     // evita envolver todo mundo num "Sem gestor" enquanto a hierarquia não foi montada.
     if (leaderIds.size === 0) {
-      for (const l of legendaries) cityNode.children.push(orgNode(`legendary:${l.id}`, 'person', l.fullName));
+      for (const l of legendaries) cityNode.children.push(orgNode(`legendary:${l.id}`, 'person', l.fullName, { refId: l.id }));
       return;
     }
 
     // Nós de Líder (topo) com seus geridos como filhos.
     for (const leaderId of leaderIds) {
       const leader = byId.get(leaderId);
-      const leaderNode = orgNode(`leader:legendary:${leaderId}`, 'leader', leader?.fullName ?? 'Líder', { subtitle: 'Líder', leaderId });
+      const leaderNode = orgNode(`leader:legendary:${leaderId}`, 'leader', leader?.fullName ?? 'Líder', { subtitle: 'Líder', leaderId, refId: leaderId });
       for (const led of ledBy.get(leaderId) ?? []) {
-        leaderNode.children.push(orgNode(`legendary:${led.id}`, 'person', led.fullName));
+        leaderNode.children.push(orgNode(`legendary:${led.id}`, 'person', led.fullName, { refId: led.id }));
       }
       cityNode.children.push(leaderNode);
     }
@@ -250,7 +251,7 @@ export class OrgChartService {
     const semGestor = legendaries.filter((l) => !l.cityLeaderId && !leaderIds.has(l.id));
     if (semGestor.length) {
       const group = orgNode(`${cityNode.id}:no-leader`, 'group', 'Sem gestor');
-      for (const l of semGestor) group.children.push(orgNode(`legendary:${l.id}`, 'person', l.fullName));
+      for (const l of semGestor) group.children.push(orgNode(`legendary:${l.id}`, 'person', l.fullName, { refId: l.id }));
       cityNode.children.push(group);
     }
   }

@@ -115,6 +115,31 @@ describe('OrgChartService', () => {
     });
   });
 
+  describe('refId nos nós de pessoa/líder (Fase 2 painel)', () => {
+    it('team: membro carrega refId=legendaryId e coordenador refId=coordinatorLegendaryId', async () => {
+      prisma.team.findFirst.mockResolvedValueOnce({
+        id: 't1', name: 'ADM', coordinatorLegendaryId: 'c1', coordinator: { fullName: 'Coord' },
+        deputyCoordinatorLegendaryId: null, deputyCoordinator: null,
+        memberships: [{ id: 'm1', legendaryId: 'l1', legendary: { fullName: 'Membro 1' }, role: 'Servo' }],
+      });
+      const root = await service.getTeamChart('t1', user);
+      const coord = root.children.find((n) => n.id === 'leader:t1')!;
+      expect(coord.refId).toBe('c1');
+      expect(coord.children.find((n) => n.id === 'member:m1')!.refId).toBe('l1');
+    });
+
+    it('city: líder e gerido carregam refId=legendaryId', async () => {
+      prisma.legendary.findMany.mockResolvedValueOnce([
+        { id: 'lead', fullName: 'Líder', city: 'Goiânia', cityLeaderId: null },
+        { id: 'led', fullName: 'Gerido', city: 'Goiânia', cityLeaderId: 'lead' },
+      ]);
+      const root = await service.getCitiesChart('legendaries', 'goiania', user);
+      const leaderNode = root.children.find((n) => n.id === 'leader:legendary:lead')!;
+      expect(leaderNode.refId).toBe('lead');
+      expect(leaderNode.children.find((n) => n.id === 'legendary:led')!.refId).toBe('led');
+    });
+  });
+
   describe('getCoordinatorsChart', () => {
     it('puts the director on top, one coordinator per team, and omits teams without coordinator', async () => {
       prisma.team.findMany.mockResolvedValueOnce([

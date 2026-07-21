@@ -3,11 +3,21 @@
 import { Network } from 'lucide-react';
 import { OrganogramaSection } from '@/features/org-chart/organograma-section';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { hasPermission } from '@/lib/permissions';
 
 export default function OrganogramaPage() {
-  const { loading: authLoading } = useRequireAuth();
+  const { user, loading: authLoading } = useRequireAuth();
 
   if (authLoading) return <main className="p-6 text-sm text-zinc-600">Carregando...</main>;
+
+  // Editar pessoa no organograma: permissão nova (organogram.person.edit) OU a
+  // funcional legada (legendarios.update) durante o rollout. Só habilita a ação;
+  // o backend revalida em toda gravação.
+  const canEditPerson = hasPermission(user, 'organogram.person.edit', 'legendarios.update');
+  // Mover pessoa entre gestores na subdivisão (Fase 3): permissão estrutural.
+  const canReorder = hasPermission(user, 'organogram.group.reorder');
+  // Mudança estrutural crítica — mover uma liderança (Fase 4).
+  const canStructureChange = hasPermission(user, 'organogram.structure.change');
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -17,11 +27,11 @@ export default function OrganogramaPage() {
           <h1 className="text-2xl font-black tracking-wide text-white uppercase">Organograma</h1>
         </div>
         <p className="mt-1 text-sm text-zinc-400">
-          Hierarquia da manada em árvore. Escolha o escopo (Equipes, Coordenadores, Cidades ou TOPs), use zoom, arraste para navegar e recolha subárvores.
+          Hierarquia da manada em árvore. Escolha o escopo (Equipes, Coordenadores, Cidades ou TOPs). A visão abre resumida (raiz + 1º nível): clique num ramo para expandir sob demanda, use zoom e arraste para navegar.
         </p>
       </div>
 
-      <OrganogramaSection />
+      <OrganogramaSection canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} />
     </div>
   );
 }

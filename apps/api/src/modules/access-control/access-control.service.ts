@@ -10,7 +10,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { EffectivePermissionsService } from '../../common/access/effective-permissions.service';
 import { roleContributesBase } from '../../common/access/access.constants';
-import { SCREEN_CATALOG, getScreen, permissionsForLevel } from '../../common/access/screen-catalog';
+import { SCREEN_CATALOG, getScreen, permissionsForLevel, screenActionToggles } from '../../common/access/screen-catalog';
 import { normalizeCityKey } from '../../common/org-chart/org-chart.util';
 import { AddUserScopeDto } from './dto/access-control.dto';
 
@@ -61,7 +61,9 @@ export class AccessControlService {
         .filter((scope) => screen.scopeTypes.includes(scope.type as UserScopeType))
         .map((scope) => ({ id: scope.id, type: scope.type as UserScopeType, value: scope.value }));
 
-      return { id: screen.id, label: screen.label, level, supportsEdit, scopeTypes: screen.scopeTypes, scopes };
+      const actionToggles = screenActionToggles(screen).map((key) => ({ key, granted: effective.has(key) }));
+
+      return { id: screen.id, label: screen.label, level, supportsEdit, scopeTypes: screen.scopeTypes, scopes, actionToggles };
     });
 
     return { userId: user.id, roles: user.roles.map((userRole) => userRole.role.name), screens };
@@ -117,6 +119,41 @@ export class AccessControlService {
       entityId: userId,
       action: 'set-level',
       after: { screen: screenId, level: effectiveLevel },
+    });
+
+    return this.getUserScreenAccess(userId);
+  }
+
+  // Concede/revoga um TOGGLE de ação de uma tela (à parte do nível VIEW/EDIT).
+  // Fail-closed: só aceita toggles declarados na tela; nunca uma permission arbitrária.
+  async setScreenToggle(userId: string, screenId: string, toggleKey: string, on: boolean, actorUserId?: string): Promise<UserScreenAccessControl> {
+    await this.ensureUserExists(userId);
+    const screen = getScreen(screenId);
+    if (!screen) throw new NotFoundException(`Unknown screen: ${screenId}`);
+    if (!screenActionToggles(screen).includes(toggleKey)) {
+      throw new BadRequestException(`Toggle ${toggleKey} is not an action toggle of screen ${screenId}.`);
+    }
+
+    const [permission] = await this.prisma.permission.findMany({ where: { key: toggleKey } });
+    if (!permission) throw new BadRequestException(`Permission ${toggleKey} is not seeded.`);
+
+    const roleHas = this.roleKeys(await this.loadUserWithAccess(userId)).has(toggleKey);
+    if (on) {
+      // Ligar: se o papel já concede (admin), basta herdar; senão concede explicitamente.
+      if (roleHas) await this.prisma.userPermissionOverride.deleteMany({ where: { userId, permissionId: permission.id } });
+      else await this.upsertOverride(userId, permission.id, PermissionEffect.GRANT);
+    } else {
+      // Desligar: se o papel concede, revoga; senão herdar (sem override).
+      if (roleHas) await this.upsertOverride(userId, permission.id, PermissionEffect.REVOKE);
+      else await this.prisma.userPermissionOverride.deleteMany({ where: { userId, permissionId: permission.id } });
+    }
+
+    await this.audit.create({
+      actorUserId,
+      entityType: 'UserScreenAccess',
+      entityId: userId,
+      action: 'set-toggle',
+      after: { screen: screenId, toggle: toggleKey, on },
     });
 
     return this.getUserScreenAccess(userId);

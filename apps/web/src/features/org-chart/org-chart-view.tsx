@@ -12,7 +12,7 @@ const VIEWS: { value: OrgChartView; label: string }[] = [
   { value: 'cities', label: 'Cidades' },
 ];
 
-export function OrgChartView({ topId }: { topId: string }) {
+export function OrgChartView({ topId, canEditPerson, canReorder, canStructureChange }: { topId: string; canEditPerson: boolean; canReorder: boolean; canStructureChange: boolean }) {
   const [view, setView] = useState<OrgChartView>('teams');
   const [root, setRoot] = useState<OrgChartNode | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,7 +56,7 @@ export function OrgChartView({ topId }: { topId: string }) {
         ))}
       </div>
 
-      <div className="h-[70vh] w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#0d0d0f]">
+      <div className="h-[74vh] w-full overflow-hidden rounded-xl border border-[#1e1e24] bg-[#0b0b0d]">
         {loading ? (
           <div className="flex h-full items-center justify-center text-sm text-zinc-500">Carregando organograma...</div>
         ) : error ? (
@@ -67,7 +67,9 @@ export function OrgChartView({ topId }: { topId: string }) {
             <p className="text-sm">Nenhum dado para esta visão ainda.</p>
           </div>
         ) : root ? (
-          <OrgChartTree root={root} />
+          // Move (Fase 3) não se aplica à visão de TOP (não é hierarquia de cidade);
+          // onDataChanged é no-op aqui.
+          <OrgChartTree root={root} canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} onDataChanged={() => {}} />
         ) : null}
       </div>
     </div>

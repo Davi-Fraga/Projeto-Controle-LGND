@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { ManagementService } from './management.service';
 
 describe('ManagementService', () => {
@@ -76,6 +76,46 @@ describe('ManagementService', () => {
       await service.assignCityLeader({ legendaryId: 'L1', leaderId: null }, admin);
       expect(prisma.legendary.update).toHaveBeenCalledWith(expect.objectContaining({ data: { cityLeaderId: null } }));
     });
+
+    // Fase 4 (mudança estrutural crítica): mover alguém que LIDERA outros reestrutura
+    // um subgrupo → exige organogram.structure.change (não basta group.reorder).
+    describe('mudança crítica: mover uma liderança', () => {
+      function countBy(leads: number, teto = 2) {
+        prisma.legendary.count.mockImplementation(({ where }: any) =>
+          Promise.resolve(where.cityLeaderId === 'L1' ? leads : teto),
+        );
+      }
+
+      it('não-admin sem structure.change não pode mover quem lidera outros', async () => {
+        accessPolicy.resolveScope.mockResolvedValue({ isAdmin: false });
+        countBy(3);
+        const user = { sub: 'u', permissions: ['organogram.group.reorder'] } as any;
+        await expect(service.assignCityLeader({ legendaryId: 'L1', leaderId: 'LEAD' }, user)).rejects.toBeInstanceOf(ForbiddenException);
+        expect(prisma.legendary.update).not.toHaveBeenCalled();
+      });
+
+      it('não-admin com structure.change pode mover quem lidera outros', async () => {
+        accessPolicy.resolveScope.mockResolvedValue({ isAdmin: false });
+        countBy(3);
+        const user = { sub: 'u', permissions: ['organogram.group.reorder', 'organogram.structure.change'] } as any;
+        await service.assignCityLeader({ legendaryId: 'L1', leaderId: 'LEAD' }, user);
+        expect(prisma.legendary.update).toHaveBeenCalledWith(expect.objectContaining({ data: { cityLeaderId: 'LEAD' } }));
+      });
+
+      it('mover quem NÃO lidera ninguém não exige structure.change', async () => {
+        accessPolicy.resolveScope.mockResolvedValue({ isAdmin: false });
+        countBy(0);
+        const user = { sub: 'u', permissions: ['organogram.group.reorder'] } as any;
+        await service.assignCityLeader({ legendaryId: 'L1', leaderId: 'LEAD' }, user);
+        expect(prisma.legendary.update).toHaveBeenCalled();
+      });
+
+      it('admin é isento (pode mover liderança sem a permissão)', async () => {
+        countBy(3);
+        await service.assignCityLeader({ legendaryId: 'L1', leaderId: 'LEAD' }, admin);
+        expect(prisma.legendary.update).toHaveBeenCalled();
+      });
+    });
   });
 
   describe('assignTeamManager', () => {
@@ -102,6 +142,39 @@ describe('ManagementService', () => {
 
     it('recusa sub-coordenador de outra equipe', async () => {
       await expect(service.assignTeamManager({ membershipId: 'M1', managerMembershipId: 'OUTRO' }, admin)).rejects.toThrow('mesma equipe');
+    });
+
+    // Fase 4: mover uma membership que GERENCIA outras (sub-coordenador) é crítico.
+    describe('mudança crítica: mover um sub-coordenador', () => {
+      function countBy(managesM1: number, teto = 2) {
+        prisma.teamMembership.count.mockImplementation(({ where }: any) =>
+          Promise.resolve(where.managerMembershipId === 'M1' ? managesM1 : teto),
+        );
+      }
+
+      it('não-admin sem structure.change não pode mover quem gerencia outros', async () => {
+        accessPolicy.resolveScope.mockResolvedValue({ isAdmin: false });
+        countBy(2);
+        const user = { sub: 'u', permissions: ['organogram.group.reorder'] } as any;
+        await expect(service.assignTeamManager({ membershipId: 'M1', managerMembershipId: 'M2' }, user)).rejects.toBeInstanceOf(ForbiddenException);
+        expect(prisma.teamMembership.update).not.toHaveBeenCalled();
+      });
+
+      it('não-admin com structure.change pode mover quem gerencia outros', async () => {
+        accessPolicy.resolveScope.mockResolvedValue({ isAdmin: false });
+        countBy(2);
+        const user = { sub: 'u', permissions: ['organogram.group.reorder', 'organogram.structure.change'] } as any;
+        await service.assignTeamManager({ membershipId: 'M1', managerMembershipId: 'M2' }, user);
+        expect(prisma.teamMembership.update).toHaveBeenCalledWith(expect.objectContaining({ data: { managerMembershipId: 'M2' } }));
+      });
+
+      it('mover quem NÃO gerencia ninguém não exige structure.change', async () => {
+        accessPolicy.resolveScope.mockResolvedValue({ isAdmin: false });
+        countBy(0);
+        const user = { sub: 'u', permissions: ['organogram.group.reorder'] } as any;
+        await service.assignTeamManager({ membershipId: 'M1', managerMembershipId: 'M2' }, user);
+        expect(prisma.teamMembership.update).toHaveBeenCalled();
+      });
     });
   });
 });

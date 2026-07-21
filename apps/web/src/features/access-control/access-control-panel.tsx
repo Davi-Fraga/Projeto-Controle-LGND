@@ -14,6 +14,7 @@ import {
   getUserScreenAccess,
   removeUserScope,
   setScreenLevel,
+  setScreenToggle,
   type ScopeTypeValue,
 } from './api';
 
@@ -22,6 +23,13 @@ const SCOPE_LABEL: Record<ScopeTypeValue, string> = {
   TEAM: 'Equipe',
   CHURCH: 'Igreja',
   TOP: 'TOP',
+};
+
+// Rótulos legíveis dos toggles de ação (o admin nunca vê a permission crua).
+const TOGGLE_LABEL: Record<string, string> = {
+  'organogram.group.reorder': 'Reordenar em subdivisão',
+  'organogram.group.move': 'Mover pessoa entre grupos',
+  'organogram.structure.change': 'Mudança estrutural crítica',
 };
 
 const LEVELS: { value: ScreenAccessLevel; label: string }[] = [
@@ -65,6 +73,19 @@ export function AccessControlPanel({ userId }: { userId: string }) {
       setAcl(res.data);
     } catch {
       setError('Erro ao atualizar o acesso da tela.');
+    } finally {
+      setSavingScreen(null);
+    }
+  }
+
+  async function changeToggle(screenId: string, toggleKey: string, on: boolean) {
+    setSavingScreen(screenId);
+    setError(null);
+    try {
+      const res = await setScreenToggle(userId, screenId, toggleKey, on);
+      setAcl(res.data);
+    } catch {
+      setError('Erro ao atualizar a ação da tela.');
     } finally {
       setSavingScreen(null);
     }
@@ -124,6 +145,7 @@ export function AccessControlPanel({ userId }: { userId: string }) {
           saving={savingScreen === screen.id}
           labels={labels}
           onLevel={(level) => changeLevel(screen.id, level)}
+          onToggle={(toggleKey, on) => changeToggle(screen.id, toggleKey, on)}
           onAddScope={addScope}
           onRemoveScope={removeScope}
         />
@@ -137,6 +159,7 @@ function ScreenRow({
   saving,
   labels,
   onLevel,
+  onToggle,
   onAddScope,
   onRemoveScope,
 }: {
@@ -144,6 +167,7 @@ function ScreenRow({
   saving: boolean;
   labels: Record<string, string>;
   onLevel: (level: ScreenAccessLevel) => void;
+  onToggle: (toggleKey: string, on: boolean) => void;
   onAddScope: (type: ScopeTypeValue, value: string, label: string) => void;
   onRemoveScope: (scopeId: string) => void;
 }) {
@@ -151,6 +175,7 @@ function ScreenRow({
   const hasScope = scopeTypes.length > 0;
   const granted = screen.level !== ScreenAccessLevel.NONE;
   const levels = screen.supportsEdit ? LEVELS : LEVELS.filter((l) => l.value !== ScreenAccessLevel.EDIT);
+  const hasToggles = screen.actionToggles.length > 0;
 
   return (
     <section className="rounded-xl border border-zinc-800 bg-[#111113] p-4">
@@ -175,6 +200,26 @@ function ScreenRow({
           ))}
         </div>
       </div>
+
+      {hasToggles && granted && (
+        <div className="mt-3 border-t border-zinc-850 pt-3">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Ações permitidas</p>
+          <div className="mt-2 flex flex-col gap-2">
+            {screen.actionToggles.map((toggle) => (
+              <label key={toggle.key} className="inline-flex items-center gap-2 text-xs text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={toggle.granted}
+                  disabled={saving}
+                  onChange={(e) => onToggle(toggle.key, e.target.checked)}
+                  className="h-4 w-4 accent-orange-600 disabled:opacity-50"
+                />
+                <span>{TOGGLE_LABEL[toggle.key] ?? toggle.key}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       {hasScope && granted && (
         <div className="mt-3 border-t border-zinc-850 pt-3">

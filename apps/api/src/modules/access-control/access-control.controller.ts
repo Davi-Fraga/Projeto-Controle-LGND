@@ -4,7 +4,7 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AccessControlService } from './access-control.service';
-import { AddUserScopeDto, SetScreenLevelDto } from './dto/access-control.dto';
+import { AddUserScopeDto, SetScreenLevelDto, SetScreenToggleDto } from './dto/access-control.dto';
 
 @Controller('access-control')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -26,6 +26,17 @@ export class AccessControlController {
     @CurrentUser() user: { sub: string },
   ) {
     return { data: await this.accessControl.setScreenLevel(userId, screenId, dto.level, user.sub) };
+  }
+
+  @Put('users/:userId/screens/:screenId/toggles')
+  @Permissions('users.update')
+  async setScreenToggle(
+    @Param('userId') userId: string,
+    @Param('screenId') screenId: string,
+    @Body() dto: SetScreenToggleDto,
+    @CurrentUser() user: { sub: string },
+  ) {
+    return { data: await this.accessControl.setScreenToggle(userId, screenId, dto.toggleKey, dto.on, user.sub) };
   }
 
   @Post('users/:userId/scopes')

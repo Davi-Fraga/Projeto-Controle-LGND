@@ -276,6 +276,7 @@ export type LegendaryFilters = PaginationParams & {
   status?: LegendaryStatus;
   city?: string;
   churchId?: string;
+  teamId?: string;
   professionId?: string;
   expertiseId?: string;
   socialActionInterest?: boolean;

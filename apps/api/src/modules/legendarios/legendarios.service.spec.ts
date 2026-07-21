@@ -216,6 +216,20 @@ describe('LegendariosService', () => {
     );
   });
 
+  it('options intersecta a busca com o escopo do AccessPolicyService para usuário restrito', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: ['church-1'], teamIds: [], legendaryIds: [] });
+    const scopeFilter = { churchId: { in: ['church-1'] } };
+    accessPolicy.buildLegendaryWhere.mockReturnValueOnce(scopeFilter);
+    prisma.legendary.findMany.mockResolvedValueOnce([]);
+
+    await service.options({ search: 'joão', limit: 5, activeOnly: true } as any, restrictedUser);
+
+    const call = prisma.legendary.findMany.mock.calls[0][0];
+    expect(accessPolicy.buildLegendaryWhere).toHaveBeenCalled();
+    expect(call.where.AND).toContainEqual(scopeFilter);
+    expect(call.where.OR).toContainEqual({ searchText: { contains: 'joao' } });
+  });
+
   it('findOne returns 404 when legendary is outside scope', async () => {
     accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: [], legendaryIds: [] });
     accessPolicy.buildLegendaryDetailWhere.mockReturnValueOnce({ id: { in: [] } });

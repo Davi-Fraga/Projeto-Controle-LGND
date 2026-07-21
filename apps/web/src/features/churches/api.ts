@@ -18,8 +18,10 @@ export type ChurchPayload = {
   notes?: string | null;
 };
 
-export function getChurches() {
-  return api<ChurchesResponse>('/churches');
+export function getChurches(search?: string) {
+  const term = search?.trim();
+  const query = term ? `?search=${encodeURIComponent(term)}` : '';
+  return api<ChurchesResponse>(`/churches${query}`);
 }
 
 export function createChurch(payload: ChurchPayload) {

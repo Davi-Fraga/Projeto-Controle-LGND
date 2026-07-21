@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { Building2, Edit2, Eye, MapPin, Phone, Trash2, User } from 'lucide-react';
+import { useState } from 'react';
+import { Building2, Edit2, Eye, MapPin, Phone, Search, Trash2, User } from 'lucide-react';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useDebouncedSearch } from '@/hooks/use-debounced-search';
 import { hasPermission } from '@/lib/permissions';
 import { deleteChurch, getChurches } from '@/features/churches/api';
 import type { Church } from '@/features/churches/api';
@@ -14,20 +15,24 @@ import { ApiError } from '@/lib/api';
 
 export default function IgrejasPage() {
   const { user, loading: authLoading } = useRequireAuth();
-  const [churches, setChurches] = useState<Church[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    search,
+    setSearch,
+    debounced,
+    data: churches,
+    setData: setChurches,
+    initialLoading,
+    searching,
+    error: loadError,
+  } = useDebouncedSearch<Church[]>(
+    async (term) => (await getChurches(term)).data,
+    [],
+    { enabled: !authLoading },
+  );
   const [error, setError] = useState<string | null>(null);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [deletingChurch, setDeletingChurch] = useState<Church | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-
-  useEffect(() => {
-    if (authLoading) return;
-    getChurches()
-      .then((response) => setChurches(response.data))
-      .catch(() => setError('Não foi possível carregar as igrejas.'))
-      .finally(() => setLoading(false));
-  }, [authLoading]);
 
   async function handleConfirmDelete() {
     if (!deletingChurch) return;
@@ -80,6 +85,24 @@ export default function IgrejasPage() {
         </div>
       )}
 
+      <div className="relative max-w-md">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nome ou apelido da igreja..."
+          className="input w-full"
+          style={{ paddingLeft: '2.5rem' }}
+          aria-label="Buscar igrejas"
+        />
+        {searching && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+            Buscando...
+          </span>
+        )}
+      </div>
+
       <div className="w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#111113] shadow-lg">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm text-zinc-300">
@@ -94,7 +117,7 @@ export default function IgrejasPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-850">
-              {loading ? (
+              {initialLoading ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-zinc-500">
                     <div className="flex flex-col items-center justify-center gap-2">
@@ -103,10 +126,18 @@ export default function IgrejasPage() {
                     </div>
                   </td>
                 </tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center font-semibold text-rose-400">
+                    Não foi possível carregar as igrejas. Tente novamente.
+                  </td>
+                </tr>
               ) : churches.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-10 text-center font-medium text-zinc-500">
-                    Nenhuma igreja cadastrada.
+                    {debounced.trim()
+                      ? `Nenhuma igreja encontrada para “${debounced.trim()}”.`
+                      : 'Nenhuma igreja cadastrada.'}
                   </td>
                 </tr>
               ) : (

@@ -1,11 +1,10 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SystemRole } from '@central-da-manada/shared';
 import { updateUser, type UserSummary } from './api';
-import { getLegendario, getLegendarioOptions } from '@/features/legendarios/api';
-import { AsyncCombobox, type ComboboxOption } from '@/components/ui/AsyncCombobox';
+import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
 
 type Props = { user?: UserSummary };
 
@@ -28,33 +27,9 @@ export function UserForm({ user }: Props) {
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [legendaryId, setLegendaryId] = useState(user?.legendaryId ?? '');
-  const [legendaryLabel, setLegendaryLabel] = useState('');
   const [roles, setRoles] = useState<string[]>(user?.roles ?? []);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // No edit, carrega o rótulo do legendário já vinculado para exibir no combobox.
-  useEffect(() => {
-    if (!user?.legendaryId) return;
-    getLegendario(user.legendaryId)
-      .then((response) => {
-        const l = response.data;
-        setLegendaryLabel(l.lgndNumber ? `${l.fullName} - LGND ${l.lgndNumber}` : l.fullName);
-      })
-      .catch(() => setLegendaryLabel('(legendário vinculado)'));
-  }, [user?.legendaryId]);
-
-  async function fetchLegendarioOptions(search: string): Promise<ComboboxOption[]> {
-    const response = await getLegendarioOptions(search, 20);
-    return response.data.map((option) => {
-      const fullName = option.metadata?.fullName ?? option.label;
-      const parts = [
-        option.metadata?.city ?? undefined,
-        option.metadata?.lgndNumber ? `LGND ${option.metadata.lgndNumber}` : undefined,
-      ].filter(Boolean) as string[];
-      return { value: option.value, label: fullName, sublabel: parts.join(' · ') || undefined };
-    });
-  }
 
   function toggleRole(role: string) {
     setRoles((current) => (current.includes(role) ? current.filter((r) => r !== role) : [...current, role]));
@@ -106,16 +81,9 @@ export function UserForm({ user }: Props) {
         </label>
         <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Legendário vinculado</span>
-          <AsyncCombobox
+          <LegendarioCombobox
             value={legendaryId}
-            selectedLabel={legendaryLabel}
-            onChange={(value, label) => {
-              setLegendaryId(value);
-              setLegendaryLabel(value ? label : '');
-            }}
-            fetchOptions={fetchLegendarioOptions}
-            placeholder="Buscar por nome, cidade ou LGND..."
-            noneLabel="Nenhum"
+            onChange={(value) => setLegendaryId(value)}
           />
           <span className="text-[11px] text-zinc-500">
             Necessário para coordenadores/subcoordenadores: o escopo de equipe usa o legendário vinculado.

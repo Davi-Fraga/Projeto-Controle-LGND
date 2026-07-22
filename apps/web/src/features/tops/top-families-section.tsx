@@ -1,10 +1,11 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { addTopFamilyMember, createTopFamily, deactivateTopFamily, deactivateTopFamilyMember, getLegendarioOptions, getTopFamilies, getTopFamilyMembers, getTopParticipantOptions, transferTopFamilyMember, updateTopFamily } from './api';
+import { addTopFamilyMember, createTopFamily, deactivateTopFamily, deactivateTopFamilyMember, getTopFamilies, getTopFamilyMembers, getTopParticipantOptions, transferTopFamilyMember, updateTopFamily } from './api';
 import type { OptionItem, TopFamily, TopFamilyMember, TopFamilyPayload } from './types';
 import { Edit2, ShieldAlert, Heart } from 'lucide-react';
 import { ActionMenu } from '@/components/ui/ActionMenu';
+import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
 import { ApiError } from '@/lib/api';
 
 type FamilyForm = { name: string; representativeLegendaryId: string; representativeRole: string; deputyRepresentativeLegendaryId: string; deputyRepresentativeRole: string; notes: string; needsReview: boolean };
@@ -36,7 +37,6 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
   const [families, setFamilies] = useState<TopFamily[]>([]);
   const [membersByFamily, setMembersByFamily] = useState<Record<string, TopFamilyMember[]>>({});
   const [participants, setParticipants] = useState<OptionItem[]>([]);
-  const [legendarios, setLegendarios] = useState<OptionItem[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<FamilyForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -55,9 +55,6 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
     getTopParticipantOptions(topId, { limit: 100 })
       .then((response) => setParticipants(response.data))
       .catch(() => setLoadError('Não foi possível carregar participantes para famílias.'));
-    getLegendarioOptions({ limit: 100 })
-      .then((response) => setLegendarios(response.data))
-      .catch(() => setLoadError('Não foi possível carregar Legendários para famílias.'));
   }, [topId]);
 
   async function refresh() {
@@ -168,10 +165,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
         </div>
         <div className="md:col-span-1 block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Representante</span>
-          <select className="input text-xs" value={form.representativeLegendaryId} onChange={(event) => setForm({ ...form, representativeLegendaryId: event.target.value })}>
-            <option value="">Não informado</option>
-            {legendarios.map((legendario) => <option key={legendario.id} value={legendario.value}>{legendario.label}</option>)}
-          </select>
+          <LegendarioCombobox value={form.representativeLegendaryId} onChange={(value) => setForm({ ...form, representativeLegendaryId: value })} noneLabel="Não informado" />
         </div>
         <div className="md:col-span-1 block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Função rep.</span>
@@ -179,10 +173,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
         </div>
         <div className="md:col-span-1 block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Sub-representante</span>
-          <select className="input text-xs" value={form.deputyRepresentativeLegendaryId} onChange={(event) => setForm({ ...form, deputyRepresentativeLegendaryId: event.target.value })}>
-            <option value="">Sub-representante</option>
-            {legendarios.map((legendario) => <option key={legendario.id} value={legendario.value}>{legendario.label}</option>)}
-          </select>
+          <LegendarioCombobox value={form.deputyRepresentativeLegendaryId} onChange={(value) => setForm({ ...form, deputyRepresentativeLegendaryId: value })} noneLabel="Não informado" />
         </div>
         <div className="md:col-span-1 block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Função sub</span>

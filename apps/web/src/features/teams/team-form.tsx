@@ -1,17 +1,16 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TeamStatus } from '@central-da-manada/shared';
-import { createTeam, searchLegendarios, updateTeam } from './api';
+import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
+import { createTeam, updateTeam } from './api';
 import type { Team, TeamPayload } from './types';
-import type { Legendary } from '@central-da-manada/shared';
 
 type Props = { team?: Team };
 
 export function TeamForm({ team }: Props) {
   const router = useRouter();
-  const [legendarios, setLegendarios] = useState<Legendary[]>([]);
   const [payload, setPayload] = useState<TeamPayload>({
     name: team?.name ?? '',
     description: team?.description ?? '',
@@ -21,12 +20,6 @@ export function TeamForm({ team }: Props) {
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' })
-      .then((response) => setLegendarios(response.data))
-      .catch(() => setError('Não foi possível carregar Legendérios.'));
-  }, []);
 
   function setField<T extends keyof TeamPayload>(field: T, value: TeamPayload[T]) {
     setPayload((current) => ({ ...current, [field]: value }));
@@ -78,17 +71,11 @@ export function TeamForm({ team }: Props) {
         </label>
         <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Coordenador</span>
-          <select className="input" value={payload.coordinatorLegendaryId} onChange={(event) => setField('coordinatorLegendaryId', event.target.value)}>
-            <option value="">Não definido</option>
-            {legendarios.map((legendario) => <option key={legendario.id} value={legendario.id}>{legendario.fullName}</option>)}
-          </select>
+          <LegendarioCombobox value={payload.coordinatorLegendaryId ?? ''} onChange={(value) => setField('coordinatorLegendaryId', value)} noneLabel="Não definido" />
         </label>
         <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Subcoordenador</span>
-          <select className="input" value={payload.deputyCoordinatorLegendaryId} onChange={(event) => setField('deputyCoordinatorLegendaryId', event.target.value)}>
-            <option value="">Não definido</option>
-            {legendarios.map((legendario) => <option key={legendario.id} value={legendario.id}>{legendario.fullName}</option>)}
-          </select>
+          <LegendarioCombobox value={payload.deputyCoordinatorLegendaryId ?? ''} onChange={(value) => setField('deputyCoordinatorLegendaryId', value)} noneLabel="Não definido" />
         </label>
         <label className="md:col-span-2 block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Descrição</span>

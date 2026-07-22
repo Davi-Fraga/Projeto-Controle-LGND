@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { InternalMessageTargetType } from '@central-da-manada/shared';
-import { getTopOptions, getTopFamilyOptions, getLegendarioOptions, getTeamsOptionsList } from '@/features/tops/api';
+import { getTopOptions, getTopFamilyOptions, getTeamsOptionsList } from '@/features/tops/api';
 import type { OptionItem } from '@/features/tops/types';
+import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
 import type { CommunicationPayload } from './api';
 
 type Props = {
@@ -16,13 +17,11 @@ type Props = {
 export function CommunicationForm({ value, saving, onChange, onSubmit }: Props) {
   const [topOptions, setTopOptions] = useState<OptionItem[]>([]);
   const [teamOptions, setTeamOptions] = useState<OptionItem[]>([]);
-  const [legendaryOptions, setLegendaryOptions] = useState<OptionItem[]>([]);
   const [familyOptions, setFamilyOptions] = useState<OptionItem[]>([]);
 
   useEffect(() => {
     getTopOptions().then((r) => setTopOptions(r.data)).catch(console.error);
     getTeamsOptionsList().then((r) => setTeamOptions(r.data)).catch(console.error);
-    getLegendarioOptions({ limit: 100 }).then((r) => setLegendaryOptions(r.data)).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -147,19 +146,7 @@ export function CommunicationForm({ value, saving, onChange, onSubmit }: Props) 
           {needsLegendary && (
             <label className="block space-y-2 animate-in fade-in duration-200">
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Selecione o Legendário</span>
-              <select
-                className="input"
-                value={value.targetId ?? ''}
-                onChange={(event) => patch({ targetId: event.target.value })}
-                required
-              >
-                <option value="">Selecione o legendário</option>
-                {legendaryOptions.map((leg) => (
-                  <option key={leg.id} value={leg.id}>
-                    {leg.label}
-                  </option>
-                ))}
-              </select>
+              <LegendarioCombobox value={value.targetId ?? ''} onChange={(id) => patch({ targetId: id })} clearable={false} noneLabel="Selecione o legendário" />
             </label>
           )}
         </div>

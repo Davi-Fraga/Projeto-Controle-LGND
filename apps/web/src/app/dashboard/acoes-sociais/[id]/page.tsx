@@ -9,6 +9,7 @@ import type { Legendary, SocialAction, SocialActionParticipant } from '@central-
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
 
 export default function SocialActionDetailPage() {
   const params = useParams<{ id: string }>();
@@ -143,11 +144,11 @@ export default function SocialActionDetailPage() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-4 bg-zinc-900/20 border border-zinc-800/40 rounded-xl p-4">
-            <input
-              className="input text-xs"
-              placeholder="ID do Legendário"
+            <LegendarioCombobox
               value={newParticipant.legendaryId}
-              onChange={(event) => setNewParticipant((current) => ({ ...current, legendaryId: event.target.value }))}
+              onChange={(id) => setNewParticipant((current) => ({ ...current, legendaryId: id }))}
+              clearable={false}
+              noneLabel="Selecione o Legendário"
             />
             <input
               className="input text-xs"

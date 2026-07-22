@@ -1,5 +1,8 @@
-## ADDED Requirements
+# user-access-control Specification
 
+## Purpose
+TBD - created by archiving change controle-acessos-por-usuario. Update Purpose after archive.
+## Requirements
 ### Requirement: Função na Manada não concede acesso (papéis desacoplados)
 O papel do usuário (`SystemRole`) SHALL representar a **Função na Manada** — um rótulo organizacional — e NÃO SHALL, por si só, conceder acesso a telas/permissions. A ÚNICA exceção é o papel **Administrador** (`COORDINATION_ADMIN`), que SHALL manter acesso total automático (todas as permissions) e escopo irrestrito. Todo o acesso dos demais usuários SHALL vir exclusivamente da tela Controle de Acessos (concessões por tela).
 
@@ -50,6 +53,10 @@ A tela administrativa SHALL apresentar o acesso em termos de **TELAS/MÓDULOS** 
 
 ### Requirement: Mapeamento Tela→Permissions no backend
 O backend SHALL definir um **mapa canônico** de cada tela/módulo para seu conjunto de permissions (separando leitura de mutação para suportar níveis), usado para traduzir a escolha por tela do admin nas permissions efetivas que o `PermissionsGuard` avalia. Esse mapa SHALL ser a fonte da verdade; a UI NÃO SHALL enviar chaves de permission cruas — apenas tela + nível.
+
+#### Scenario: Tela + nível traduzidos pelo mapa canônico
+- **WHEN** o admin define o nível de acesso de um usuário a uma tela (Ver ou Ver e editar)
+- **THEN** o backend usa o mapa canônico tela→permissions (separando leitura de mutação) para compor as permissions efetivas avaliadas pelo `PermissionsGuard`, sem a UI enviar chaves de permission cruas
 
 ### Requirement: Criar e excluir são ações administrativas
 O nível **Ver** e **Ver e editar** de uma tela SHALL cobrir apenas ler e editar itens **dentro do escopo**. Criar e excluir itens de topo (novo TOP, nova Equipe, novo Legendário, nova Igreja, etc.) SHALL ser ação **administrativa** — as permissions `*.create`, `*.delete`, `*.restore`/`*.deactivate` de entidade de topo NÃO SHALL constar em nenhum conjunto concedível por tela; só o Administrador as possui. O backend (guard) SHALL recusar a criação/exclusão para não-admin; esconder o botão no front é só usabilidade.
@@ -129,3 +136,4 @@ O frontend SHALL adaptar navegação e menus às permissions efetivas do usuári
 #### Scenario: Menu oculto não é segurança
 - **WHEN** um usuário sem acesso a uma tela tenta acessar a rota correspondente diretamente
 - **THEN** o backend nega a requisição, independentemente do menu estar oculto no front
+

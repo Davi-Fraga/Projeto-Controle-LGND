@@ -1,9 +1,10 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { TeamMembershipStatus } from '@central-da-manada/shared';
-import type { Legendary, TeamMembership } from '@central-da-manada/shared';
-import { addTeamMember, searchLegendarios, updateTeamMember } from './api';
+import type { TeamMembership } from '@central-da-manada/shared';
+import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
+import { addTeamMember, updateTeamMember } from './api';
 import type { TeamMemberPayload } from './types';
 
 type Props = {
@@ -14,7 +15,6 @@ type Props = {
 };
 
 export function TeamMemberForm({ teamId, member, onSaved, onCancel }: Props) {
-  const [legendarios, setLegendarios] = useState<Legendary[]>([]);
   const [payload, setPayload] = useState<TeamMemberPayload>({
     legendaryId: member?.legendaryId ?? '',
     role: member?.role ?? '',
@@ -25,12 +25,6 @@ export function TeamMemberForm({ teamId, member, onSaved, onCancel }: Props) {
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' })
-      .then((response) => setLegendarios(response.data))
-      .catch(() => setError('Não foi possível carregar Legendários.'));
-  }, []);
 
   function setField<T extends keyof TeamMemberPayload>(field: T, value: TeamMemberPayload[T]) {
     setPayload((current) => ({ ...current, [field]: value }));
@@ -65,10 +59,7 @@ export function TeamMemberForm({ teamId, member, onSaved, onCancel }: Props) {
       <div className="grid gap-3 md:grid-cols-2">
         <label>
           <span className="mb-1 block text-sm font-medium">Legendario</span>
-          <select className="input" value={payload.legendaryId} onChange={(event) => setField('legendaryId', event.target.value)} disabled={Boolean(member)} required>
-            <option value="">Selecione</option>
-            {legendarios.map((legendario) => <option key={legendario.id} value={legendario.id}>{legendario.fullName}</option>)}
-          </select>
+          <LegendarioCombobox value={payload.legendaryId ?? ''} onChange={(value) => setField('legendaryId', value)} clearable={false} disabled={Boolean(member)} noneLabel="Selecione" />
         </label>
         <label>
           <span className="mb-1 block text-sm font-medium">Função</span>

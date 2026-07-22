@@ -1,9 +1,9 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
-import { TopParticipantStatus, TopParticipantType, type Legendary } from '@central-da-manada/shared';
-import { addTopParticipant, searchLegendarios, updateTopParticipant } from './api';
-import { PersonSelect } from './top-form';
+import { FormEvent, useState } from 'react';
+import { TopParticipantStatus, TopParticipantType } from '@central-da-manada/shared';
+import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
+import { addTopParticipant, updateTopParticipant } from './api';
 import type { TopParticipant, TopParticipantPayload } from './types';
 
 export function TopParticipantForm({
@@ -17,7 +17,6 @@ export function TopParticipantForm({
   onSaved: () => void;
   onCancel: () => void;
 }) {
-  const [people, setPeople] = useState<Legendary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<TopParticipantPayload>({
     legendaryId: item?.legendaryId ?? '',
@@ -25,12 +24,6 @@ export function TopParticipantForm({
     status: item?.status ?? TopParticipantStatus.REGISTERED,
     notes: item?.notes ?? '',
   });
-
-  useEffect(() => {
-    searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' })
-      .then((r) => setPeople(r.data))
-      .catch(() => setError('Não foi possível carregar Legendários.'));
-  }, []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -55,7 +48,7 @@ export function TopParticipantForm({
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Legendário</span>
-          <PersonSelect value={payload.legendaryId} items={people} onChange={(v) => setPayload({ ...payload, legendaryId: v })} />
+          <LegendarioCombobox value={payload.legendaryId ?? ''} onChange={(v) => setPayload({ ...payload, legendaryId: v })} clearable={false} noneLabel="Selecione..." />
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Tipo de Participação</span>

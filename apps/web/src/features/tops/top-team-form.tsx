@@ -1,9 +1,9 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import type { Legendary, Team } from '@central-da-manada/shared';
-import { addTopTeam, getTeamsOptions, searchLegendarios, updateTopTeam } from './api';
-import { PersonSelect } from './top-form';
+import type { Team } from '@central-da-manada/shared';
+import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
+import { addTopTeam, getTeamsOptions, updateTopTeam } from './api';
 import type { TopTeam, TopTeamPayload } from './types';
 
 export function TopTeamForm({
@@ -18,7 +18,6 @@ export function TopTeamForm({
   onCancel: () => void;
 }) {
   const [teams, setTeams] = useState<Team[]>([]);
-  const [people, setPeople] = useState<Legendary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<TopTeamPayload>({
     teamId: item?.teamId ?? '',
@@ -31,9 +30,6 @@ export function TopTeamForm({
     getTeamsOptions({ page: 1, perPage: 100 })
       .then((r) => setTeams(r.data))
       .catch(() => setError('Não foi possível carregar equipes.'));
-    searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' })
-      .then((r) => setPeople(r.data))
-      .catch(() => setError('Não foi possível carregar Legendários.'));
   }, []);
 
   async function submit(e: FormEvent) {
@@ -76,11 +72,11 @@ export function TopTeamForm({
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Coordenador da Equipe</span>
-          <PersonSelect value={payload.coordinatorLegendaryId} items={people} onChange={(v) => setPayload({ ...payload, coordinatorLegendaryId: v })} />
+          <LegendarioCombobox value={payload.coordinatorLegendaryId ?? ''} onChange={(v) => setPayload({ ...payload, coordinatorLegendaryId: v })} noneLabel="Não definido" />
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Subcoordenador da Equipe</span>
-          <PersonSelect value={payload.deputyCoordinatorLegendaryId} items={people} onChange={(v) => setPayload({ ...payload, deputyCoordinatorLegendaryId: v })} />
+          <LegendarioCombobox value={payload.deputyCoordinatorLegendaryId ?? ''} onChange={(v) => setPayload({ ...payload, deputyCoordinatorLegendaryId: v })} noneLabel="Não definido" />
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Observações</span>

@@ -1,6 +1,7 @@
 'use client';
 
 import { SocialActionStatus } from '@central-da-manada/shared';
+import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
 import type { SocialActionPayload } from './api';
 
 type Props = {
@@ -59,8 +60,8 @@ export function SocialActionForm({ value, saving, onChange, onSubmit }: Props) {
             <input className="input" type="datetime-local" value={value.endDate} onChange={(event) => patch({ endDate: event.target.value })} />
           </label>
           <label className="block space-y-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">ID do Responsável (UUID)</span>
-            <input className="input" placeholder="Ex.: a1b2c3d4..." value={value.responsibleLegendaryId} onChange={(event) => patch({ responsibleLegendaryId: event.target.value })} />
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Responsável</span>
+            <LegendarioCombobox value={value.responsibleLegendaryId ?? ''} onChange={(id) => patch({ responsibleLegendaryId: id })} clearable={false} noneLabel="Selecione o responsável" />
           </label>
         </div>
 
@@ -71,7 +72,7 @@ export function SocialActionForm({ value, saving, onChange, onSubmit }: Props) {
 
         <div className="pt-4 border-t border-zinc-800 flex items-center justify-between">
           <p className="text-xs text-zinc-500 font-semibold max-w-md">
-            * Use o ID único (UUID) do Legendário responsável. As sugestões de voluntários por cidade ficam na tela de detalhes após salvar.
+            * Busque o Legendário responsável por nome ou número LGND. As sugestões de voluntários por cidade ficam na tela de detalhes após salvar.
           </p>
           <button
             type="button"

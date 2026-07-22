@@ -1,9 +1,9 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { TopServantStatus, type Legendary } from '@central-da-manada/shared';
-import { addTopServant, getTopTeams, searchLegendarios, updateTopServant } from './api';
-import { PersonSelect } from './top-form';
+import { TopServantStatus } from '@central-da-manada/shared';
+import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
+import { addTopServant, getTopTeams, updateTopServant } from './api';
 import type { TopServant, TopServantPayload, TopTeam } from './types';
 
 export function TopServantForm({
@@ -17,7 +17,6 @@ export function TopServantForm({
   onSaved: () => void;
   onCancel: () => void;
 }) {
-  const [people, setPeople] = useState<Legendary[]>([]);
   const [teams, setTeams] = useState<TopTeam[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<TopServantPayload>({
@@ -29,9 +28,6 @@ export function TopServantForm({
   });
 
   useEffect(() => {
-    searchLegendarios({ page: 1, perPage: 100, orderBy: 'fullName' })
-      .then((r) => setPeople(r.data))
-      .catch(() => setError('Não foi possível carregar Legendários.'));
     getTopTeams(topId)
       .then((r) => setTeams(r.data))
       .catch(() => setError('Não foi possível carregar equipes do TOP.'));
@@ -66,7 +62,7 @@ export function TopServantForm({
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-5">
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Legendário</span>
-          <PersonSelect value={payload.legendaryId} items={people} onChange={(v) => setPayload({ ...payload, legendaryId: v })} />
+          <LegendarioCombobox value={payload.legendaryId ?? ''} onChange={(v) => setPayload({ ...payload, legendaryId: v })} clearable={false} noneLabel="Selecione..." />
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Equipe de Serviço</span>

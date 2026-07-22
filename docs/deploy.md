@@ -12,8 +12,10 @@ este guia cobre o passo a passo seguro em volta dele, incluindo os pontos que o 
 2. `docker compose build` — reconstrói as imagens (roda `prisma generate`).
 3. Sobe `postgres` + `redis`.
 4. `prisma migrate deploy` — aplica migrations pendentes (idempotente).
-5. Sobe `api`, `web`, `caddy`.
-6. Remove imagens órfãs.
+5. **Sincroniza acesso** — `SEED_MODE=access prisma db seed`: garante que permissions novas
+   de features cheguem ao banco (roles/permissions, idempotente). NÃO mexe no admin nem em demo.
+6. Sobe `api`, `web`, `caddy`.
+7. Remove imagens órfãs.
 
 Usa `.env.production` + `docker-compose.prod.yml`.
 
@@ -23,11 +25,16 @@ Usa `.env.production` + `docker-compose.prod.yml`.
 
 - VPS com o repositório clonado, Docker + Docker Compose.
 - `.env.production` preenchido (copiar de `.env.production.example`).
-- Seed administrativo rodado **uma única vez** (não faz parte do deploy):
+- Seed **completo** rodado **uma única vez** na instalação (cria o admin + dados demo;
+  NÃO faz parte do deploy):
   ```bash
   docker compose --env-file .env.production -f docker-compose.prod.yml \
     run --rm -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 -w /app api pnpm exec prisma db seed
   ```
+  > As **permissions** (roles/permissions) são sincronizadas automaticamente em **todo deploy**
+  > (`SEED_MODE=access`, dentro do `deploy.sh`). Não precisa re-rodar o seed completo quando uma
+  > feature adiciona permission nova — se rodar o completo, ele **não** reseta a senha do admin
+  > (o `update` do upsert não toca em `passwordHash`).
 
 ---
 
@@ -41,7 +48,11 @@ branch de integração). Confirme que o merge foi feito **antes** de fazer deplo
 > Se o `git pull` não trouxer nada novo, a feature não está no `main` ainda.
 
 ### 2. Backup do banco (o `deploy.sh` NÃO faz isto)
-Produção tem dados reais. Antes de qualquer migration:
+Produção tem dados reais. **Você não roda migration na mão** — o `deploy.sh` chama
+`prisma migrate deploy` e aplica as pendentes **automaticamente**. As migrations do projeto
+são **aditivas** (coluna nulável, tabela nova, ou backfill dentro da própria migration):
+sem perda de dado e sem downtime. Ou seja, "mexeu no schema" **não** exige ação manual sua —
+só o **backup abaixo** é manual. Antes de qualquer migration:
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml exec postgres \
   pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > "backup_$(date +%F_%H%M).sql"
@@ -50,11 +61,11 @@ docker compose --env-file .env.production -f docker-compose.prod.yml exec postgr
 ### 3. Rodar o deploy
 Na raiz do repositório, na VPS:
 ```bash
-COREPACK_ENABLE_DOWNLOAD_PROMPT=0 ./scripts/deploy.sh
+./scripts/deploy.sh
 ```
-> **Por que a variável:** no passo de migration o `pnpm` pode ser baixado pelo Corepack e
-> abrir um prompt interativo (`Do you want to continue? [Y/n]`) que **trava** o deploy.
-> `COREPACK_ENABLE_DOWNLOAD_PROMPT=0` faz o download acontecer sem perguntar.
+> O script já passa `COREPACK_ENABLE_DOWNLOAD_PROMPT=0` **dentro** dos containers de
+> migration/sync — sem isso o Corepack abre um prompt `[Y/n]` ao baixar o pnpm e **trava** o
+> deploy. Dica: rode sob `tmux`/`screen` para uma queda de SSH não matar o deploy.
 
 ### 4. Verificar (não pule)
 ```bash
@@ -68,6 +79,16 @@ docker compose --env-file .env.production -f docker-compose.prod.yml ps
 ```
 E o **smoke test** da feature no navegador (ex.: a tela alterada). Faça **Ctrl+Shift+R**
 (hard refresh) para descartar o JS antigo em cache.
+
+### 5. Marcar o deploy (para saber depois o que está no ar)
+Não há CI nem branch de produção, então **o git não registra qual commit está em produção** —
+a menos que você marque. Depois do deploy verde, na VPS:
+```bash
+git tag -a "deploy-$(date +%F)" -m "deploy: <features do dia>"
+git push origin --tags
+```
+Assim "o que está no ar" vira `git describe --tags`, e o próximo deploy sabe de onde partiu
+(sem precisar reconstruir isso pelo histórico de merges).
 
 ---
 
@@ -108,3 +129,4 @@ E o **smoke test** da feature no navegador (ex.: a tela alterada). Faça **Ctrl+
 - [ ] `prisma migrate status` = "up to date"
 - [ ] `docker compose ... ps` (containers Running/Healthy)
 - [ ] Smoke test no navegador (hard refresh)
+- [ ] Tag do deploy (`git tag -a deploy-AAAA-MM-DD -m "..." && git push origin --tags`)

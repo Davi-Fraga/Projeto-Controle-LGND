@@ -119,14 +119,10 @@ const permissions = [
 ];
 
 async function main() {
-  const adminName = process.env.ADMIN_NAME;
-  const adminEmail = process.env.ADMIN_EMAIL;
-  const adminPassword = process.env.ADMIN_PASSWORD;
-
-  if (!adminName || !adminEmail || !adminPassword) {
-    throw new Error('ADMIN_NAME, ADMIN_EMAIL and ADMIN_PASSWORD are required for seed.');
-  }
-
+  // === Sincronização de ACESSO (roles + permissions + concessões por papel) ===
+  // Idempotente e SEGURA para rodar em TODO deploy (não mexe no admin nem em dados
+  // demo). `SEED_MODE=access` roda só esta parte — é o que o deploy.sh usa para
+  // garantir que permissions novas de features cheguem ao banco.
   for (const role of roles) {
     await prisma.role.upsert({
       where: { name: role },
@@ -324,10 +320,24 @@ async function main() {
     'map.read',
   ]);
 
+  // === Bootstrap de ADMIN + dados demo — SÓ na instalação (uma vez) ===
+  // Nunca roda no deploy (SEED_MODE=access retorna aqui): não reseta a senha do
+  // admin nem injeta igrejas/equipes demo em produção.
+  if (process.env.SEED_MODE === 'access') return;
+
+  const adminName = process.env.ADMIN_NAME;
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminName || !adminEmail || !adminPassword) {
+    throw new Error('ADMIN_NAME, ADMIN_EMAIL and ADMIN_PASSWORD are required for seed.');
+  }
+
   const passwordHash = await bcrypt.hash(adminPassword, 12);
+  // `update` NÃO redefine passwordHash: re-rodar o seed não sobrescreve a senha
+  // atual do admin (só define na criação inicial).
   const admin = await prisma.user.upsert({
     where: { email: adminEmail.toLowerCase() },
-    update: { name: adminName, passwordHash, isActive: true },
+    update: { name: adminName, isActive: true },
     create: {
       name: adminName,
       email: adminEmail.toLowerCase(),

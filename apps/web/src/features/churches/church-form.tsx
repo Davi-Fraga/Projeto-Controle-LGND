@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { cleanPhone, maskPhoneInput, type Church } from '@central-da-manada/shared';
 import { createChurch, geocodeChurch, updateChurch, type ChurchPayload } from './api';
 import { getUsers, type UserSummary } from '@/features/users/api';
+import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
 
 type Props = { church?: Church };
 
@@ -15,6 +16,7 @@ type FormState = {
   spiritualLeaderName: string;
   spiritualLeaderPhone: string;
   spiritualLeaderUserId: string;
+  spiritualLeaderLegendaryId: string;
   latitude: string;
   longitude: string;
   notes: string;
@@ -30,6 +32,7 @@ export function ChurchForm({ church }: Props) {
     spiritualLeaderName: church?.spiritualLeaderName ?? '',
     spiritualLeaderPhone: maskPhoneInput(church?.spiritualLeaderPhone ?? ''),
     spiritualLeaderUserId: church?.spiritualLeaderUserId ?? '',
+    spiritualLeaderLegendaryId: church?.spiritualLeaderLegendaryId ?? '',
     latitude: church?.latitude != null ? String(church.latitude) : '',
     longitude: church?.longitude != null ? String(church.longitude) : '',
     notes: church?.notes ?? '',
@@ -88,6 +91,7 @@ export function ChurchForm({ church }: Props) {
       spiritualLeaderName: form.spiritualLeaderName.trim() || null,
       spiritualLeaderPhone: cleanPhone(form.spiritualLeaderPhone),
       spiritualLeaderUserId: form.spiritualLeaderUserId || null,
+      spiritualLeaderLegendaryId: form.spiritualLeaderLegendaryId || null,
       latitude: form.latitude.trim() === '' ? null : Number(form.latitude),
       longitude: form.longitude.trim() === '' ? null : Number(form.longitude),
       notes: form.notes.trim() || null,
@@ -139,6 +143,19 @@ export function ChurchForm({ church }: Props) {
         <div className="md:col-span-2">
           <span className="text-xs font-bold uppercase tracking-widest text-orange-500">Líder Espiritual</span>
         </div>
+        <label className="md:col-span-2 block space-y-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Legendário vinculado</span>
+          <LegendarioCombobox
+            value={form.spiritualLeaderLegendaryId}
+            initialLabel={church?.spiritualLeaderLegendary?.fullName}
+            onChange={(value) => setField('spiritualLeaderLegendaryId', value)}
+            placeholder="Buscar líder por nome, cidade ou LGND..."
+            noneLabel="Nenhum Legendário vinculado"
+          />
+          <span className="text-[11px] text-zinc-500">
+            Quando vinculado, o nome do Legendário prevalece na exibição. O nome livre abaixo permanece salvo como alternativa.
+          </span>
+        </label>
         <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Nome do Líder (livre)</span>
           <input className="input" value={form.spiritualLeaderName} onChange={(e) => setField('spiritualLeaderName', e.target.value)} />

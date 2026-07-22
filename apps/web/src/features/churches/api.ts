@@ -13,6 +13,7 @@ export type ChurchPayload = {
   spiritualLeaderName?: string | null;
   spiritualLeaderPhone?: string | null;
   spiritualLeaderUserId?: string | null;
+  spiritualLeaderLegendaryId?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   notes?: string | null;

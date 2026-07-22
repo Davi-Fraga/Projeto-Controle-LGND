@@ -4,6 +4,8 @@ import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../../common/decorators/permissions.decorator';
 import { ChurchesController } from './churches.controller';
 import { ListChurchesQueryDto } from './dto/list-churches-query.dto';
+import { CreateChurchDto } from './dto/create-church.dto';
+import { UpdateChurchDto } from './dto/update-church.dto';
 
 describe('ChurchesController (listagens com busca)', () => {
   let controller: ChurchesController;
@@ -14,6 +16,8 @@ describe('ChurchesController (listagens com busca)', () => {
     service = {
       findAll: jest.fn().mockResolvedValue([{ id: 'c1' }]),
       spiritualLeadersView: jest.fn().mockResolvedValue([{ id: 'c1' }]),
+      create: jest.fn().mockResolvedValue({ id: 'c1' }),
+      update: jest.fn().mockResolvedValue({ id: 'c1' }),
     };
     controller = new ChurchesController(service);
   });
@@ -39,6 +43,34 @@ describe('ChurchesController (listagens com busca)', () => {
     const reflector = new Reflector();
     expect(reflector.get(PERMISSIONS_KEY, controller.findAll)).toEqual(['churches.read']);
     expect(reflector.get(PERMISSIONS_KEY, controller.spiritualLeaders)).toEqual(['churches.read']);
+  });
+
+  it('POST e PATCH repassam o usuário autenticado completo ao service', async () => {
+    const createDto = { name: 'Igreja' } as CreateChurchDto;
+    const updateDto = { spiritualLeaderLegendaryId: null } as UpdateChurchDto;
+
+    await controller.create(createDto, user);
+    await controller.update('c1', updateDto, user);
+
+    expect(service.create).toHaveBeenCalledWith(createDto, user);
+    expect(service.update).toHaveBeenCalledWith('c1', updateDto, user);
+  });
+
+  describe('DTO do vínculo com Legendário', () => {
+    const validId = '11111111-1111-4111-8111-111111111111';
+
+    it('aceita UUID na criação e null na atualização', async () => {
+      const createDto = plainToInstance(CreateChurchDto, { name: 'Igreja', spiritualLeaderLegendaryId: validId });
+      const updateDto = plainToInstance(UpdateChurchDto, { spiritualLeaderLegendaryId: null });
+
+      expect(await validate(createDto)).toHaveLength(0);
+      expect(await validate(updateDto)).toHaveLength(0);
+    });
+
+    it('rejeita identificador inválido', async () => {
+      const dto = plainToInstance(UpdateChurchDto, { spiritualLeaderLegendaryId: 'invalido' });
+      expect(await validate(dto)).not.toHaveLength(0);
+    });
   });
 
   describe('ListChurchesQueryDto', () => {

@@ -215,6 +215,9 @@ export type Church = {
   spiritualLeaderName?: string | null;
   spiritualLeaderPhone?: string | null;
   spiritualLeaderUserId?: string | null;
+  spiritualLeaderLegendaryId?: string | null;
+  spiritualLeaderLegendary?: { id: string; fullName: string } | null;
+  spiritualLeaderEffectiveName?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   notes?: string | null;

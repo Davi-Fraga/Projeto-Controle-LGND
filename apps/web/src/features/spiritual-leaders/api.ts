@@ -8,6 +8,9 @@ export type SpiritualLeaderChurch = {
   spiritualLeaderPhone: string | null;
   spiritualLeaderUserId: string | null;
   spiritualLeader: { id: string; name: string; email: string } | null;
+  spiritualLeaderLegendaryId: string | null;
+  spiritualLeaderLegendary: { id: string; fullName: string } | null;
+  spiritualLeaderEffectiveName: string | null;
   latitude: number | null;
   longitude: number | null;
   _count: { legendarios: number };

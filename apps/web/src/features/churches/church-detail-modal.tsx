@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Building2, MapPin, Phone, User, X } from 'lucide-react';
 import { formatPhone } from '@central-da-manada/shared';
 import { getChurch, type ChurchDetail } from './api';
@@ -60,7 +61,18 @@ export function ChurchDetailModal({ churchId, onClose }: { churchId: string | nu
             <>
               <dl className="grid gap-3 sm:grid-cols-2">
                 <Info label="Cidade" value={detail.city} icon={<MapPin className="h-3.5 w-3.5 text-zinc-500" />} />
-                <Info label="Líder espiritual" value={detail.spiritualLeaderName} icon={<User className="h-3.5 w-3.5 text-zinc-500" />} />
+                <Info
+                  label="Líder espiritual"
+                  value={detail.spiritualLeaderLegendary ? (
+                    <Link
+                      href={`/dashboard/legendarios/${detail.spiritualLeaderLegendary.id}`}
+                      className="font-semibold text-orange-400 transition-colors hover:text-orange-300"
+                    >
+                      {detail.spiritualLeaderLegendary.fullName}
+                    </Link>
+                  ) : detail.spiritualLeaderEffectiveName}
+                  icon={<User className="h-3.5 w-3.5 text-zinc-500" />}
+                />
                 <Info label="Telefone do líder" value={formatPhone(detail.spiritualLeaderPhone)} icon={<Phone className="h-3.5 w-3.5 text-zinc-500" />} />
                 <Info
                   label="Coordenadas"
@@ -106,7 +118,7 @@ export function ChurchDetailModal({ churchId, onClose }: { churchId: string | nu
   );
 }
 
-function Info({ label, value, icon, className }: { label: string; value?: string | null; icon?: React.ReactNode; className?: string }) {
+function Info({ label, value, icon, className }: { label: string; value?: React.ReactNode; icon?: React.ReactNode; className?: string }) {
   return (
     <div className={className}>
       <dt className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">{label}</dt>

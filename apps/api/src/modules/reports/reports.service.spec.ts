@@ -62,4 +62,16 @@ describe('ReportsService (scope / PII)', () => {
     const where = prisma.legendary.findMany.mock.calls[0][0].where;
     expect(where.AND).toBeUndefined();
   });
+
+  it('pendingReview: observação do membro de família usa somente notes (sem sourceNotes)', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true });
+    prisma.topFamilyMember.findMany.mockResolvedValueOnce([
+      { id: 'm1', notes: 'nota geral', sourceNotes: 'texto de origem', topFamily: { name: 'Fam' }, topParticipant: { legendary: { fullName: 'João' } } },
+    ]);
+
+    const rows = await service.pendingReview(adminUser);
+    const member = rows.find((r: any) => r.tipo === 'Membro de família');
+
+    expect(member?.observacao).toBe('nota geral');
+  });
 });

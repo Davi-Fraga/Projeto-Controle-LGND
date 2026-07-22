@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import {
   TopEventStatus,
+  TopFamilyMemberStatus,
   TopParticipantStatus,
   TopParticipantType,
   TopServantStatus,
@@ -20,6 +21,7 @@ describe('TopsService', () => {
       team: { findFirst: jest.fn() },
       topTeam: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
       topFamily: { findFirst: jest.fn(), update: jest.fn() },
+      topFamilyMember: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
       topParticipant: { findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn(), create: jest.fn(), update: jest.fn() },
       topServant: { findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn(), create: jest.fn(), update: jest.fn() },
     };
@@ -141,6 +143,78 @@ describe('TopsService', () => {
     prisma.topServant.findFirst.mockResolvedValueOnce({ id: 's1', topEventId: 'top-1' });
     prisma.topServant.update.mockResolvedValueOnce({ id: 's1', status: TopServantStatus.CANCELLED });
     await expect(service.cancelServant('top-1', 's1')).resolves.toMatchObject({ status: TopServantStatus.CANCELLED });
+  });
+
+  describe('participantOptions', () => {
+    beforeEach(() => {
+      prisma.topEvent.findFirst.mockResolvedValue({ id: 'top-1', _count: { participants: 0, servants: 0, teams: 0 } });
+      prisma.topParticipant.findMany.mockResolvedValue([]);
+    });
+
+    it('busca por searchText normalizado (sem acento/caixa), não por fullName', async () => {
+      await service.participantOptions('top-1', { search: 'João', limit: 20 } as any);
+      const where = prisma.topParticipant.findMany.mock.calls[0][0].where;
+      expect(where.legendary).toEqual({ searchText: { contains: 'joao' } });
+    });
+
+    it('termo vazio/em branco não adiciona clause de searchText (regressão contains vazio)', async () => {
+      await service.participantOptions('top-1', { search: '   ', limit: 20 } as any);
+      const where = prisma.topParticipant.findMany.mock.calls[0][0].where;
+      expect(where.legendary).toBeUndefined();
+    });
+
+    it('sempre exclui participante cancelado/excluído do TOP da rota', async () => {
+      await service.participantOptions('top-1', { limit: 20 } as any);
+      const where = prisma.topParticipant.findMany.mock.calls[0][0].where;
+      expect(where.topEventId).toBe('top-1');
+      expect(where.deletedAt).toBeNull();
+      expect(where.status).toEqual({ not: TopParticipantStatus.CANCELLED });
+    });
+
+    it('availableForFamily=true omite quem já pertence a Família ativa no mesmo TOP', async () => {
+      await service.participantOptions('top-1', { availableForFamily: true, limit: 20 } as any);
+      const where = prisma.topParticipant.findMany.mock.calls[0][0].where;
+      expect(where.familyMemberships).toEqual({ none: { status: TopFamilyMemberStatus.ACTIVE, deletedAt: null } });
+    });
+
+    it('sem availableForFamily preserva o comportamento compatível (sem filtro de Família)', async () => {
+      await service.participantOptions('top-1', { limit: 20 } as any);
+      const where = prisma.topParticipant.findMany.mock.calls[0][0].where;
+      expect(where.familyMemberships).toBeUndefined();
+    });
+
+    it('respeita o limite solicitado e retorna payload enxuto com value = TopParticipant.id', async () => {
+      prisma.topParticipant.findMany.mockResolvedValueOnce([
+        { id: 'p1', legendaryId: 'l1', legendary: { id: 'l1', fullName: 'João Silva', lgndNumber: 'A12', city: 'Goiânia' } },
+      ]);
+      const result = await service.participantOptions('top-1', { search: 'joao', limit: 5 } as any);
+      expect(prisma.topParticipant.findMany.mock.calls[0][0].take).toBe(5);
+      expect(result[0]).toMatchObject({
+        value: 'p1',
+        metadata: { legendaryId: 'l1', fullName: 'João Silva', lgndNumber: 'A12', city: 'Goiânia' },
+      });
+    });
+  });
+
+  describe('addFamilyMember revalida elegibilidade no backend', () => {
+    beforeEach(() => {
+      prisma.topFamily.findFirst.mockResolvedValue({ id: 'fam-1', topEventId: 'top-1', name: 'Família A' });
+    });
+
+    it('rejeita participante que já está em Família ativa (corrida/requisição manual)', async () => {
+      prisma.topParticipant.findFirst.mockResolvedValueOnce({ id: 'pp-1', legendaryId: 'l1' });
+      prisma.topFamilyMember.findFirst.mockResolvedValueOnce({ id: 'existing' });
+      await expect(
+        service.addFamilyMember('top-1', 'fam-1', { topParticipantId: 'pp-1' } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejeita participante inativo/cancelado do TOP', async () => {
+      prisma.topParticipant.findFirst.mockResolvedValueOnce(null);
+      await expect(
+        service.addFamilyMember('top-1', 'fam-1', { topParticipantId: 'pp-x' } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });
 

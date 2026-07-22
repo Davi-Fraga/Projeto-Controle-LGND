@@ -45,11 +45,6 @@ export type LegendarioPayload = {
   firstTopFamilyId?: string;
   firstTopExternalText?: string;
   firstTopNotes?: string;
-  alreadyServedAsService: boolean;
-  serviceTopEventId?: string;
-  serviceTeamId?: string;
-  serviceRole?: string;
-  serviceNotes?: string;
 };
 
 export type ChurchPayload = {

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { formatPhone } from '@central-da-manada/shared';
 import { getLegendario } from '@/features/legendarios/api';
 import { LegendarioHistorySection } from '@/features/legendarios/legendario-history-section';
+import { LegendarioServiceSection } from '@/features/legendarios/legendario-service-section';
 import type { Legendary } from '@/features/legendarios/types';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -26,12 +27,14 @@ export default function LegendarioDetalhePage() {
   const [legendario, setLegendario] = useState<Legendary | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const loadLegendario = () => getLegendario(params.id).then((response) => setLegendario(response.data));
+
   useEffect(() => {
     if (authLoading) return;
-    getLegendario(params.id)
-      .then((response) => setLegendario(response.data))
+    loadLegendario()
       .catch(() => router.replace(backHref))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, backHref, params.id, router]);
 
   if (authLoading || loading) return <main className="p-6 text-sm text-zinc-600">Carregando...</main>;
@@ -119,42 +122,25 @@ export default function LegendarioDetalhePage() {
               : [
                   ['Subiu em Outra Rota', 'Não'],
                   ['Primeiro TOP que subiu', legendario.firstTopEvent ? `TOP #${legendario.firstTopEvent.number} - ${legendario.firstTopEvent.name}` : <span className="text-amber-500 font-bold">Pendente de revisão</span>],
-                  ['Família no primeiro TOP', legendario.firstTopFamily ? legendario.firstTopFamily.name : <span className="text-amber-500 font-bold">Pendente de revisão</span>],
+                  ['Família', legendario.firstTopFamily ? legendario.firstTopFamily.name : <span className="text-amber-500 font-bold">Pendente de revisão</span>],
                   ['Observações', legendario.firstTopNotes || '-'],
                 ]
           }
         />
-        <Info
-          title="Serviço em TOP"
-          rows={[
-            ['Já serviu em algum TOP?', legendario.topServants && legendario.topServants.length > 0 ? 'Sim' : 'Não'],
-            ...(legendario.topServants && legendario.topServants.length > 0
-              ? legendario.topServants.map((s, idx) => [
-                  `Serviço #${idx + 1}`,
-                  <div key={s.id} className="space-y-1">
-                    <p className="font-bold text-zinc-200">
-                      {s.topEvent ? `TOP #${s.topEvent.number} - ${s.topEvent.name}` : 'TOP não especificado'}
-                    </p>
-                    <p className="text-xs text-zinc-400 font-medium">
-                      Equipe: <span className="text-zinc-300 font-semibold">{s.team?.name || '-'}</span>
-                    </p>
-                    {s.role && (
-                      <p className="text-xs text-zinc-400 font-medium">
-                        Função: <span className="text-zinc-300 font-semibold">{s.role}</span>
-                      </p>
-                    )}
-                    {s.notes && (
-                      <p className="text-xs text-zinc-400 font-medium">
-                        Obs.: <span className="text-zinc-300 font-semibold">{s.notes}</span>
-                      </p>
-                    )}
-                  </div>,
-                ] as [string, React.ReactNode])
-              : []),
-          ]}
-        />
         {hasFormsData ? <Info title="Dados do Google Forms" rows={formsRows} /> : null}
       </div>
+
+      {/* Serviço em TOP: histórico múltiplo gerido pelos endpoints canônicos de servos. */}
+      <LegendarioServiceSection
+        legendarioId={legendario.id}
+        servants={legendario.topServants ?? []}
+        permissions={{
+          add: hasPermission(user, 'tops.servants.add'),
+          update: hasPermission(user, 'tops.servants.update'),
+          remove: hasPermission(user, 'tops.servants.remove'),
+        }}
+        onChanged={loadLegendario}
+      />
 
       {/* Expertises Card */}
       <section className="rounded-xl border border-zinc-800 bg-[#111113] p-5 shadow-lg">

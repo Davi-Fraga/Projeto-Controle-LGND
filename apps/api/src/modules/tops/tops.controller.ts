@@ -10,6 +10,7 @@ import { CreateTopDto, TopQueryDto } from './dto/top-query.dto';
 import { UpdateTopDto } from './dto/update-top.dto';
 import { CreateTopTeamDto, UpdateTopTeamDto } from './dto/top-team.dto';
 import { CreateTopParticipantDto, TopParticipantsQueryDto, UpdateTopParticipantDto } from './dto/top-participant.dto';
+import { ParticipantOptionsQueryDto } from './dto/participant-options-query.dto';
 import { CreateTopServantDto, TopServantsQueryDto, UpdateTopServantDto } from './dto/top-servant.dto';
 import { CreateTopFamilyDto, CreateTopFamilyMemberDto, TransferTopFamilyMemberDto, UpdateTopFamilyDto, UpdateTopFamilyMemberDto } from './dto/top-family.dto';
 import { OrgChartQueryDto } from './dto/org-chart.dto';
@@ -46,7 +47,7 @@ export class TopsController {
   @Patch(':id/teams/:topTeamId') @Permissions('tops.teams.update') async updateTeam(@Param('id') id: string, @Param('topTeamId') topTeamId: string, @Body() dto: UpdateTopTeamDto, @CurrentUser() u: { sub: string }) { return { data: await this.tops.updateTeam(id, topTeamId, dto, u.sub) }; }
   @Delete(':id/teams/:topTeamId') @Permissions('tops.teams.remove') async removeTeam(@Param('id') id: string, @Param('topTeamId') topTeamId: string, @CurrentUser() u: { sub: string }) { return { data: await this.tops.removeTeam(id, topTeamId, u.sub) }; }
   @Get(':id/participants') @Permissions('tops.participants.read') findParticipants(@Param('id') id: string, @Query() q: TopParticipantsQueryDto) { return this.tops.findParticipants(id, q); }
-  @Get(':id/participants/options') @Permissions('tops.participants.read') async participantOptions(@Param('id') id: string, @Query() q: OptionsQueryDto) { return { data: await this.tops.participantOptions(id, q) }; }
+  @Get(':id/participants/options') @Permissions('tops.participants.read') async participantOptions(@Param('id') id: string, @Query() q: ParticipantOptionsQueryDto) { return { data: await this.tops.participantOptions(id, q) }; }
   @Post(':id/participants') @Permissions('tops.participants.add') async addParticipant(@Param('id') id: string, @Body() dto: CreateTopParticipantDto, @CurrentUser() u: { sub: string }) { return { data: await this.tops.addParticipant(id, dto, u.sub) }; }
   @Patch(':id/participants/:participantId') @Permissions('tops.participants.update') async updateParticipant(@Param('id') id: string, @Param('participantId') participantId: string, @Body() dto: UpdateTopParticipantDto, @CurrentUser() u: { sub: string }) { return { data: await this.tops.updateParticipant(id, participantId, dto, u.sub) }; }
   @Patch(':id/participants/:participantId/cancel') @Permissions('tops.participants.remove') async cancelParticipant(@Param('id') id: string, @Param('participantId') participantId: string, @CurrentUser() u: { sub: string }) { return { data: await this.tops.cancelParticipant(id, participantId, u.sub) }; }

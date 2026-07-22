@@ -410,6 +410,8 @@ model Church {
   // `normalizeName` de @central-da-manada/shared. Persistido para busca parcial
   // acento/caixa-insensível sem carregar a lista inteira em memória.
   normalizedName String
+  // Nome + cidade normalizados para busca textual no endpoint paginado.
+  searchText  String?
   city        String?
   // Endereço da igreja (opcional). Quando preenchido, o geocoding busca por ele
   // (mais preciso que nome+cidade), deixando o "Buscar localização automaticamente"
@@ -432,6 +434,7 @@ model Church {
 
   @@index([name])
   @@index([normalizedName])
+  @@index([searchText])
   @@index([city])
   @@index([spiritualLeaderUserId])
   @@index([spiritualLeaderLegendaryId])

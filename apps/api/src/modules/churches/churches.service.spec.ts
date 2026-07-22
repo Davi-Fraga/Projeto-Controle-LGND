@@ -13,6 +13,7 @@ describe('ChurchesService geocoding integration', () => {
       church: {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
         create: jest.fn().mockImplementation(({ data }: any) => Promise.resolve({ id: 'church-1', ...data })),
         update: jest.fn().mockImplementation(({ data }: any) => Promise.resolve({ id: 'church-1', ...data })),
       },
@@ -20,7 +21,12 @@ describe('ChurchesService geocoding integration', () => {
       legendary: { count: jest.fn(), findFirst: jest.fn() },
     };
     audit = { create: jest.fn() };
-    accessPolicy = { resolveScope: jest.fn(), buildChurchWhere: jest.fn(), buildLegendaryWhere: jest.fn() };
+    accessPolicy = {
+      resolveScope: jest.fn(),
+      buildChurchWhere: jest.fn(),
+      buildChurchScopeWhere: jest.fn(),
+      buildLegendaryWhere: jest.fn(),
+    };
     geocoding = { geocode: jest.fn() };
     service = new ChurchesService(prisma, audit, accessPolicy, geocoding as any);
   });
@@ -126,6 +132,165 @@ describe('ChurchesService geocoding integration', () => {
       expect(prisma.church.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ normalizedName: undefined }) }),
       );
+    });
+  });
+
+  describe('searchText', () => {
+    it('persiste nome + cidade normalizados ao criar', async () => {
+      geocoding.geocode.mockResolvedValueOnce(null);
+
+      await service.create({ name: ' Primeira Igreja ', city: ' São José ' } as any, actor);
+
+      expect(prisma.church.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ searchText: 'primeira igreja sao jose' }),
+        }),
+      );
+    });
+
+    it('recalcula com os valores mesclados quando nome ou cidade muda', async () => {
+      prisma.church.findFirst.mockResolvedValueOnce({
+        id: 'church-1',
+        name: 'Igreja Antiga',
+        city: 'Goiânia',
+        address: null,
+        spiritualLeaderUserId: null,
+      });
+      geocoding.geocode.mockResolvedValueOnce(null);
+
+      await service.update('church-1', { city: 'Anápolis' } as any, actor);
+
+      expect(prisma.church.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ searchText: 'igreja antiga anapolis' }),
+        }),
+      );
+    });
+  });
+
+  describe('search (listagem paginada)', () => {
+    const lastFindMany = () => prisma.church.findMany.mock.calls.at(-1)[0];
+
+    it('busca por searchText e alias com termo normalizado antes de paginar', async () => {
+      accessPolicy.resolveScope.mockResolvedValue({ isAdmin: true });
+      prisma.church.findMany.mockResolvedValueOnce([{ id: 'c1' }]);
+      prisma.church.count.mockResolvedValueOnce(1);
+
+      const result = await service.search(
+        { page: 1, perPage: 10, search: ' SÃO   JOÃO ' } as any,
+        {} as any,
+      );
+
+      expect(lastFindMany()).toEqual(expect.objectContaining({
+        where: {
+          AND: [
+            { deletedAt: null },
+            {
+              OR: [
+                { searchText: { contains: 'sao joao' } },
+                { aliases: { some: { normalizedAlias: { contains: 'sao joao' } } } },
+              ],
+            },
+          ],
+        },
+        skip: 0,
+        take: 10,
+      }));
+      expect(prisma.church.count).toHaveBeenCalledWith({ where: lastFindMany().where });
+      expect(result).toEqual({
+        data: [{ id: 'c1' }],
+        meta: { page: 1, perPage: 10, total: 1, totalPages: 1 },
+      });
+    });
+
+    it('não cria contains vazio quando a busca contém apenas espaços', async () => {
+      accessPolicy.resolveScope.mockResolvedValue({ isAdmin: true });
+
+      await service.search({ page: 1, perPage: 10, search: '   ' } as any, {} as any);
+
+      expect(lastFindMany().where).toEqual({ AND: [{ deletedAt: null }] });
+      expect(JSON.stringify(lastFindMany().where)).not.toContain('contains');
+    });
+
+    it('combina busca, filtros, escopo e paginação sem ampliar a visibilidade', async () => {
+      const scopeWhere = {
+        OR: [
+          { city: { in: ['Goiânia'] } },
+          { id: { in: ['church-1'] } },
+        ],
+      };
+      accessPolicy.resolveScope.mockResolvedValue({ isAdmin: false });
+      accessPolicy.buildChurchScopeWhere.mockReturnValue(scopeWhere);
+
+      await service.search({
+        page: 2,
+        perPage: 5,
+        search: 'batista',
+        city: 'Goiânia',
+        hasCoordinates: false,
+        hasLegendarios: true,
+        orderBy: 'name',
+        orderDirection: 'asc',
+      } as any, {} as any);
+
+      expect(lastFindMany()).toEqual(expect.objectContaining({
+        where: {
+          AND: [
+            { deletedAt: null },
+            {
+              OR: [
+                { searchText: { contains: 'batista' } },
+                { aliases: { some: { normalizedAlias: { contains: 'batista' } } } },
+              ],
+            },
+            { city: 'Goiânia' },
+            { OR: [{ latitude: null }, { longitude: null }] },
+            { legendarios: { some: { deletedAt: null } } },
+            scopeWhere,
+          ],
+        },
+        orderBy: { name: 'asc' },
+        skip: 5,
+        take: 5,
+      }));
+      expect(accessPolicy.buildChurchScopeWhere).toHaveBeenCalled();
+    });
+
+    it('filtra igrejas com coordenadas e sem legendários ativos', async () => {
+      accessPolicy.resolveScope.mockResolvedValue({ isAdmin: true });
+
+      await service.search({
+        page: 1,
+        perPage: 10,
+        hasCoordinates: true,
+        hasLegendarios: false,
+      } as any, {} as any);
+
+      expect(lastFindMany().where.AND).toEqual([
+        { deletedAt: null },
+        { latitude: { not: null }, longitude: { not: null } },
+        { legendarios: { none: { deletedAt: null } } },
+      ]);
+    });
+  });
+
+  describe('searchCities', () => {
+    it('retorna cidades distintas somente dentro do escopo', async () => {
+      const scopeWhere = { OR: [{ city: { in: ['Goiânia'] } }] };
+      accessPolicy.resolveScope.mockResolvedValue({ isAdmin: false });
+      accessPolicy.buildChurchScopeWhere.mockReturnValue(scopeWhere);
+      prisma.church.findMany.mockResolvedValueOnce([
+        { city: 'Goiânia' },
+        { city: null },
+      ]);
+
+      await expect(service.searchCities({} as any)).resolves.toEqual(['Goiânia']);
+      expect(prisma.church.findMany).toHaveBeenCalledWith({
+        where: { AND: [{ deletedAt: null }, { city: { not: null } }, scopeWhere] },
+        select: { city: true },
+        distinct: ['city'],
+        orderBy: { city: 'asc' },
+      });
     });
   });
 

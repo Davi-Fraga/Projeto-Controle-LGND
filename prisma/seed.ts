@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { normalizeName } from '@central-da-manada/shared';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -349,12 +350,19 @@ async function main() {
     },
   });
 
-  for (const church of [
+  for (const churchInput of [
     { name: 'Igreja Batista Central', city: 'Brasilia' },
     { name: 'Comunidade Crista Rota do Cerrado', city: 'Brasilia' },
     { name: 'Igreja Presbiteriana', city: 'Goiania' },
   ]) {
-    const existingChurch = await prisma.church.findFirst({ where: church });
+    const church = {
+      ...churchInput,
+      normalizedName: normalizeName(churchInput.name),
+      searchText: normalizeName(`${churchInput.name} ${churchInput.city}`),
+    };
+    const existingChurch = await prisma.church.findFirst({
+      where: { name: church.name, city: church.city },
+    });
     if (!existingChurch) {
       await prisma.church.create({ data: church });
     }

@@ -5,6 +5,26 @@ export type { Church };
 
 export type ChurchesResponse = { data: Church[] };
 export type ChurchResponse = { data: Church };
+export type ChurchesPageResponse = {
+  data: Church[];
+  meta: {
+    page: number;
+    perPage: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export type ChurchSearchFilters = {
+  page?: number;
+  perPage?: number;
+  search?: string;
+  city?: string;
+  hasCoordinates?: boolean;
+  hasLegendarios?: boolean;
+  orderBy?: 'name' | 'createdAt';
+  orderDirection?: 'asc' | 'desc';
+};
 
 export type ChurchPayload = {
   name: string;
@@ -23,6 +43,21 @@ export function getChurches(search?: string) {
   const term = search?.trim();
   const query = term ? `?search=${encodeURIComponent(term)}` : '';
   return api<ChurchesResponse>(`/churches${query}`);
+}
+
+export function getChurchesPage(filters: ChurchSearchFilters) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      params.set(key, String(value));
+    }
+  });
+  const query = params.toString();
+  return api<ChurchesPageResponse>(`/churches/search${query ? `?${query}` : ''}`);
+}
+
+export function getChurchCities() {
+  return api<{ data: string[] }>('/churches/search/cities');
 }
 
 export function createChurch(payload: ChurchPayload) {

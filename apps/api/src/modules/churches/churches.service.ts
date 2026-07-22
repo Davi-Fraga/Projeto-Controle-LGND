@@ -2,8 +2,10 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { cleanPhone, normalizeName } from '@central-da-manada/shared';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
+import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { ChurchQueryDto } from './dto/church-query.dto';
 import { CreateChurchDto } from './dto/create-church.dto';
 import { UpdateChurchDto } from './dto/update-church.dto';
 import { GeocodingService } from './geocoding.service';
@@ -38,6 +40,60 @@ export class ChurchesService {
       where: { AND: and },
       orderBy: [{ name: 'asc' }, { city: 'asc' }],
     });
+  }
+
+  async search(query: ChurchQueryDto, user: AuthenticatedUser) {
+    const { page, perPage, skip, take } = getPagination(query);
+    const and: any[] = [{ deletedAt: null }];
+
+    const searchOr = this.buildSearchOr(query.search);
+    if (searchOr) and.push({ OR: searchOr });
+    if (query.city) and.push({ city: query.city });
+
+    if (query.hasCoordinates === true) {
+      and.push({ latitude: { not: null }, longitude: { not: null } });
+    } else if (query.hasCoordinates === false) {
+      and.push({ OR: [{ latitude: null }, { longitude: null }] });
+    }
+
+    if (query.hasLegendarios === true) {
+      and.push({ legendarios: { some: { deletedAt: null } } });
+    } else if (query.hasLegendarios === false) {
+      and.push({ legendarios: { none: { deletedAt: null } } });
+    }
+
+    const scope = await this.accessPolicy.resolveScope(user);
+    if (!scope.isAdmin) {
+      and.push(this.accessPolicy.buildChurchScopeWhere(scope));
+    }
+
+    const where = { AND: and };
+    const orderBy = { [query.orderBy ?? 'name']: query.orderDirection ?? 'asc' };
+    const [items, total] = await Promise.all([
+      this.prisma.church.findMany({ where, orderBy, skip, take }),
+      this.prisma.church.count({ where }),
+    ]);
+
+    return toPaginatedResponse(items, total, page, perPage);
+  }
+
+  async searchCities(user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    const and: any[] = [{ deletedAt: null }, { city: { not: null } }];
+    if (!scope.isAdmin) {
+      and.push(this.accessPolicy.buildChurchScopeWhere(scope));
+    }
+
+    const rows = await this.prisma.church.findMany({
+      where: { AND: and },
+      select: { city: true },
+      distinct: ['city'],
+      orderBy: { city: 'asc' },
+    });
+
+    return rows
+      .map((row: { city: string | null }) => row.city)
+      .filter((city): city is string => Boolean(city?.trim()));
   }
 
   geocode(name: string | undefined, city: string, locationHint?: string) {
@@ -151,6 +207,7 @@ export class ChurchesService {
       data: {
         name: dto.name.trim(),
         normalizedName: normalized,
+        searchText: this.buildSearchText(dto.name, dto.city),
         city: dto.city?.trim() || null,
         address: dto.address?.trim() || null,
         spiritualLeaderName: dto.spiritualLeaderName?.trim() || null,
@@ -204,6 +261,9 @@ export class ChurchesService {
       data: {
         name: dto.name?.trim(),
         normalizedName: dto.name !== undefined ? normalizeName(newName) : undefined,
+        searchText: dto.name !== undefined || dto.city !== undefined
+          ? this.buildSearchText(newName, newCity)
+          : undefined,
         city: dto.city === null ? null : (dto.city !== undefined ? dto.city.trim() : undefined),
         address: dto.address === null ? null : (dto.address !== undefined ? dto.address.trim() : undefined),
         spiritualLeaderName: dto.spiritualLeaderName === null ? null : (dto.spiritualLeaderName !== undefined ? dto.spiritualLeaderName.trim() : undefined),
@@ -275,5 +335,19 @@ export class ChurchesService {
       spiritualLeaderLegendary: linked,
       spiritualLeaderEffectiveName: linked?.fullName ?? church.spiritualLeaderName,
     };
+  }
+
+  private buildSearchOr(search?: string): any[] | undefined {
+    if (!search) return undefined;
+    const term = normalizeName(search);
+    if (!term) return undefined;
+    return [
+      { searchText: { contains: term } },
+      { aliases: { some: { normalizedAlias: { contains: term } } } },
+    ];
+  }
+
+  private buildSearchText(name?: string | null, city?: string | null) {
+    return normalizeName([name, city].filter(Boolean).join(' '));
   }
 }

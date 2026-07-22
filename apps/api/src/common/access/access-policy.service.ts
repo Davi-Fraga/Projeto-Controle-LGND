@@ -121,6 +121,23 @@ export class AccessPolicyService {
     return scope.churchIds.length ? { id: { in: scope.churchIds } } : { id: { in: [] } };
   }
 
+  // Filtro da listagem administrativa de igrejas: cidade ∪ igrejas explícitas.
+  // `buildChurchWhere` permanece restrito a churchIds para não alterar outros
+  // consumidores que dependem dessa semântica mais estreita.
+  buildChurchScopeWhere(scope: AccessScope) {
+    if (scope.isAdmin) return {};
+
+    const OR: any[] = [];
+    if (scope.legendaryCities.length) {
+      OR.push({ city: { in: scope.legendaryCities } });
+    }
+    if (scope.churchIds.length) {
+      OR.push({ id: { in: scope.churchIds } });
+    }
+
+    return OR.length ? { OR } : { id: { in: [] } };
+  }
+
   buildTopWhere(scope: AccessScope) {
     if (scope.isAdmin) return {};
     return scope.topIds.length ? { id: { in: scope.topIds } } : { id: { in: [] } };

@@ -130,6 +130,47 @@ describe('AccessPolicyService', () => {
     });
   });
 
+  describe('buildChurchScopeWhere', () => {
+    const baseScope = {
+      teamIds: [],
+      legendaryIds: [],
+      cityKeys: [],
+      topIds: [],
+    };
+
+    it('mantém o administrador irrestrito', () => {
+      expect(service.buildChurchScopeWhere({
+        ...baseScope,
+        isAdmin: true,
+        churchIds: [],
+        legendaryCities: [],
+      })).toEqual({});
+    });
+
+    it('combina cidades e igrejas explícitas por OR', () => {
+      expect(service.buildChurchScopeWhere({
+        ...baseScope,
+        isAdmin: false,
+        churchIds: ['church-1'],
+        legendaryCities: ['Goiânia', 'Anápolis'],
+      })).toEqual({
+        OR: [
+          { city: { in: ['Goiânia', 'Anápolis'] } },
+          { id: { in: ['church-1'] } },
+        ],
+      });
+    });
+
+    it('fecha o acesso quando não existe cidade nem igreja no escopo', () => {
+      expect(service.buildChurchScopeWhere({
+        ...baseScope,
+        isAdmin: false,
+        churchIds: [],
+        legendaryCities: [],
+      })).toEqual({ id: { in: [] } });
+    });
+  });
+
   it('legendário só com escopo de equipe não vê legendários (equipe vale em Equipes/Organograma)', () => {
     const where = service.buildLegendaryWhere({
       isAdmin: false,

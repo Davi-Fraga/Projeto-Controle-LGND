@@ -80,6 +80,5 @@ export type TopFamilyMemberPayload = {
   topParticipantId?: string;
   status?: string;
   notes?: string;
-  sourceNotes?: string;
   needsReview?: boolean;
 };

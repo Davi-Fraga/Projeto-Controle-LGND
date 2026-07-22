@@ -3,7 +3,7 @@
 import { FormEvent, ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { cleanPhone, LegendaryStatus, maskPhoneInput } from '@central-da-manada/shared';
-import { getTopOptions, getTopFamilyOptions, getTeamsOptionsList } from '@/features/tops/api';
+import { getTopOptions, getTopFamilyOptions } from '@/features/tops/api';
 import type { OptionItem } from '@/features/tops/types';
 import {
   createChurch,
@@ -35,11 +35,6 @@ const emptyPayload: LegendarioPayload = {
   firstTopFamilyId: '',
   firstTopExternalText: '',
   firstTopNotes: '',
-  alreadyServedAsService: false,
-  serviceTopEventId: '',
-  serviceTeamId: '',
-  serviceRole: '',
-  serviceNotes: '',
 };
 
 const ADD_CHURCH_VALUE = '__add_church__';
@@ -72,11 +67,6 @@ export function LegendarioForm({ legendario }: Props) {
           firstTopFamilyId: legendario.firstTopFamilyId ?? '',
           firstTopExternalText: legendario.firstTopExternalText ?? '',
           firstTopNotes: legendario.firstTopNotes ?? '',
-          alreadyServedAsService: (legendario.topServants && legendario.topServants.length > 0) ?? false,
-          serviceTopEventId: legendario.topServants?.[0]?.topEventId ?? '',
-          serviceTeamId: legendario.topServants?.[0]?.teamId ?? '',
-          serviceRole: legendario.topServants?.[0]?.role ?? '',
-          serviceNotes: legendario.topServants?.[0]?.notes ?? '',
         }
       : emptyPayload,
   );
@@ -84,7 +74,6 @@ export function LegendarioForm({ legendario }: Props) {
   const [professions, setProfessions] = useState<Profession[]>([]);
   const [expertises, setExpertises] = useState<Expertise[]>([]);
   const [topOptions, setTopOptions] = useState<OptionItem[]>([]);
-  const [teamOptions, setTeamOptions] = useState<OptionItem[]>([]);
   const [firstTopFamilyOptions, setFirstTopFamilyOptions] = useState<OptionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -92,13 +81,12 @@ export function LegendarioForm({ legendario }: Props) {
   const [churchForm, setChurchForm] = useState({ name: '', city: '', notes: '' });
 
   useEffect(() => {
-    Promise.all([getChurches(), getProfessions(), getExpertises(), getTopOptions(), getTeamsOptionsList()])
-      .then(([churchResponse, professionResponse, expertiseResponse, topResponse, teamResponse]) => {
+    Promise.all([getChurches(), getProfessions(), getExpertises(), getTopOptions()])
+      .then(([churchResponse, professionResponse, expertiseResponse, topResponse]) => {
         setChurches(churchResponse.data);
         setProfessions(professionResponse.data);
         setExpertises(expertiseResponse.data);
         setTopOptions(topResponse.data);
-        setTeamOptions(teamResponse.data);
       })
       .catch(() => setError('Não foi possível carregar os cadastros auxiliares.'));
   }, []);
@@ -169,23 +157,10 @@ export function LegendarioForm({ legendario }: Props) {
           return;
         }
         if (!payload.firstTopFamilyId) {
-          setError('Família no primeiro TOP é obrigatória.');
+          setError('Família é obrigatória.');
           setLoading(false);
           return;
         }
-      }
-    }
-
-    if (payload.alreadyServedAsService) {
-      if (!payload.serviceTopEventId) {
-        setError('TOP em que serviu é obrigatório.');
-        setLoading(false);
-        return;
-      }
-      if (!payload.serviceTeamId) {
-        setError('Equipe em que serviu é obrigatória.');
-        setLoading(false);
-        return;
       }
     }
 
@@ -205,11 +180,6 @@ export function LegendarioForm({ legendario }: Props) {
         firstTopFamilyId: !payload.firstTopIsExternal && payload.firstTopFamilyId ? payload.firstTopFamilyId : undefined,
         firstTopExternalText: payload.firstTopIsExternal && payload.firstTopExternalText ? payload.firstTopExternalText : undefined,
         firstTopNotes: payload.firstTopNotes || undefined,
-        alreadyServedAsService: payload.alreadyServedAsService,
-        serviceTopEventId: payload.alreadyServedAsService && payload.serviceTopEventId ? payload.serviceTopEventId : undefined,
-        serviceTeamId: payload.alreadyServedAsService && payload.serviceTeamId ? payload.serviceTeamId : undefined,
-        serviceRole: payload.alreadyServedAsService && payload.serviceRole ? payload.serviceRole : undefined,
-        serviceNotes: payload.alreadyServedAsService && payload.serviceNotes ? payload.serviceNotes : undefined,
       };
 
       const response = legendario
@@ -380,7 +350,7 @@ export function LegendarioForm({ legendario }: Props) {
               </select>
             </Field>
 
-            <Field label="Família no primeiro TOP">
+            <Field label="Família">
               <select
                 className="input"
                 value={payload.firstTopFamilyId}
@@ -415,78 +385,11 @@ export function LegendarioForm({ legendario }: Props) {
         )}
       </section>
 
-      {/* Serviço / Service Section */}
-      <section className="rounded-xl border border-zinc-800 bg-[#111113] p-5 space-y-4 shadow-lg">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Serviço em TOP</h2>
-
-        <Checkbox
-          label="Já serviu em algum TOP?"
-          checked={payload.alreadyServedAsService}
-          onChange={(checked) => {
-            updateField('alreadyServedAsService', checked);
-            if (!checked) {
-              updateField('serviceTopEventId', '');
-              updateField('serviceTeamId', '');
-              updateField('serviceRole', '');
-              updateField('serviceNotes', '');
-            }
-          }}
-        />
-
-        {payload.alreadyServedAsService && (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 animate-in fade-in duration-200">
-            <Field label="TOP em que serviu">
-              <select
-                className="input"
-                value={payload.serviceTopEventId}
-                onChange={(event) => updateField('serviceTopEventId', event.target.value)}
-                required
-              >
-                <option value="">Selecione o TOP</option>
-                {topOptions.map((top) => (
-                  <option key={top.id} value={top.id}>
-                    {top.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Equipe em que serviu">
-              <select
-                className="input"
-                value={payload.serviceTeamId}
-                onChange={(event) => updateField('serviceTeamId', event.target.value)}
-                required
-              >
-                <option value="">Selecione a equipe</option>
-                {teamOptions.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Função (Opcional)">
-              <input
-                className="input"
-                placeholder="Ex.: Cozinheiro, Apoio..."
-                value={payload.serviceRole}
-                onChange={(event) => updateField('serviceRole', event.target.value)}
-              />
-            </Field>
-
-            <Field label="Observações (Opcional)">
-              <input
-                className="input"
-                placeholder="Observações..."
-                value={payload.serviceNotes}
-                onChange={(event) => updateField('serviceNotes', event.target.value)}
-              />
-            </Field>
-          </div>
-        )}
-      </section>
+      {/*
+        Serviço em TOP não é mais editado no cadastro: o histórico é 1:N (TopServant) e
+        passou a ser gerido no perfil do Legendário via endpoints canônicos de servos
+        (POST/PATCH/cancel /tops/:topId/servants). Ver LegendarioServiceSection.
+      */}
 
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/10 p-5">
         <h2 className="mb-4 text-xs font-bold uppercase tracking-widest text-zinc-400">Expertises</h2>

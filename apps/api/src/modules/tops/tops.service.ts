@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { LegendaryHistoryType, TopEventStatus, TopFamilyMemberStatus, TopParticipantStatus, TopServantStatus, teamDisplayName } from '@central-da-manada/shared';
+import { LegendaryHistoryType, TopEventStatus, TopFamilyMemberStatus, TopParticipantStatus, TopServantStatus, normalizeName, teamDisplayName } from '@central-da-manada/shared';
 import type { OrgChartNode, OrgChartView } from '@central-da-manada/shared';
 import { annotateCounts, normalizeCityKey, orgNode } from '../../common/org-chart/org-chart.util';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
@@ -13,6 +13,7 @@ import { CreateTopDto, TopQueryDto } from './dto/top-query.dto';
 import { UpdateTopDto } from './dto/update-top.dto';
 import { CreateTopTeamDto, UpdateTopTeamDto } from './dto/top-team.dto';
 import { CreateTopParticipantDto, TopParticipantsQueryDto, UpdateTopParticipantDto } from './dto/top-participant.dto';
+import { ParticipantOptionsQueryDto } from './dto/participant-options-query.dto';
 import { CreateTopServantDto, TopServantsQueryDto, UpdateTopServantDto } from './dto/top-servant.dto';
 import { CreateTopFamilyDto, CreateTopFamilyMemberDto, TransferTopFamilyMemberDto, UpdateTopFamilyDto, UpdateTopFamilyMemberDto } from './dto/top-family.dto';
 
@@ -330,14 +331,22 @@ export class TopsService {
     }));
   }
 
-  async participantOptions(topEventId: string, query: OptionsQueryDto) {
+  async participantOptions(topEventId: string, query: ParticipantOptionsQueryDto) {
     await this.findExistingTop(topEventId);
     const where: any = {
       topEventId,
       deletedAt: null,
       status: { not: TopParticipantStatus.CANCELLED },
     };
-    if (query.search) where.legendary = { fullName: { contains: query.search, mode: 'insensitive' } };
+    // Busca normalizada (acento/caixa insensível) sobre o `searchText` do Legendário,
+    // igual à busca canônica de Legendários. Só adiciona clause quando o termo normalizado
+    // não é vazio — evita `contains: ''`, que casaria todos os participantes.
+    const term = normalizeName(query.search ?? '');
+    if (term) where.legendary = { searchText: { contains: term } };
+    // Contexto de inclusão em Família: omite quem já pertence a uma Família ativa do mesmo TOP.
+    if (query.availableForFamily) {
+      where.familyMemberships = { none: { status: TopFamilyMemberStatus.ACTIVE, deletedAt: null } };
+    }
     const items = await this.prisma.topParticipant.findMany({
       where,
       include: { legendary: { select: { id: true, fullName: true, lgndNumber: true, city: true } } },

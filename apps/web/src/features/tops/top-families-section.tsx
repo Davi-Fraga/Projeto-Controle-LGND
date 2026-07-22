@@ -1,11 +1,12 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { addTopFamilyMember, createTopFamily, deactivateTopFamily, deactivateTopFamilyMember, getTopFamilies, getTopFamilyMembers, getTopParticipantOptions, transferTopFamilyMember, updateTopFamily } from './api';
-import type { OptionItem, TopFamily, TopFamilyMember, TopFamilyPayload } from './types';
+import { FormEvent, useEffect, useState } from 'react';
+import { addTopFamilyMember, createTopFamily, deactivateTopFamily, deactivateTopFamilyMember, getTopFamilies, getTopFamilyMembers, transferTopFamilyMember, updateTopFamily } from './api';
+import type { TopFamily, TopFamilyMember, TopFamilyPayload } from './types';
 import { Edit2, ShieldAlert, Heart } from 'lucide-react';
 import { ActionMenu } from '@/components/ui/ActionMenu';
 import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
+import { ParticipantCombobox } from './participant-combobox';
 import { ApiError } from '@/lib/api';
 
 type FamilyForm = { name: string; representativeLegendaryId: string; representativeRole: string; deputyRepresentativeLegendaryId: string; deputyRepresentativeRole: string; notes: string; needsReview: boolean };
@@ -36,25 +37,18 @@ export function buildFamilyPayload(form: FamilyForm, editing: boolean): TopFamil
 export function TopFamiliesSection({ topId, permissions }: { topId: string; permissions: FamilyPermissions }) {
   const [families, setFamilies] = useState<TopFamily[]>([]);
   const [membersByFamily, setMembersByFamily] = useState<Record<string, TopFamilyMember[]>>({});
-  const [participants, setParticipants] = useState<OptionItem[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [form, setForm] = useState<FamilyForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedFamilyId, setSelectedFamilyId] = useState('');
   const [selectedParticipantId, setSelectedParticipantId] = useState('');
+  const [selectedParticipantLabel, setSelectedParticipantLabel] = useState('');
   const [memberNotes, setMemberNotes] = useState('');
-  const [memberSourceNotes, setMemberSourceNotes] = useState('');
   const [memberNeedsReview, setMemberNeedsReview] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const activeMembers = useMemo(() => new Set(Object.values(membersByFamily).flat().map((member) => member.topParticipantId)), [membersByFamily]);
-  const availableParticipants = participants.filter((participant) => !activeMembers.has(participant.id));
-
   useEffect(() => {
     refresh();
-    getTopParticipantOptions(topId, { limit: 100 })
-      .then((response) => setParticipants(response.data))
-      .catch(() => setLoadError('Não foi possível carregar participantes para famílias.'));
   }, [topId]);
 
   async function refresh() {
@@ -97,12 +91,24 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
     if (!selectedFamilyId || !selectedParticipantId) return;
     setBusy(true);
     try {
-      await addTopFamilyMember(topId, selectedFamilyId, { topParticipantId: selectedParticipantId, notes: memberNotes || undefined, sourceNotes: memberSourceNotes || undefined, needsReview: memberNeedsReview });
+      setLoadError(null);
+      await addTopFamilyMember(topId, selectedFamilyId, { topParticipantId: selectedParticipantId, notes: memberNotes.trim() || undefined, needsReview: memberNeedsReview });
+      // Limpa a seleção somente após sucesso e recarrega para refletir o novo vínculo.
       setSelectedParticipantId('');
+      setSelectedParticipantLabel('');
       setMemberNotes('');
-      setMemberSourceNotes('');
       setMemberNeedsReview(false);
       await refresh();
+    } catch (error) {
+      // Conflito/validação (participante perdeu elegibilidade ou já está em Família ativa):
+      // preserva a seleção e mostra erro acionável em vez de transformar em lista vazia.
+      if (error instanceof ApiError && (error.status === 400 || error.status === 409)) {
+        setLoadError('Não foi possível adicionar: o participante pode já estar em uma família ativa ou não estar mais elegível. Busque novamente.');
+      } else if (error instanceof ApiError && error.status === 403) {
+        setLoadError('Você não tem permissão para adicionar membros neste TOP.');
+      } else {
+        setLoadError('Não foi possível adicionar o membro. Tente novamente.');
+      }
     } finally {
       setBusy(false);
     }
@@ -195,7 +201,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
 
       {/* Form: Add Participant to Family */}
       {permissions.addMember ? (
-      <form onSubmit={addMember} className="grid gap-3 rounded-xl border border-zinc-800 bg-zinc-900/10 p-4 md:grid-cols-5 items-end">
+      <form onSubmit={addMember} className="grid gap-3 rounded-xl border border-zinc-800 bg-zinc-900/10 p-4 md:grid-cols-4 items-end">
         <div className="block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Selecionar Família</span>
           <select className="input text-xs" value={selectedFamilyId} onChange={(event) => setSelectedFamilyId(event.target.value)} required>
@@ -205,18 +211,19 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
         </div>
         <div className="block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Selecionar Participante Disponível</span>
-          <select className="input text-xs" value={selectedParticipantId} onChange={(event) => setSelectedParticipantId(event.target.value)} required>
-            <option value="">Participante</option>
-            {availableParticipants.map((participant) => <option key={participant.id} value={participant.value}>{participant.label}</option>)}
-          </select>
+          <ParticipantCombobox
+            topId={topId}
+            value={selectedParticipantId}
+            selectedLabel={selectedParticipantLabel}
+            onChange={(value, label) => {
+              setSelectedParticipantId(value);
+              setSelectedParticipantLabel(value ? label : '');
+            }}
+          />
         </div>
         <div className="block space-y-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Observações do vínculo</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Observações</span>
           <input className="input text-xs" value={memberNotes} onChange={(event) => setMemberNotes(event.target.value)} placeholder="Função, equipe, igreja..." />
-        </div>
-        <div className="block space-y-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Observação original</span>
-          <input className="input text-xs" value={memberSourceNotes} onChange={(event) => setMemberSourceNotes(event.target.value)} placeholder="Texto do documento antigo" />
         </div>
         <label className="flex h-11 items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/20 px-3 text-xs font-semibold text-zinc-300">
           <input type="checkbox" checked={memberNeedsReview} onChange={(event) => setMemberNeedsReview(event.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-orange-600" />
@@ -256,7 +263,6 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
                     {member.topParticipant?.legendary?.fullName} <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wide">({member.status})</span>
                     {member.needsReview ? <span className="ml-2 rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-300">Revisar</span> : null}
                     {member.notes ? <span className="block text-[11px] text-zinc-500">{member.notes}</span> : null}
-                    {member.sourceNotes ? <span className="block text-[11px] text-orange-300/80">Origem: {member.sourceNotes}</span> : null}
                   </span>
                   <div className="flex gap-2 items-center">
                     {permissions.transferMember ? (

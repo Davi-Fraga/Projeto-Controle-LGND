@@ -102,7 +102,7 @@ export class ReportsService {
       ...legendarios.map((item: any) => ({ tipo: 'Legendário', id: item.id, nome: item.fullName, contexto: item.city ?? '', motivo: 'Marcado para revisar', observacao: item.notes ?? '' })),
       ...tops.map((item: any) => ({ tipo: 'TOP', id: item.id, nome: `${item.name} #${item.number}`, contexto: item.city, motivo: item.familyCoordinatorLegendaryId ? 'Marcado para revisar' : 'Sem coordenador de famílias', observacao: '' })),
       ...families.map((item: any) => ({ tipo: 'Família', id: item.id, nome: item.name, contexto: item.topEvent?.name ?? '', motivo: item.representativeLegendaryId ? 'Marcada para revisar' : 'Sem representante', observacao: item.notes ?? '' })),
-      ...members.map((item: any) => ({ tipo: 'Membro de família', id: item.id, nome: item.topParticipant?.legendary?.fullName ?? '', contexto: item.topFamily?.name ?? '', motivo: 'Marcado para revisar', observacao: item.sourceNotes ?? item.notes ?? '' })),
+      ...members.map((item: any) => ({ tipo: 'Membro de família', id: item.id, nome: item.topParticipant?.legendary?.fullName ?? '', contexto: item.topFamily?.name ?? '', motivo: 'Marcado para revisar', observacao: item.notes ?? '' })),
     ];
   }
 

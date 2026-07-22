@@ -713,6 +713,10 @@ model TopServant {
   @@index([legendaryId])
   @@index([teamId])
   @@index([status])
+  // Leitura do histórico de serviço por Legendário/status/data. O índice ÚNICO PARCIAL
+  // de serviço ativo por (topEventId, legendaryId) NÃO é expressável aqui (Prisma não
+  // suporta índice parcial) — vive na migration 20260722120000 (SQL puro).
+  @@index([legendaryId, status, deletedAt, createdAt])
 }
 
 model TopTeam {

@@ -41,7 +41,11 @@ branch de integração). Confirme que o merge foi feito **antes** de fazer deplo
 > Se o `git pull` não trouxer nada novo, a feature não está no `main` ainda.
 
 ### 2. Backup do banco (o `deploy.sh` NÃO faz isto)
-Produção tem dados reais. Antes de qualquer migration:
+Produção tem dados reais. **Você não roda migration na mão** — o `deploy.sh` chama
+`prisma migrate deploy` e aplica as pendentes **automaticamente**. As migrations do projeto
+são **aditivas** (coluna nulável, tabela nova, ou backfill dentro da própria migration):
+sem perda de dado e sem downtime. Ou seja, "mexeu no schema" **não** exige ação manual sua —
+só o **backup abaixo** é manual. Antes de qualquer migration:
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml exec postgres \
   pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > "backup_$(date +%F_%H%M).sql"
@@ -68,6 +72,16 @@ docker compose --env-file .env.production -f docker-compose.prod.yml ps
 ```
 E o **smoke test** da feature no navegador (ex.: a tela alterada). Faça **Ctrl+Shift+R**
 (hard refresh) para descartar o JS antigo em cache.
+
+### 5. Marcar o deploy (para saber depois o que está no ar)
+Não há CI nem branch de produção, então **o git não registra qual commit está em produção** —
+a menos que você marque. Depois do deploy verde, na VPS:
+```bash
+git tag -a "deploy-$(date +%F)" -m "deploy: <features do dia>"
+git push origin --tags
+```
+Assim "o que está no ar" vira `git describe --tags`, e o próximo deploy sabe de onde partiu
+(sem precisar reconstruir isso pelo histórico de merges).
 
 ---
 
@@ -108,3 +122,4 @@ E o **smoke test** da feature no navegador (ex.: a tela alterada). Faça **Ctrl+
 - [ ] `prisma migrate status` = "up to date"
 - [ ] `docker compose ... ps` (containers Running/Healthy)
 - [ ] Smoke test no navegador (hard refresh)
+- [ ] Tag do deploy (`git tag -a deploy-AAAA-MM-DD -m "..." && git push origin --tags`)

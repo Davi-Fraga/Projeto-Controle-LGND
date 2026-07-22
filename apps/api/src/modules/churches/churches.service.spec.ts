@@ -6,6 +6,7 @@ describe('ChurchesService geocoding integration', () => {
   let audit: any;
   let accessPolicy: any;
   let geocoding: { geocode: jest.Mock };
+  const actor = { sub: 'actor', roles: [], permissions: [] } as any;
 
   beforeEach(() => {
     prisma = {
@@ -16,10 +17,10 @@ describe('ChurchesService geocoding integration', () => {
         update: jest.fn().mockImplementation(({ data }: any) => Promise.resolve({ id: 'church-1', ...data })),
       },
       user: { findFirst: jest.fn() },
-      legendary: { count: jest.fn() },
+      legendary: { count: jest.fn(), findFirst: jest.fn() },
     };
     audit = { create: jest.fn() };
-    accessPolicy = { resolveScope: jest.fn(), buildChurchWhere: jest.fn() };
+    accessPolicy = { resolveScope: jest.fn(), buildChurchWhere: jest.fn(), buildLegendaryWhere: jest.fn() };
     geocoding = { geocode: jest.fn() };
     service = new ChurchesService(prisma, audit, accessPolicy, geocoding as any);
   });
@@ -28,7 +29,7 @@ describe('ChurchesService geocoding integration', () => {
     it('normaliza o telefone do líder antes de persistir', async () => {
       geocoding.geocode.mockResolvedValueOnce(null);
 
-      await service.create({ name: 'Igreja Central', spiritualLeaderPhone: '5564992485187' } as any, 'actor');
+      await service.create({ name: 'Igreja Central', spiritualLeaderPhone: '5564992485187' } as any, actor);
 
       expect(prisma.church.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ spiritualLeaderPhone: '(64) 99248-5187' }) }),
@@ -38,7 +39,7 @@ describe('ChurchesService geocoding integration', () => {
     it('geocodifica quando não recebe coordenadas', async () => {
       geocoding.geocode.mockResolvedValueOnce({ lat: -16.68, lng: -49.26, displayName: 'Goiânia' });
 
-      await service.create({ name: 'Igreja Central', city: 'Goiânia' } as any, 'actor');
+      await service.create({ name: 'Igreja Central', city: 'Goiânia' } as any, actor);
 
       expect(geocoding.geocode).toHaveBeenCalledWith('Igreja Central', 'Goiânia', null);
       expect(prisma.church.create).toHaveBeenCalledWith(
@@ -49,7 +50,7 @@ describe('ChurchesService geocoding integration', () => {
     it('usa endereço como locationHint no geocoding e o persiste', async () => {
       geocoding.geocode.mockResolvedValueOnce({ lat: -16.7, lng: -49.3, displayName: 'Rua X' });
 
-      await service.create({ name: 'Igreja Central', city: 'Goiânia', address: 'Rua X, 100' } as any, 'actor');
+      await service.create({ name: 'Igreja Central', city: 'Goiânia', address: 'Rua X, 100' } as any, actor);
 
       expect(geocoding.geocode).toHaveBeenCalledWith('Igreja Central', 'Goiânia', 'Rua X, 100');
       expect(prisma.church.create).toHaveBeenCalledWith(
@@ -58,7 +59,7 @@ describe('ChurchesService geocoding integration', () => {
     });
 
     it('preserva coordenadas manuais e não chama o geocoding', async () => {
-      await service.create({ name: 'Igreja Central', city: 'Goiânia', latitude: -1.1, longitude: -2.2 } as any, 'actor');
+      await service.create({ name: 'Igreja Central', city: 'Goiânia', latitude: -1.1, longitude: -2.2 } as any, actor);
 
       expect(geocoding.geocode).not.toHaveBeenCalled();
       expect(prisma.church.create).toHaveBeenCalledWith(
@@ -69,7 +70,7 @@ describe('ChurchesService geocoding integration', () => {
     it('cria sem coordenadas quando o geocoding retorna null', async () => {
       geocoding.geocode.mockResolvedValueOnce(null);
 
-      await service.create({ name: 'Igreja Central', city: 'Lugar Nenhum' } as any, 'actor');
+      await service.create({ name: 'Igreja Central', city: 'Lugar Nenhum' } as any, actor);
 
       expect(prisma.church.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ latitude: null, longitude: null }) }),
@@ -81,14 +82,14 @@ describe('ChurchesService geocoding integration', () => {
     it('normaliza o telefone do líder na edição e preserva null explícito', async () => {
       prisma.church.findFirst.mockResolvedValueOnce({ id: 'church-1', name: 'Igreja', city: 'Goiânia', address: null, spiritualLeaderUserId: null });
 
-      await service.update('church-1', { spiritualLeaderPhone: '+55 64 99988-7766' } as any, 'actor');
+      await service.update('church-1', { spiritualLeaderPhone: '+55 64 99988-7766' } as any, actor);
 
       expect(prisma.church.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ spiritualLeaderPhone: '(64) 99988-7766' }) }),
       );
 
       prisma.church.findFirst.mockResolvedValueOnce({ id: 'church-1', name: 'Igreja', city: 'Goiânia', address: null, spiritualLeaderUserId: null });
-      await service.update('church-1', { spiritualLeaderPhone: null } as any, 'actor');
+      await service.update('church-1', { spiritualLeaderPhone: null } as any, actor);
       expect(prisma.church.update).toHaveBeenLastCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ spiritualLeaderPhone: null }) }),
       );
@@ -99,7 +100,7 @@ describe('ChurchesService geocoding integration', () => {
     it('persiste normalizedName sem acento, minúsculo e com espaços colapsados ao criar', async () => {
       geocoding.geocode.mockResolvedValueOnce(null);
 
-      await service.create({ name: '  São   José ' } as any, 'actor');
+      await service.create({ name: '  São   José ' } as any, actor);
 
       expect(prisma.church.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ name: 'São   José', normalizedName: 'sao jose' }) }),
@@ -110,7 +111,7 @@ describe('ChurchesService geocoding integration', () => {
       prisma.church.findFirst.mockResolvedValueOnce({ id: 'church-1', name: 'Antiga', city: 'Goiânia', spiritualLeaderUserId: null });
       geocoding.geocode.mockResolvedValueOnce(null);
 
-      await service.update('church-1', { name: 'Ígreja Nôva' } as any, 'actor');
+      await service.update('church-1', { name: 'Ígreja Nôva' } as any, actor);
 
       expect(prisma.church.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ name: 'Ígreja Nôva', normalizedName: 'igreja nova' }) }),
@@ -120,7 +121,7 @@ describe('ChurchesService geocoding integration', () => {
     it('não altera normalizedName quando o nome não é enviado na edição', async () => {
       prisma.church.findFirst.mockResolvedValueOnce({ id: 'church-1', name: 'Antiga', city: 'Goiânia', spiritualLeaderUserId: null });
 
-      await service.update('church-1', { notes: 'nota' } as any, 'actor');
+      await service.update('church-1', { notes: 'nota' } as any, actor);
 
       expect(prisma.church.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ normalizedName: undefined }) }),
@@ -190,6 +191,7 @@ describe('ChurchesService geocoding integration', () => {
             { normalizedName: { contains: 'amilton' } },
             { aliases: { some: { normalizedAlias: { contains: 'amilton' } } } },
             { spiritualLeader: { name: { contains: 'Amilton', mode: 'insensitive' } } },
+            { spiritualLeaderLegendary: { fullName: { contains: 'Amilton', mode: 'insensitive' }, deletedAt: null } },
             { spiritualLeaderName: { contains: 'Amilton', mode: 'insensitive' } },
           ],
         },
@@ -213,7 +215,7 @@ describe('ChurchesService geocoding integration', () => {
       prisma.church.findFirst.mockResolvedValueOnce(before);
       geocoding.geocode.mockResolvedValueOnce({ lat: -16.68, lng: -49.26, displayName: 'Anápolis' });
 
-      await service.update('church-1', { city: 'Anápolis' } as any, 'actor');
+      await service.update('church-1', { city: 'Anápolis' } as any, actor);
 
       expect(geocoding.geocode).toHaveBeenCalledWith('Antiga', 'Anápolis', null);
       expect(prisma.church.update).toHaveBeenCalledWith(
@@ -225,7 +227,7 @@ describe('ChurchesService geocoding integration', () => {
       prisma.church.findFirst.mockResolvedValueOnce(before);
       geocoding.geocode.mockResolvedValueOnce({ lat: -16.7, lng: -49.3, displayName: 'Rua Y' });
 
-      await service.update('church-1', { address: 'Rua Y, 200' } as any, 'actor');
+      await service.update('church-1', { address: 'Rua Y, 200' } as any, actor);
 
       expect(geocoding.geocode).toHaveBeenCalledWith('Antiga', 'Goiânia', 'Rua Y, 200');
       expect(prisma.church.update).toHaveBeenCalledWith(
@@ -236,7 +238,7 @@ describe('ChurchesService geocoding integration', () => {
     it('não geocodifica quando nome e cidade permanecem iguais', async () => {
       prisma.church.findFirst.mockResolvedValueOnce(before);
 
-      await service.update('church-1', { notes: 'só uma nota' } as any, 'actor');
+      await service.update('church-1', { notes: 'só uma nota' } as any, actor);
 
       expect(geocoding.geocode).not.toHaveBeenCalled();
     });
@@ -244,7 +246,7 @@ describe('ChurchesService geocoding integration', () => {
     it('preserva coordenadas manuais mesmo mudando nome ou cidade', async () => {
       prisma.church.findFirst.mockResolvedValueOnce(before);
 
-      await service.update('church-1', { city: 'Anápolis', latitude: -5.5, longitude: -6.6 } as any, 'actor');
+      await service.update('church-1', { city: 'Anápolis', latitude: -5.5, longitude: -6.6 } as any, actor);
 
       expect(geocoding.geocode).not.toHaveBeenCalled();
       expect(prisma.church.update).toHaveBeenCalledWith(
@@ -260,6 +262,123 @@ describe('ChurchesService geocoding integration', () => {
       await service.geocode('Igreja', 'Goiânia', 'Setor Bueno');
 
       expect(geocoding.geocode).toHaveBeenCalledWith('Igreja', 'Goiânia', 'Setor Bueno');
+    });
+  });
+
+  describe('spiritualLeaderLegendary', () => {
+    const legendaryId = '11111111-1111-4111-8111-111111111111';
+
+    it('valida e persiste o vínculo ao criar sem apagar o nome livre', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true });
+      prisma.legendary.findFirst.mockResolvedValueOnce({ id: legendaryId });
+      geocoding.geocode.mockResolvedValueOnce(null);
+
+      await service.create({
+        name: 'Igreja Central',
+        spiritualLeaderName: 'Pastor legado',
+        spiritualLeaderLegendaryId: legendaryId,
+      } as any, actor);
+
+      expect(prisma.legendary.findFirst).toHaveBeenCalledWith({
+        where: { id: legendaryId, deletedAt: null },
+        select: { id: true },
+      });
+      expect(prisma.church.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          spiritualLeaderName: 'Pastor legado',
+          spiritualLeaderLegendaryId: legendaryId,
+        }),
+      }));
+    });
+
+    it('recusa vínculo inexistente ou excluído', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true });
+      prisma.legendary.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.create({ name: 'Igreja', spiritualLeaderLegendaryId: legendaryId } as any, actor))
+        .rejects.toThrow('not found or unavailable');
+      expect(prisma.church.create).not.toHaveBeenCalled();
+    });
+
+    it('recusa vínculo fora do escopo mesmo em chamada direta à API/service', async () => {
+      const scopeFilter = { churchId: { in: ['church-allowed'] } };
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false });
+      accessPolicy.buildLegendaryWhere.mockReturnValueOnce(scopeFilter);
+      prisma.legendary.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.create({ name: 'Igreja', spiritualLeaderLegendaryId: legendaryId } as any, actor))
+        .rejects.toThrow('not found or unavailable');
+      expect(prisma.legendary.findFirst).toHaveBeenCalledWith({
+        where: { id: legendaryId, deletedAt: null, AND: [scopeFilter] },
+        select: { id: true },
+      });
+    });
+
+    it('troca o vínculo, preserva o texto livre e registra auditoria antes/depois', async () => {
+      const before = {
+        id: 'church-1', name: 'Igreja', city: null, address: null,
+        spiritualLeaderName: 'Nome livre', spiritualLeaderUserId: null,
+        spiritualLeaderLegendaryId: '22222222-2222-4222-8222-222222222222',
+      };
+      prisma.church.findFirst.mockResolvedValueOnce(before);
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true });
+      prisma.legendary.findFirst.mockResolvedValueOnce({ id: legendaryId });
+
+      await service.update('church-1', { spiritualLeaderLegendaryId: legendaryId } as any, actor);
+
+      expect(prisma.church.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          spiritualLeaderName: undefined,
+          spiritualLeaderLegendaryId: legendaryId,
+        }),
+      }));
+      expect(audit.create).toHaveBeenCalledWith({
+        actorUserId: actor.sub,
+        entityType: 'Church',
+        entityId: 'church-1',
+        action: 'update_spiritual_leader_legendary',
+        before: { spiritualLeaderLegendaryId: before.spiritualLeaderLegendaryId },
+        after: { spiritualLeaderLegendaryId: legendaryId },
+      });
+    });
+
+    it('aceita null para desvincular sem validar outro Legendário', async () => {
+      prisma.church.findFirst.mockResolvedValueOnce({
+        id: 'church-1', name: 'Igreja', city: null, address: null,
+        spiritualLeaderUserId: null, spiritualLeaderLegendaryId: legendaryId,
+      });
+
+      await service.update('church-1', { spiritualLeaderLegendaryId: null } as any, actor);
+
+      expect(prisma.legendary.findFirst).not.toHaveBeenCalled();
+      expect(prisma.church.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ spiritualLeaderLegendaryId: null }),
+      }));
+    });
+
+    it('deriva o nome efetivo do vínculo e retorna ao texto livre se o vínculo estiver excluído', async () => {
+      accessPolicy.resolveScope.mockResolvedValue({ isAdmin: true });
+      prisma.church.findMany.mockResolvedValueOnce([
+        {
+          id: 'c1', spiritualLeaderName: 'Nome livre',
+          spiritualLeaderLegendary: { id: legendaryId, fullName: 'Nome cadastrado', deletedAt: null },
+        },
+        {
+          id: 'c2', spiritualLeaderName: 'Nome alternativo',
+          spiritualLeaderLegendary: { id: legendaryId, fullName: 'Excluído', deletedAt: new Date() },
+        },
+      ]);
+
+      const result = await service.spiritualLeadersView(actor);
+
+      expect(result[0]).toEqual(expect.objectContaining({
+        spiritualLeaderEffectiveName: 'Nome cadastrado',
+        spiritualLeaderLegendary: { id: legendaryId, fullName: 'Nome cadastrado' },
+      }));
+      expect(result[1]).toEqual(expect.objectContaining({
+        spiritualLeaderEffectiveName: 'Nome alternativo',
+        spiritualLeaderLegendary: null,
+      }));
     });
   });
 

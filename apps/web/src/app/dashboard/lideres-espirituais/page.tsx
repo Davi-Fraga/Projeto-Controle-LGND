@@ -22,7 +22,7 @@ export default function LideresEspirituaisPage() {
 
   // Resumos recalculados a partir do conjunto filtrado atual (não de totais globais).
   const totalMembers = churches.reduce((sum, c) => sum + c._count.legendarios, 0);
-  const withLeader = churches.filter((c) => c.spiritualLeaderUserId || c.spiritualLeaderName).length;
+  const withLeader = churches.filter((c) => c.spiritualLeaderEffectiveName || c.spiritualLeaderName).length;
 
   if (authLoading || initialLoading) {
     return (
@@ -116,16 +116,30 @@ export default function LideresEspirituaisPage() {
               <div className="mt-4 space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Líder Espiritual</p>
 
-                {church.spiritualLeader ? (
-                  <>
-                    <InfoRow icon={<User className="h-3.5 w-3.5" />} value={church.spiritualLeader.name} />
-                    <InfoRow icon={<Mail className="h-3.5 w-3.5" />} value={church.spiritualLeader.email} />
-                  </>
-                ) : church.spiritualLeaderName ? (
-                  <InfoRow icon={<User className="h-3.5 w-3.5" />} value={church.spiritualLeaderName} />
+                {church.spiritualLeaderLegendary ? (
+                  <Link
+                    href={`/dashboard/legendarios/${church.spiritualLeaderLegendary.id}`}
+                    className="flex items-center gap-2 text-sm font-semibold text-orange-400 transition-colors hover:text-orange-300"
+                  >
+                    <User className="h-3.5 w-3.5" />
+                    <span className="truncate">{church.spiritualLeaderLegendary.fullName}</span>
+                  </Link>
+                ) : church.spiritualLeaderEffectiveName || church.spiritualLeaderName ? (
+                  <InfoRow
+                    icon={<User className="h-3.5 w-3.5" />}
+                    value={church.spiritualLeaderEffectiveName || church.spiritualLeaderName || ''}
+                  />
                 ) : (
                   <p className="text-sm italic text-zinc-600">Líder espiritual não cadastrado</p>
                 )}
+
+                {church.spiritualLeader ? (
+                  <>
+                    <p className="pt-1 text-[10px] font-bold uppercase tracking-widest text-zinc-600">Acesso do sistema</p>
+                    <InfoRow icon={<ShieldCheck className="h-3.5 w-3.5" />} value={church.spiritualLeader.name} />
+                    <InfoRow icon={<Mail className="h-3.5 w-3.5" />} value={church.spiritualLeader.email} />
+                  </>
+                ) : null}
 
                 {church.spiritualLeaderPhone && (
                   <InfoRow icon={<Phone className="h-3.5 w-3.5" />} value={formatPhone(church.spiritualLeaderPhone)} />

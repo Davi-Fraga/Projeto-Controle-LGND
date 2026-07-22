@@ -28,6 +28,10 @@ export class CreateChurchDto {
   spiritualLeaderUserId?: string;
 
   @IsOptional()
+  @IsUUID()
+  spiritualLeaderLegendaryId?: string | null;
+
+  @IsOptional()
   @IsNumber()
   @IsLatitude()
   latitude?: number;

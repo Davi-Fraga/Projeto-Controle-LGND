@@ -42,14 +42,14 @@ export class ChurchesController {
 
   @Post()
   @Permissions('churches.create')
-  async create(@Body() dto: CreateChurchDto, @CurrentUser() user: { sub: string }) {
-    return { data: await this.churchesService.create(dto, user.sub) };
+  async create(@Body() dto: CreateChurchDto, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.churchesService.create(dto, user) };
   }
 
   @Patch(':id')
   @Permissions('churches.update')
-  async update(@Param('id') id: string, @Body() dto: UpdateChurchDto, @CurrentUser() user: { sub: string }) {
-    return { data: await this.churchesService.update(id, dto, user.sub) };
+  async update(@Param('id') id: string, @Body() dto: UpdateChurchDto, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.churchesService.update(id, dto, user) };
   }
 
   @Delete(':id')

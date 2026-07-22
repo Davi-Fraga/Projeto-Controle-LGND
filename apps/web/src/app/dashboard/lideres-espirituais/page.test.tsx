@@ -99,4 +99,28 @@ describe('LideresEspirituaisPage', () => {
 
     expect(await screen.findByText('(64) 99248-5187')).toBeInTheDocument();
   });
+
+  it('prioriza o Legendário vinculado e oferece navegação para seu perfil', async () => {
+    mocks.getChurches.mockResolvedValueOnce([
+      {
+        id: 'church-1',
+        name: 'Igreja Central',
+        city: 'Goiânia',
+        spiritualLeaderName: 'Nome livre preservado',
+        spiritualLeaderEffectiveName: 'Legendário Atualizado',
+        spiritualLeaderLegendaryId: 'legendary-1',
+        spiritualLeaderLegendary: { id: 'legendary-1', fullName: 'Legendário Atualizado' },
+        spiritualLeaderPhone: null,
+        spiritualLeaderUserId: null,
+        spiritualLeader: null,
+        _count: { legendarios: 1 },
+      },
+    ]);
+
+    render(<LideresEspirituaisPage />);
+
+    const leaderLink = await screen.findByRole('link', { name: 'Legendário Atualizado' });
+    expect(leaderLink).toHaveAttribute('href', '/dashboard/legendarios/legendary-1');
+    expect(screen.queryByText('Nome livre preservado')).not.toBeInTheDocument();
+  });
 });

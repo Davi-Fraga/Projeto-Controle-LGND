@@ -360,6 +360,7 @@ model Legendary {
   messageRecipients    MessageRecipient[]
   responsibleSocialActions SocialAction[]     @relation("SocialActionResponsible")
   socialActionParticipants SocialActionParticipant[]
+  spiritualLeaderOfChurches Church[]          @relation("ChurchSpiritualLeaderLegendary")
 
   firstTopIsExternal    Boolean              @default(false)
   firstTopEventId       String?              @db.Uuid
@@ -418,6 +419,8 @@ model Church {
   spiritualLeaderPhone String?
   spiritualLeaderUserId String? @db.Uuid
   spiritualLeader User? @relation("ChurchSpiritualLeader", fields: [spiritualLeaderUserId], references: [id])
+  spiritualLeaderLegendaryId String? @db.Uuid
+  spiritualLeaderLegendary Legendary? @relation("ChurchSpiritualLeaderLegendary", fields: [spiritualLeaderLegendaryId], references: [id], onDelete: SetNull)
   latitude    Float?
   longitude   Float?
   notes       String?
@@ -431,6 +434,7 @@ model Church {
   @@index([normalizedName])
   @@index([city])
   @@index([spiritualLeaderUserId])
+  @@index([spiritualLeaderLegendaryId])
 }
 
 /// Apelido (variante de grafia) de uma igreja canônica. A resolução do sync casa

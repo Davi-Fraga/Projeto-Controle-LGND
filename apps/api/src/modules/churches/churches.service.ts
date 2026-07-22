@@ -48,6 +48,9 @@ export class ChurchesService {
     const church = await this.prisma.church.findFirst({
       where: { id, deletedAt: null },
       include: {
+        spiritualLeaderLegendary: {
+          select: { id: true, fullName: true, deletedAt: true },
+        },
         legendarios: {
           where: { deletedAt: null },
           select: { id: true, fullName: true, lgndNumber: true, city: true, phone: true, status: true },
@@ -56,7 +59,7 @@ export class ChurchesService {
       },
     });
     if (!church) throw new NotFoundException('Church not found.');
-    return church;
+    return this.withEffectiveSpiritualLeader(church);
   }
 
   async remove(id: string, actorUserId?: string) {
@@ -91,12 +94,13 @@ export class ChurchesService {
           { normalizedName: { contains: term } },
           { aliases: { some: { normalizedAlias: { contains: term } } } },
           { spiritualLeader: { name: { contains: raw, mode: 'insensitive' } } },
+          { spiritualLeaderLegendary: { fullName: { contains: raw, mode: 'insensitive' }, deletedAt: null } },
           { spiritualLeaderName: { contains: raw, mode: 'insensitive' } },
         ],
       });
     }
 
-    return this.prisma.church.findMany({
+    const churches = await this.prisma.church.findMany({
       where: { AND: and },
       select: {
         id: true,
@@ -106,15 +110,19 @@ export class ChurchesService {
         spiritualLeaderPhone: true,
         spiritualLeaderUserId: true,
         spiritualLeader: { select: { id: true, name: true, email: true } },
+        spiritualLeaderLegendaryId: true,
+        spiritualLeaderLegendary: { select: { id: true, fullName: true, deletedAt: true } },
         latitude: true,
         longitude: true,
         _count: { select: { legendarios: { where: { deletedAt: null } } } },
       },
       orderBy: [{ name: 'asc' }],
     });
+
+    return churches.map((church) => this.withEffectiveSpiritualLeader(church));
   }
 
-  async create(dto: CreateChurchDto, actorUserId?: string) {
+  async create(dto: CreateChurchDto, actor: AuthenticatedUser) {
     const normalized = normalizeName(dto.name);
     const churches = await this.prisma.church.findMany({ where: { deletedAt: null } });
     const existing = churches.find((church: any) => normalizeName(church.name) === normalized);
@@ -122,6 +130,9 @@ export class ChurchesService {
 
     if (dto.spiritualLeaderUserId) {
       await this.validateSpiritualLeaderUser(dto.spiritualLeaderUserId);
+    }
+    if (dto.spiritualLeaderLegendaryId) {
+      await this.validateSpiritualLeaderLegendary(dto.spiritualLeaderLegendaryId, actor);
     }
 
     const locationHint = dto.address?.trim() || null;
@@ -145,21 +156,25 @@ export class ChurchesService {
         spiritualLeaderName: dto.spiritualLeaderName?.trim() || null,
         spiritualLeaderPhone: cleanPhone(dto.spiritualLeaderPhone ?? null),
         spiritualLeaderUserId: dto.spiritualLeaderUserId || null,
+        spiritualLeaderLegendaryId: dto.spiritualLeaderLegendaryId || null,
         latitude,
         longitude,
         notes: dto.notes?.trim() || null,
       },
     });
-    await this.audit.create({ actorUserId, entityType: 'Church', entityId: church.id, action: 'create', after: church });
+    await this.audit.create({ actorUserId: actor.sub, entityType: 'Church', entityId: church.id, action: 'create', after: church });
     return church;
   }
 
-  async update(id: string, dto: UpdateChurchDto, actorUserId?: string) {
+  async update(id: string, dto: UpdateChurchDto, actor: AuthenticatedUser) {
     const before = await this.prisma.church.findFirst({ where: { id, deletedAt: null } });
     if (!before) throw new NotFoundException('Church not found.');
 
     if (dto.spiritualLeaderUserId) {
       await this.validateSpiritualLeaderUser(dto.spiritualLeaderUserId);
+    }
+    if (dto.spiritualLeaderLegendaryId) {
+      await this.validateSpiritualLeaderLegendary(dto.spiritualLeaderLegendaryId, actor);
     }
 
     let latitude = dto.latitude !== undefined ? (dto.latitude ?? null) : undefined;
@@ -196,22 +211,34 @@ export class ChurchesService {
           ? null
           : (dto.spiritualLeaderPhone !== undefined ? cleanPhone(dto.spiritualLeaderPhone) : undefined),
         spiritualLeaderUserId: dto.spiritualLeaderUserId !== undefined ? (dto.spiritualLeaderUserId ?? null) : undefined,
+        spiritualLeaderLegendaryId: dto.spiritualLeaderLegendaryId !== undefined ? (dto.spiritualLeaderLegendaryId ?? null) : undefined,
         latitude,
         longitude,
         notes: dto.notes === null ? null : (dto.notes !== undefined ? dto.notes.trim() : undefined),
       },
     });
 
-    await this.audit.create({ actorUserId, entityType: 'Church', entityId: id, action: 'update', before, after });
+    await this.audit.create({ actorUserId: actor.sub, entityType: 'Church', entityId: id, action: 'update', before, after });
 
     if ('spiritualLeaderUserId' in dto && before.spiritualLeaderUserId !== after.spiritualLeaderUserId) {
       await this.audit.create({
-        actorUserId,
+        actorUserId: actor.sub,
         entityType: 'Church',
         entityId: id,
         action: 'update_spiritual_leader',
         before: { spiritualLeaderUserId: before.spiritualLeaderUserId },
         after: { spiritualLeaderUserId: after.spiritualLeaderUserId },
+      });
+    }
+
+    if ('spiritualLeaderLegendaryId' in dto && before.spiritualLeaderLegendaryId !== after.spiritualLeaderLegendaryId) {
+      await this.audit.create({
+        actorUserId: actor.sub,
+        entityType: 'Church',
+        entityId: id,
+        action: 'update_spiritual_leader_legendary',
+        before: { spiritualLeaderLegendaryId: before.spiritualLeaderLegendaryId },
+        after: { spiritualLeaderLegendaryId: after.spiritualLeaderLegendaryId },
       });
     }
 
@@ -221,5 +248,32 @@ export class ChurchesService {
   private async validateSpiritualLeaderUser(userId: string) {
     const user = await this.prisma.user.findFirst({ where: { id: userId, deletedAt: null, isActive: true } });
     if (!user) throw new BadRequestException('Spiritual leader user not found or inactive.');
+  }
+
+  private async validateSpiritualLeaderLegendary(legendaryId: string, actor: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(actor);
+    const where: any = { id: legendaryId, deletedAt: null };
+    if (!scope.isAdmin) {
+      where.AND = [this.accessPolicy.buildLegendaryWhere(scope)];
+    }
+    const legendary = await this.prisma.legendary.findFirst({ where, select: { id: true } });
+    if (!legendary) {
+      throw new BadRequestException('Spiritual leader legendary not found or unavailable.');
+    }
+  }
+
+  private withEffectiveSpiritualLeader<T extends {
+    spiritualLeaderName: string | null;
+    spiritualLeaderLegendary: { id: string; fullName: string; deletedAt: Date | null } | null;
+  }>(church: T) {
+    const { spiritualLeaderLegendary, ...rest } = church;
+    const linked = spiritualLeaderLegendary && !spiritualLeaderLegendary.deletedAt
+      ? { id: spiritualLeaderLegendary.id, fullName: spiritualLeaderLegendary.fullName }
+      : null;
+    return {
+      ...rest,
+      spiritualLeaderLegendary: linked,
+      spiritualLeaderEffectiveName: linked?.fullName ?? church.spiritualLeaderName,
+    };
   }
 }

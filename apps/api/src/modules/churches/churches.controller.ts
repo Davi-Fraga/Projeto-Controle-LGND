@@ -4,6 +4,7 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChurchesService } from './churches.service';
+import { ChurchQueryDto } from './dto/church-query.dto';
 import { CreateChurchDto } from './dto/create-church.dto';
 import { GeocodeQueryDto } from './dto/geocode-query.dto';
 import { ListChurchesQueryDto } from './dto/list-churches-query.dto';
@@ -26,6 +27,18 @@ export class ChurchesController {
     return { data: await this.churchesService.spiritualLeadersView(user, query.search) };
   }
 
+  @Get('search/cities')
+  @Permissions('churches.read')
+  async searchCities(@CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.churchesService.searchCities(user) };
+  }
+
+  @Get('search')
+  @Permissions('churches.read')
+  async search(@CurrentUser() user: AuthenticatedUser, @Query() query: ChurchQueryDto) {
+    return this.churchesService.search(query, user);
+  }
+
   // Rota estática declarada antes de qualquer rota parametrizada (`:id`).
   @Get('geocode')
   @Permissions('churches.read')
@@ -33,7 +46,7 @@ export class ChurchesController {
     return { data: await this.churchesService.geocode(query.name, query.city, query.address) };
   }
 
-  // Rota parametrizada declarada após as estáticas (spiritual-leaders, geocode).
+  // Rota parametrizada declarada após as estáticas.
   @Get(':id')
   @Permissions('churches.read')
   async findOne(@Param('id') id: string) {

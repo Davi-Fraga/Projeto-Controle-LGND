@@ -13,13 +13,18 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=()' },
 ];
 
+// O output standalone depende de symlinks que o Windows bloqueia sem Modo
+// Desenvolvedor/admin. Builds Linux (CI/Docker) continuam gerando standalone;
+// no Windows, o build padrão ainda compila, valida tipos e gera as páginas.
+const standaloneOutput = process.platform === 'win32' ? undefined : 'standalone';
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@central-da-manada/shared'],
   // Build standalone: gera um servidor mínimo (.next/standalone) com só as deps
   // realmente usadas — imagem Docker enxuta. outputFileTracingRoot aponta para a
   // raiz do monorepo para o tracing de dependências funcionar com pnpm workspaces.
-  output: 'standalone',
+  output: standaloneOutput,
   outputFileTracingRoot: path.join(__dirname, '../../'),
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];

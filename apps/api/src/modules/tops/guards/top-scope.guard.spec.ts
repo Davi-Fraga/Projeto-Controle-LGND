@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TopScopeGuard } from './top-scope.guard';
 import { AccessPolicyService } from '../../../common/access/access-policy.service';
 
@@ -16,7 +16,7 @@ describe('TopScopeGuard (IDOR por TOP)', () => {
     } as unknown as AccessPolicyService;
     const guard = new TopScopeGuard(accessPolicy);
 
-    await expect(guard.canActivate(context({ sub: 'u1' }, { id: 'top-9' }))).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(guard.canActivate(context({ sub: 'u1' }, { id: 'top-9' }))).rejects.toBeInstanceOf(NotFoundException);
     expect(accessPolicy.assertTopAllowed).toHaveBeenCalledWith(expect.anything(), 'top-9');
   });
 
@@ -28,6 +28,19 @@ describe('TopScopeGuard (IDOR por TOP)', () => {
     const guard = new TopScopeGuard(accessPolicy);
 
     await expect(guard.canActivate(context({ sub: 'u1' }, { id: 'top-1' }))).resolves.toBe(true);
+  });
+
+  it('protege também rotas aninhadas que usam :topEventId', async () => {
+    const accessPolicy = {
+      resolveScope: jest.fn().mockResolvedValue({ isAdmin: false, topIds: ['top-1'] }),
+      assertTopAllowed: jest.fn(),
+    } as unknown as AccessPolicyService;
+    const guard = new TopScopeGuard(accessPolicy);
+
+    await expect(
+      guard.canActivate(context({ sub: 'u1' }, { topEventId: 'top-1', id: 'pre-1' })),
+    ).resolves.toBe(true);
+    expect(accessPolicy.assertTopAllowed).toHaveBeenCalledWith(expect.anything(), 'top-1');
   });
 
   it('ignora rotas sem :id (lista/options) — sem assert', async () => {

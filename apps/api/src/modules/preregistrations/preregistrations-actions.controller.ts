@@ -1,13 +1,14 @@
 import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TopScopeGuard } from '../tops/guards/top-scope.guard';
 import { ApprovePreRegistrationDto, RejectPreRegistrationDto } from './dto/review-preregistration.dto';
 import { PreRegistrationsService } from './preregistrations.service';
 
 @Controller('tops/:topEventId/pre-registrations')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, TopScopeGuard)
 export class PreRegistrationsActionsController {
   constructor(private readonly preRegistrations: PreRegistrationsService) {}
 
@@ -17,9 +18,9 @@ export class PreRegistrationsActionsController {
     @Param('topEventId') topEventId: string,
     @Param('id') id: string,
     @Body() dto: ApprovePreRegistrationDto,
-    @CurrentUser() user: { sub: string },
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return { data: await this.preRegistrations.approve(topEventId, id, dto, user.sub) };
+    return { data: await this.preRegistrations.approve(topEventId, id, dto, user) };
   }
 
   @Post(':id/reject')
@@ -28,8 +29,8 @@ export class PreRegistrationsActionsController {
     @Param('topEventId') topEventId: string,
     @Param('id') id: string,
     @Body() dto: RejectPreRegistrationDto,
-    @CurrentUser() user: { sub: string },
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return { data: await this.preRegistrations.reject(topEventId, id, dto, user.sub) };
+    return { data: await this.preRegistrations.reject(topEventId, id, dto, user) };
   }
 }

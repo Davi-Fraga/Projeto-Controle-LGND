@@ -197,9 +197,9 @@ export class AccessPolicyService {
 
   // Barreira de IDOR (tri-estado): admin ou dimensão ALL → libera; SELECTED → só ids do escopo;
   // MISSING (lista vazia, sem ALL) → nega tudo (fail-closed).
-  assertCityAllowed(scope: AccessScope, cityKey: string): void {
+  assertCityAllowed(scope: AccessScope, city: string): void {
     if (scope.isAdmin || scope.allCities) return;
-    if (!scope.cityKeys.includes(cityKey)) {
+    if (!scope.cityKeys.includes(normalizeCityKey(city))) {
       throw new ForbiddenException('City out of scope.');
     }
   }

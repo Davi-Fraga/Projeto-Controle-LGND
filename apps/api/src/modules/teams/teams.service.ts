@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { cleanPhone, LegendaryHistoryType, TeamMembershipStatus, TeamStatus } from '@central-da-manada/shared';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
@@ -128,7 +128,8 @@ export class TeamsService {
     return this.toTeamResponse(team);
   }
 
-  async update(id: string, dto: UpdateTeamDto, actorUserId?: string) {
+  async update(id: string, dto: UpdateTeamDto, user: AuthenticatedUser) {
+    await this.assertTeamVisible(id, user);
     const before = await this.findExistingTeam(id);
     if (dto.name) await this.ensureTeamNameAvailable(dto.name, id);
     await this.validateCoordinators(dto);
@@ -140,7 +141,7 @@ export class TeamsService {
     });
 
     await this.audit.create({
-      actorUserId,
+      actorUserId: user.sub,
       entityType: 'Team',
       entityId: id,
       action: 'update',
@@ -153,7 +154,7 @@ export class TeamsService {
       before.coordinatorLegendaryId !== after.coordinatorLegendaryId
     ) {
       await this.audit.create({
-        actorUserId,
+        actorUserId: user.sub,
         entityType: 'Team',
         entityId: id,
         action: 'update_coordinator',
@@ -167,7 +168,7 @@ export class TeamsService {
       before.deputyCoordinatorLegendaryId !== after.deputyCoordinatorLegendaryId
     ) {
       await this.audit.create({
-        actorUserId,
+        actorUserId: user.sub,
         entityType: 'Team',
         entityId: id,
         action: 'update_deputy_coordinator',
@@ -179,30 +180,29 @@ export class TeamsService {
     return this.toTeamResponse(after);
   }
 
-  async deactivate(id: string, actorUserId?: string) {
+  async deactivate(id: string, user: AuthenticatedUser) {
+    await this.assertTeamVisible(id, user);
     const before = await this.findExistingTeam(id);
     const after = await this.prisma.team.update({
       where: { id },
       data: { deletedAt: new Date(), status: TeamStatus.INACTIVE },
       include: includeTeam,
     });
-    await this.audit.create({ actorUserId, entityType: 'Team', entityId: id, action: 'deactivate', before: this.toTeamResponse(before), after: this.toTeamResponse(after) });
+    await this.audit.create({ actorUserId: user.sub, entityType: 'Team', entityId: id, action: 'deactivate', before: this.toTeamResponse(before), after: this.toTeamResponse(after) });
     return this.toTeamResponse(after);
   }
 
-  async restore(id: string, actorUserId?: string) {
+  async restore(id: string, user: AuthenticatedUser) {
+    await this.assertTeamVisible(id, user);
     const before = await this.findExistingTeamWithDeleted(id);
     await this.ensureTeamNameAvailable(before.name, id);
     const after = await this.prisma.team.update({ where: { id }, data: { deletedAt: null }, include: includeTeam });
-    await this.audit.create({ actorUserId, entityType: 'Team', entityId: id, action: 'restore', before: this.toTeamResponse(before), after: this.toTeamResponse(after) });
+    await this.audit.create({ actorUserId: user.sub, entityType: 'Team', entityId: id, action: 'restore', before: this.toTeamResponse(before), after: this.toTeamResponse(after) });
     return this.toTeamResponse(after);
   }
 
   async findMembers(teamId: string, query: TeamMembersQueryDto, user: AuthenticatedUser) {
-    const scope = await this.accessPolicy.resolveScope(user);
-    if (!scope.isAdmin && !scope.teamIds.includes(teamId)) {
-      throw new NotFoundException('Team not found.');
-    }
+    await this.assertTeamVisible(teamId, user);
     await this.findExistingTeam(teamId);
     const { page, perPage, skip, take } = getPagination(query);
     const where: any = {
@@ -239,7 +239,8 @@ export class TeamsService {
     return toPaginatedResponse(items, total, page, perPage);
   }
 
-  async addMember(teamId: string, dto: AddTeamMemberDto, actorUserId?: string) {
+  async addMember(teamId: string, dto: AddTeamMemberDto, user: AuthenticatedUser) {
+    await this.assertTeamVisible(teamId, user);
     await this.findExistingTeam(teamId);
     await this.ensureLegendaryExists(dto.legendaryId);
     await this.ensureActiveMembershipAvailable(teamId, dto.legendaryId);
@@ -255,12 +256,13 @@ export class TeamsService {
       include: includeMember,
     });
 
-    await this.audit.create({ actorUserId, entityType: 'TeamMembership', entityId: membership.id, action: 'add_member', after: membership });
-    await this.createHistory(membership.legendaryId, LegendaryHistoryType.TEAM_JOINED, 'Entrou em equipe', `Entrou na equipe ${membership.team?.name ?? ''}.`.trim(), actorUserId, { teamId });
+    await this.audit.create({ actorUserId: user.sub, entityType: 'TeamMembership', entityId: membership.id, action: 'add_member', after: membership });
+    await this.createHistory(membership.legendaryId, LegendaryHistoryType.TEAM_JOINED, 'Entrou em equipe', `Entrou na equipe ${membership.team?.name ?? ''}.`.trim(), user.sub, { teamId });
     return membership;
   }
 
-  async updateMember(teamId: string, membershipId: string, dto: UpdateTeamMemberDto, actorUserId?: string) {
+  async updateMember(teamId: string, membershipId: string, dto: UpdateTeamMemberDto, user: AuthenticatedUser) {
+    await this.assertTeamVisible(teamId, user);
     await this.findExistingTeam(teamId);
     const before = await this.findExistingMembership(teamId, membershipId);
 
@@ -276,12 +278,13 @@ export class TeamsService {
       include: includeMember,
     });
 
-    await this.audit.create({ actorUserId, entityType: 'TeamMembership', entityId: membershipId, action: 'update_member', before, after });
-    if (dto.role && before.role !== after.role) await this.createHistory(after.legendaryId, LegendaryHistoryType.TEAM_ROLE_CHANGED, 'Função em equipe alterada', `Função alterada para ${after.role}.`, actorUserId, { teamId });
+    await this.audit.create({ actorUserId: user.sub, entityType: 'TeamMembership', entityId: membershipId, action: 'update_member', before, after });
+    if (dto.role && before.role !== after.role) await this.createHistory(after.legendaryId, LegendaryHistoryType.TEAM_ROLE_CHANGED, 'Função em equipe alterada', `Função alterada para ${after.role}.`, user.sub, { teamId });
     return after;
   }
 
-  async deactivateMember(teamId: string, membershipId: string, actorUserId?: string) {
+  async deactivateMember(teamId: string, membershipId: string, user: AuthenticatedUser) {
+    await this.assertTeamVisible(teamId, user);
     await this.findExistingTeam(teamId);
     const before = await this.findExistingMembership(teamId, membershipId);
     const after = await this.prisma.teamMembership.update({
@@ -294,9 +297,21 @@ export class TeamsService {
       include: includeMember,
     });
 
-    await this.audit.create({ actorUserId, entityType: 'TeamMembership', entityId: membershipId, action: 'deactivate_member', before, after });
-    await this.createHistory(after.legendaryId, LegendaryHistoryType.TEAM_LEFT, 'Saiu de equipe', `Saiu da equipe ${after.team?.name ?? ''}.`.trim(), actorUserId, { teamId });
+    await this.audit.create({ actorUserId: user.sub, entityType: 'TeamMembership', entityId: membershipId, action: 'deactivate_member', before, after });
+    await this.createHistory(after.legendaryId, LegendaryHistoryType.TEAM_LEFT, 'Saiu de equipe', `Saiu da equipe ${after.team?.name ?? ''}.`.trim(), user.sub, { teamId });
     return after;
+  }
+
+  private async assertTeamVisible(teamId: string, user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    try {
+      this.accessPolicy.assertTeamAllowed(scope, teamId);
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw new NotFoundException('Team not found.');
+      }
+      throw error;
+    }
   }
 
   private async validateCoordinators(dto: Partial<CreateTeamDto>) {

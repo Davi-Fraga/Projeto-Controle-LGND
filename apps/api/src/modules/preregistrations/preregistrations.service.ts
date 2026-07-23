@@ -1,7 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { LegendaryStatus, TopEventStatus, TopParticipantStatus, TopParticipantType, TopPreRegistrationStatus } from '@central-da-manada/shared';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
+import { AccessPolicyService, AccessScope } from '../../common/access/access-policy.service';
+import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateLegendarioDto } from '../legendarios/dto/create-legendario.dto';
@@ -25,6 +27,7 @@ export class PreRegistrationsService {
     private readonly audit: AuditService,
     private readonly legendarios: LegendariosService,
     private readonly tops: TopsService,
+    private readonly accessPolicy: AccessPolicyService,
   ) {}
 
   async ingestFromWebhook(topEventId: string, payload: WebhookPreRegistrationDto) {
@@ -68,10 +71,15 @@ export class PreRegistrationsService {
     return created;
   }
 
-  async pendingCountByTopEvent() {
+  async pendingCountByTopEvent(user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
     const grouped = await this.prisma.topPreRegistration.groupBy({
       by: ['topEventId'],
-      where: { status: TopPreRegistrationStatus.PENDING, deletedAt: null },
+      where: {
+        status: TopPreRegistrationStatus.PENDING,
+        deletedAt: null,
+        topEvent: this.scopedTopRelation(scope),
+      },
       _count: { _all: true },
     });
 
@@ -90,12 +98,17 @@ export class PreRegistrationsService {
     }));
   }
 
-  async findAll(query: PreRegistrationQueryDto) {
+  async findAll(query: PreRegistrationQueryDto, user: AuthenticatedUser) {
     const { page, perPage, skip, take } = getPagination(query);
+    const scope = await this.accessPolicy.resolveScope(user);
+    if (query.topEventId) {
+      this.assertTopVisible(scope, query.topEventId);
+    }
     const where: any = {
       deletedAt: null,
       topEventId: query.topEventId,
       status: query.status,
+      topEvent: this.scopedTopRelation(scope),
     };
 
     if (query.search) {
@@ -114,9 +127,8 @@ export class PreRegistrationsService {
     return toPaginatedResponse(items, total, page, perPage);
   }
 
-  async findOne(id: string) {
-    const item = await this.prisma.topPreRegistration.findFirst({ where: { id, deletedAt: null }, include: includeTopEvent });
-    if (!item) throw new NotFoundException('Pre-registration not found.');
+  async findOne(id: string, user: AuthenticatedUser) {
+    const item = await this.findExistingForUser(id, user, true);
 
     const legendary = item.legendaryId
       ? await this.prisma.legendary.findUnique({ where: { id: item.legendaryId } })
@@ -125,12 +137,14 @@ export class PreRegistrationsService {
     return { ...item, legendary };
   }
 
-  async approve(topEventId: string, id: string, dto: ApprovePreRegistrationDto, actorUserId: string) {
+  async approve(topEventId: string, id: string, dto: ApprovePreRegistrationDto, user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    this.assertTopVisible(scope, topEventId);
     const preReg = await this.findExisting(id);
     this.assertBelongsToTop(preReg, topEventId);
 
     if (preReg.status === TopPreRegistrationStatus.APPROVED) {
-      return this.findOne(id);
+      return this.findOne(id, user);
     }
     if (preReg.status !== TopPreRegistrationStatus.PENDING) {
       throw new BadRequestException('Pre-registration already reviewed.');
@@ -155,12 +169,12 @@ export class PreRegistrationsService {
       if (providedLegendaryId) {
         legendaryId = providedLegendaryId;
       } else {
-        const created = await this.legendarios.create(this.toLegendarioDto(preReg, churchId), actorUserId, tx);
+        const created = await this.legendarios.create(this.toLegendarioDto(preReg, churchId), user.sub, tx);
         legendaryId = created.id;
       }
 
       // b) Inscreve como participante do TOP (reuso tops.service.addParticipant), idempotente
-      await this.ensureParticipant(topEventId, legendaryId, actorUserId, tx);
+      await this.ensureParticipant(topEventId, legendaryId, user.sub, tx);
 
       // c) Atualiza a pré-inscrição
       const updated = await tx.topPreRegistration.update({
@@ -168,19 +182,21 @@ export class PreRegistrationsService {
         data: {
           status: TopPreRegistrationStatus.APPROVED,
           legendaryId,
-          reviewedByUserId: actorUserId,
+          reviewedByUserId: user.sub,
           reviewedAt: new Date(),
           notes: dto.notes?.trim() || preReg.notes,
         },
         include: includeTopEvent,
       });
 
-      await this.audit.create({ actorUserId, entityType: 'TopPreRegistration', entityId: id, action: 'approve', before: preReg, after: updated }, tx);
+      await this.audit.create({ actorUserId: user.sub, entityType: 'TopPreRegistration', entityId: id, action: 'approve', before: preReg, after: updated }, tx);
       return updated;
     });
   }
 
-  async reject(topEventId: string, id: string, dto: RejectPreRegistrationDto, actorUserId: string) {
+  async reject(topEventId: string, id: string, dto: RejectPreRegistrationDto, user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    this.assertTopVisible(scope, topEventId);
     const preReg = await this.findExisting(id);
     this.assertBelongsToTop(preReg, topEventId);
 
@@ -195,19 +211,19 @@ export class PreRegistrationsService {
       where: { id },
       data: {
         status: TopPreRegistrationStatus.REJECTED,
-        reviewedByUserId: actorUserId,
+        reviewedByUserId: user.sub,
         reviewedAt: new Date(),
         notes: dto.notes?.trim() || preReg.notes,
       },
       include: includeTopEvent,
     });
 
-    await this.audit.create({ actorUserId, entityType: 'TopPreRegistration', entityId: id, action: 'reject', before: preReg, after: updated });
+    await this.audit.create({ actorUserId: user.sub, entityType: 'TopPreRegistration', entityId: id, action: 'reject', before: preReg, after: updated });
     return updated;
   }
 
-  async remove(id: string, actorUserId: string) {
-    const preReg = await this.findExisting(id);
+  async remove(id: string, user: AuthenticatedUser) {
+    const preReg = await this.findExistingForUser(id, user);
 
     const updated = await this.prisma.topPreRegistration.update({
       where: { id },
@@ -215,8 +231,22 @@ export class PreRegistrationsService {
       include: includeTopEvent,
     });
 
-    await this.audit.create({ actorUserId, entityType: 'TopPreRegistration', entityId: id, action: 'delete', before: preReg, after: updated });
+    await this.audit.create({ actorUserId: user.sub, entityType: 'TopPreRegistration', entityId: id, action: 'delete', before: preReg, after: updated });
     return updated;
+  }
+
+  private async findExistingForUser(id: string, user: AuthenticatedUser, withTopEvent = false) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    const preReg = await this.prisma.topPreRegistration.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+        topEvent: this.scopedTopRelation(scope),
+      },
+      ...(withTopEvent ? { include: includeTopEvent } : {}),
+    });
+    if (!preReg) throw new NotFoundException('Pre-registration not found.');
+    return preReg;
   }
 
   private async findExisting(id: string) {
@@ -228,6 +258,24 @@ export class PreRegistrationsService {
   private assertBelongsToTop(preReg: { topEventId: string }, topEventId: string) {
     if (preReg.topEventId !== topEventId) {
       throw new NotFoundException('Pre-registration not found for this TOP.');
+    }
+  }
+
+  private scopedTopRelation(scope: AccessScope) {
+    return {
+      deletedAt: null,
+      ...this.accessPolicy.buildTopWhere(scope),
+    };
+  }
+
+  private assertTopVisible(scope: AccessScope, topEventId: string) {
+    try {
+      this.accessPolicy.assertTopAllowed(scope, topEventId);
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw new NotFoundException('TOP event not found.');
+      }
+      throw error;
     }
   }
 

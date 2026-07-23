@@ -184,7 +184,7 @@ export class TopsService {
     return root;
   }
 
-  async options(query: OptionsQueryDto) {
+  async options(query: OptionsQueryDto, user: AuthenticatedUser) {
     const where: any = { deletedAt: null };
     if (query.search) {
       where.OR = [
@@ -192,6 +192,10 @@ export class TopsService {
         { city: { contains: query.search, mode: 'insensitive' } },
         { number: Number.isNaN(Number(query.search)) ? undefined : Number(query.search) },
       ].filter(Boolean);
+    }
+    const scope = await this.accessPolicy.resolveScope(user);
+    if (!scope.isAdmin) {
+      where.AND = [...(where.AND ?? []), this.accessPolicy.buildTopWhere(scope)];
     }
 
     const items = await this.prisma.topEvent.findMany({

@@ -14,15 +14,6 @@ import { SCREEN_CATALOG, getScreen, permissionsForLevel, screenActionToggles } f
 import { normalizeCityKey } from '../../common/org-chart/org-chart.util';
 import { AddUserScopeDto } from './dto/access-control.dto';
 
-// Permission de leitura exigida por tipo de escopo: um escopo sem a permission
-// correspondente é uma combinação inválida (tela×escopo).
-const SCOPE_REQUIRED_PERMISSION: Record<UserScopeType, string> = {
-  [UserScopeType.CITY]: 'legendarios.read',
-  [UserScopeType.TEAM]: 'teams.read',
-  [UserScopeType.CHURCH]: 'churches.read',
-  [UserScopeType.TOP]: 'tops.read',
-};
-
 const userAccessInclude = {
   roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
   permissionOverrides: { include: { permission: true } },
@@ -266,11 +257,21 @@ export class AccessControlService {
     return rows.some((row) => row.city && normalizeCityKey(row.city) === normalizedKey);
   }
 
+  // Elegibilidade de escopo DERIVADA do catálogo (change alinhar-abas-controle-acessos):
+  // um tipo é aceito quando existe ao menos UMA tela efetivamente concedida (todo o conjunto
+  // VIEW efetivo — equivalente ao nível ≥ VIEW) cujo `scopeTypes` contenha o tipo. Substitui o
+  // antigo mapa hardcoded (1 permission por tipo), permitindo, ex.: CHURCH com apenas a tela
+  // Líderes Espirituais. Não amplia acesso: o valor ainda é validado como entidade real.
   private async assertScopeAllowed(userId: string, type: UserScopeType) {
-    const required = SCOPE_REQUIRED_PERMISSION[type];
-    const effective = await this.effectivePermissions.resolveKeys(userId);
-    if (!effective.includes(required)) {
-      throw new BadRequestException(`Invalid screen×scope: scope ${type} requires permission ${required}.`);
+    const effective = new Set(await this.effectivePermissions.resolveKeys(userId));
+    const hasCompatibleScreen = SCREEN_CATALOG.some(
+      (screen) =>
+        screen.scopeTypes.includes(type) &&
+        screen.view.length > 0 &&
+        screen.view.every((key) => effective.has(key)),
+    );
+    if (!hasCompatibleScreen) {
+      throw new BadRequestException(`Invalid screen×scope: no granted screen supports scope ${type}.`);
     }
   }
 }

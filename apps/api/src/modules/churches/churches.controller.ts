@@ -20,8 +20,11 @@ export class ChurchesController {
     return { data: await this.churchesService.findAll(user, query.search) };
   }
 
+  // Permission DEDICADA (change alinhar-abas-controle-acessos): a view de Líderes Espirituais
+  // é concedível/revogável independentemente de Igrejas. O escopo real segue via
+  // AccessPolicyService.buildChurchWhere dentro do service (não é barreira de menu).
   @Get('spiritual-leaders')
-  @Permissions('churches.read')
+  @Permissions('spiritual-leaders.read')
   async spiritualLeaders(@CurrentUser() user: AuthenticatedUser, @Query() query: ListChurchesQueryDto) {
     return { data: await this.churchesService.spiritualLeadersView(user, query.search) };
   }

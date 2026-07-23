@@ -1,6 +1,10 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ScreenAccessLevel, UserScopeType } from '@central-da-manada/shared';
 import { AccessControlService } from './access-control.service';
+import { getScreen, permissionsForLevel } from '../../common/access/screen-catalog';
+
+// Conjunto VIEW efetivo de uma tela concedida (= nível ≥ VIEW).
+const viewOf = (screenId: string) => permissionsForLevel(getScreen(screenId)!, 'VIEW');
 
 // Monta um usuário com papel (nome + permissions), overrides e escopos.
 function buildUser(
@@ -199,19 +203,19 @@ describe('AccessControlService (por tela)', () => {
     });
   });
 
-  describe('addScope — validação tela×escopo (inclui TOP)', () => {
+  describe('addScope — elegibilidade derivada do catálogo', () => {
     beforeEach(() => {
       prisma.user.findFirst.mockResolvedValue(buildUser([]));
     });
 
-    it('rejeita escopo TOP quando o usuário não tem tops.read', async () => {
-      effective.resolveKeys.mockResolvedValue(['teams.read']);
+    it('rejeita escopo TOP quando nenhuma tela concedida suporta TOP', async () => {
+      effective.resolveKeys.mockResolvedValue(viewOf('teams')); // tela Equipes não suporta TOP
       await expect(service.addScope('u1', { type: UserScopeType.TOP, value: 'top-1' })).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.userScope.upsert).not.toHaveBeenCalled();
     });
 
-    it('valida a referência do TOP e aceita quando o usuário tem tops.read', async () => {
-      effective.resolveKeys.mockResolvedValue(['tops.read']);
+    it('valida a referência do TOP e aceita quando a tela TOPs está concedida', async () => {
+      effective.resolveKeys.mockResolvedValue(viewOf('tops'));
       prisma.topEvent.findFirst.mockResolvedValueOnce({ id: 'top-1' });
       await service.addScope('u1', { type: UserScopeType.TOP, value: 'top-1' }, 'admin');
       expect(prisma.userScope.upsert).toHaveBeenCalledWith(
@@ -219,8 +223,8 @@ describe('AccessControlService (por tela)', () => {
       );
     });
 
-    it('normaliza a cidade existente e exige legendarios.read', async () => {
-      effective.resolveKeys.mockResolvedValue(['legendarios.read']);
+    it('normaliza a cidade existente quando a tela Legendários está concedida', async () => {
+      effective.resolveKeys.mockResolvedValue(viewOf('legendarios'));
       prisma.legendary.findMany.mockResolvedValueOnce([{ city: 'Piracanjuba' }, { city: 'Goiânia' }]);
       await service.addScope('u1', { type: UserScopeType.CITY, value: '  Piracanjuba ' });
       expect(prisma.userScope.upsert).toHaveBeenCalledWith(
@@ -229,9 +233,25 @@ describe('AccessControlService (por tela)', () => {
     });
 
     it('rejeita uma cidade que não existe entre os Legendários (sem texto livre)', async () => {
-      effective.resolveKeys.mockResolvedValue(['legendarios.read']);
+      effective.resolveKeys.mockResolvedValue(viewOf('legendarios'));
       prisma.legendary.findMany.mockResolvedValueOnce([{ city: 'Goiânia' }, { city: 'Caldas Novas' }]);
       await expect(service.addScope('u1', { type: UserScopeType.CITY, value: 'Londres' })).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.userScope.upsert).not.toHaveBeenCalled();
+    });
+
+    // change alinhar-abas: CHURCH aceito com APENAS a tela Líderes Espirituais (sem churches.read).
+    it('aceita CHURCH quando só a tela Líderes Espirituais está concedida', async () => {
+      effective.resolveKeys.mockResolvedValue(viewOf('spiritual-leaders'));
+      prisma.church.findFirst.mockResolvedValueOnce({ id: 'church-1' });
+      await service.addScope('u1', { type: UserScopeType.CHURCH, value: 'church-1' }, 'admin');
+      expect(prisma.userScope.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ create: { userId: 'u1', type: 'CHURCH', value: 'church-1' } }),
+      );
+    });
+
+    it('rejeita CHURCH (400) quando nenhuma tela concedida suporta CHURCH', async () => {
+      effective.resolveKeys.mockResolvedValue(viewOf('communications')); // não suporta CHURCH
+      await expect(service.addScope('u1', { type: UserScopeType.CHURCH, value: 'church-1' })).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.userScope.upsert).not.toHaveBeenCalled();
     });
   });

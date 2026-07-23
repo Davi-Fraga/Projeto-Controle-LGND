@@ -4,6 +4,7 @@ import LideresEspirituaisPage from './page';
 
 const mocks = vi.hoisted(() => ({
   getChurches: vi.fn(),
+  useRequireAuth: vi.fn(),
 }));
 
 vi.mock('next/link', () => ({
@@ -13,7 +14,7 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('@/hooks/use-require-auth', () => ({
-  useRequireAuth: () => ({ loading: false }),
+  useRequireAuth: () => mocks.useRequireAuth(),
 }));
 
 vi.mock('@/features/spiritual-leaders/api', () => ({
@@ -22,6 +23,8 @@ vi.mock('@/features/spiritual-leaders/api', () => ({
 
 describe('LideresEspirituaisPage', () => {
   beforeEach(() => {
+    // Por padrão o usuário também tem legendarios.read (links cruzados habilitados).
+    mocks.useRequireAuth.mockReturnValue({ loading: false, user: { permissions: ['legendarios.read'] } });
     mocks.getChurches.mockReset().mockResolvedValue([
       {
         id: '11111111-1111-4111-8111-111111111111',
@@ -122,5 +125,31 @@ describe('LideresEspirituaisPage', () => {
     const leaderLink = await screen.findByRole('link', { name: 'Legendário Atualizado' });
     expect(leaderLink).toHaveAttribute('href', '/dashboard/legendarios/legendary-1');
     expect(screen.queryByText('Nome livre preservado')).not.toBeInTheDocument();
+  });
+
+  // change alinhar-abas: sem legendarios.read os links cruzados somem, mas os dados ficam.
+  it('sem legendarios.read: dados do líder aparecem como texto, sem links para Legendários', async () => {
+    mocks.useRequireAuth.mockReturnValue({ loading: false, user: { permissions: ['spiritual-leaders.read'] } });
+    mocks.getChurches.mockReset().mockResolvedValueOnce([
+      {
+        id: 'church-1',
+        name: 'Igreja Central',
+        city: 'Goiânia',
+        spiritualLeaderName: null,
+        spiritualLeaderEffectiveName: 'Legendário Atualizado',
+        spiritualLeaderLegendaryId: 'legendary-1',
+        spiritualLeaderLegendary: { id: 'legendary-1', fullName: 'Legendário Atualizado' },
+        spiritualLeaderPhone: null,
+        spiritualLeaderUserId: null,
+        spiritualLeader: null,
+        _count: { legendarios: 1 },
+      },
+    ]);
+
+    render(<LideresEspirituaisPage />);
+
+    expect(await screen.findByText('Legendário Atualizado')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Legendário Atualizado' })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Ver legendários/i })).toBeNull();
   });
 });

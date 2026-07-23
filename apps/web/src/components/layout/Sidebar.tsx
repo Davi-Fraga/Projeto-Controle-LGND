@@ -20,45 +20,25 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getCurrentUser } from '@/features/auth/actions';
-import { hasPermission, hasRole } from '@/lib/permissions';
 import type { CurrentUser } from '@/features/auth/types';
 import type { LucideIcon } from 'lucide-react';
+import { visiblePrimaryNav } from '@central-da-manada/shared';
 
-type MenuItem = {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  permission?: string;
-  anyPermission?: string[];
-  roles?: string[];
+// Ícone por screenId — o manifesto compartilhado não carrega componentes React (nav é só UX).
+const ICONS: Record<string, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  legendarios: Users,
+  teams: Shield,
+  'spiritual-leaders': Building2,
+  map: Map,
+  tops: MapPin,
+  'org-chart': Network,
+  'social-actions': HeartHandshake,
+  communications: MessageSquare,
+  reports: FileText,
+  churches: Church,
+  users: UserCog,
 };
-
-const MENU_ITEMS: MenuItem[] = [
-  { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
-  { href: '/dashboard/legendarios', label: 'Legendários', icon: Users, permission: 'legendarios.read' },
-  { href: '/dashboard/equipes', label: 'Equipes', icon: Shield, permission: 'teams.read' },
-  {
-    href: '/dashboard/lideres-espirituais',
-    label: 'Líderes Espirituais',
-    icon: Building2,
-    roles: ['COORDINATION_ADMIN', 'COORDINATION_USER', 'SPIRITUAL_LEADER'],
-  },
-  { href: '/dashboard/mapa', label: 'Mapa', icon: Map, permission: 'map.read' },
-  { href: '/dashboard/tops', label: 'TOPs', icon: MapPin, permission: 'tops.read' },
-  { href: '/dashboard/organograma', label: 'Organograma', icon: Network, anyPermission: ['organogram.read', 'teams.read', 'legendarios.read', 'tops.read'] },
-  { href: '/dashboard/acoes-sociais', label: 'Ações Sociais', icon: HeartHandshake, permission: 'tops.read' },
-  { href: '/dashboard/comunicacao', label: 'Comunicação', icon: MessageSquare, permission: 'communications.read' },
-  { href: '/dashboard/relatorios', label: 'Relatórios', icon: FileText, permission: 'reports.read' },
-  { href: '/dashboard/igrejas', label: 'Igrejas', icon: Church, roles: ['COORDINATION_ADMIN'] },
-  { href: '/dashboard/usuarios', label: 'Usuários', icon: UserCog, roles: ['COORDINATION_ADMIN'] },
-];
-
-function isVisible(item: MenuItem, user: CurrentUser | null): boolean {
-  if (item.permission && !hasPermission(user, item.permission)) return false;
-  if (item.anyPermission && !item.anyPermission.some((p) => hasPermission(user, p))) return false;
-  if (item.roles && !hasRole(user, ...item.roles)) return false;
-  return true;
-}
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -69,7 +49,10 @@ export function Sidebar() {
     getCurrentUser().then(setUser).catch(() => {});
   }, []);
 
-  const visibleItems = MENU_ITEMS.filter((item) => isVisible(item, user));
+  // Fonte única de navegação: manifesto compartilhado por permissions efetivas
+  // (change alinhar-abas). Sem gates paralelos por papel nas telas concedíveis; Usuários
+  // continua exceção admin (declarada no manifesto). A autorização real é sempre no backend.
+  const visibleItems = visiblePrimaryNav(user);
 
   return (
     <>
@@ -113,7 +96,7 @@ export function Sidebar() {
         {/* Navigation Links */}
         <nav className="flex-1 space-y-1 px-3 py-6 overflow-y-auto">
           {visibleItems.map((item) => {
-            const Icon = item.icon;
+            const Icon = ICONS[item.screenId];
             const isActive =
               item.href === '/dashboard'
                 ? pathname === '/dashboard'
@@ -121,7 +104,7 @@ export function Sidebar() {
 
             return (
               <Link
-                key={item.href}
+                key={item.screenId}
                 href={item.href}
                 onClick={() => setIsOpen(false)}
                 className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium tracking-wide transition-all duration-200 ${
@@ -130,7 +113,7 @@ export function Sidebar() {
                     : 'text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-100 border-l-2 border-transparent'
                 }`}
               >
-                <Icon className={`h-5 w-5 ${isActive ? 'text-orange-500' : 'text-zinc-400 group-hover:text-zinc-100'}`} />
+                {Icon && <Icon className={`h-5 w-5 ${isActive ? 'text-orange-500' : 'text-zinc-400 group-hover:text-zinc-100'}`} />}
                 {item.label}
               </Link>
             );

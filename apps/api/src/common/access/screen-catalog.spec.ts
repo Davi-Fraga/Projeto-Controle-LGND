@@ -1,3 +1,4 @@
+import { UserScopeType } from '@central-da-manada/shared';
 import { SCREEN_CATALOG, getScreen, permissionsForLevel, screenActionToggles } from './screen-catalog';
 
 // Criar/excluir/restaurar de entidade de topo é ação administrativa: NÃO pode
@@ -79,5 +80,26 @@ describe('screen-catalog action toggles (organograma)', () => {
   it('org-chart concede organogram.person.edit no nível EDIT (Fase 2)', () => {
     const orgChart = getScreen('org-chart')!;
     expect(permissionsForLevel(orgChart, 'EDIT')).toContain('organogram.person.edit');
+  });
+});
+
+// change alinhar-abas-controle-acessos: tela Líderes Espirituais independente de Igrejas.
+describe('screen-catalog — Líderes Espirituais', () => {
+  const grantable = new Set(SCREEN_CATALOG.flatMap((s) => [...s.view, ...s.edit]));
+
+  it('declara a tela spiritual-leaders VIEW-only com escopo CHURCH', () => {
+    const s = getScreen('spiritual-leaders');
+    expect(s).toBeDefined();
+    expect(s!.label).toBe('Líderes Espirituais');
+    expect(s!.view).toEqual(['spiritual-leaders.read']);
+    expect(s!.edit).toEqual([]);
+    expect(s!.scopeTypes).toEqual([UserScopeType.CHURCH]);
+  });
+
+  it('torna spiritual-leaders.read concedível por tela, sem tocar em churches.*', () => {
+    expect(grantable.has('spiritual-leaders.read')).toBe(true);
+    // Independência: a tela de Líderes NÃO concede permissões de Igrejas.
+    const s = getScreen('spiritual-leaders')!;
+    expect([...s.view, ...s.edit].some((k) => k.startsWith('churches.'))).toBe(false);
   });
 });

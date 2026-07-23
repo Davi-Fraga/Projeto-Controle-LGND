@@ -11,6 +11,7 @@ describe('AccessPolicyService', () => {
       team: { findMany: jest.fn() },
       user: { findFirst: jest.fn() },
       userScope: { findMany: jest.fn().mockResolvedValue([]) },
+      userScopePolicy: { findMany: jest.fn().mockResolvedValue([]) },
       legendary: { findMany: jest.fn().mockResolvedValue([]) },
     };
     service = new AccessPolicyService(prisma);
@@ -339,5 +340,71 @@ describe('AccessPolicyService', () => {
       expect(service.buildTopWhere(scope)).toEqual({ id: { in: [] } });
       expect(service.buildCityWhere(scope)).toEqual({ id: { in: [] } });
     });
+  });
+});
+
+// change access-scope-bulk-selection: modo ALL por dimensão.
+describe('AccessPolicyService — tri-estado ALL', () => {
+  let prisma: any;
+  let service: AccessPolicyService;
+
+  beforeEach(() => {
+    prisma = {
+      church: { findMany: jest.fn().mockResolvedValue([]) },
+      team: { findMany: jest.fn().mockResolvedValue([]) },
+      user: { findFirst: jest.fn() },
+      userScope: { findMany: jest.fn().mockResolvedValue([]) },
+      userScopePolicy: { findMany: jest.fn().mockResolvedValue([]) },
+      legendary: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    service = new AccessPolicyService(prisma);
+  });
+
+  const allScope = (over: any) => ({
+    isAdmin: false, churchIds: [], teamIds: [], legendaryIds: [], cityKeys: [], legendaryCities: [], topIds: [], ...over,
+  });
+
+  it('ALL libera build*Where (sem predicado) por dimensão', () => {
+    expect(service.buildChurchWhere(allScope({ allChurches: true }))).toEqual({});
+    expect(service.buildTeamWhere(allScope({ allTeams: true }))).toEqual({});
+    expect(service.buildTopWhere(allScope({ allTops: true }))).toEqual({});
+    expect(service.buildCityWhere(allScope({ allCities: true }))).toEqual({});
+  });
+
+  it('CITY=ALL = todos os Legendários (buildLegendaryWhere sem predicado)', () => {
+    expect(service.buildLegendaryWhere(allScope({ allCities: true }))).toEqual({});
+  });
+
+  it('CHURCH=ALL entra na geografia de legendário como churchId not null', () => {
+    expect(service.buildLegendaryWhere(allScope({ allChurches: true }))).toEqual({ OR: [{ churchId: { not: null } }] });
+  });
+
+  it('ALL libera assert*Allowed para qualquer id', () => {
+    expect(() => service.assertChurchAllowed(allScope({ allChurches: true }), 'x')).not.toThrow();
+    expect(() => service.assertTeamAllowed(allScope({ allTeams: true }), 'x')).not.toThrow();
+    expect(() => service.assertTopAllowed(allScope({ allTops: true }), 'x')).not.toThrow();
+    expect(() => service.assertCityAllowed(allScope({ allCities: true }), 'x')).not.toThrow();
+  });
+
+  it('resolveScope: política CHURCH=ALL → allChurches e ignora a lista explícita', async () => {
+    prisma.userScope.findMany.mockResolvedValueOnce([{ type: 'CHURCH', value: 'church-1' }]);
+    prisma.userScopePolicy.findMany.mockResolvedValueOnce([{ type: 'CHURCH', mode: 'ALL' }]);
+
+    const scope = await service.resolveScope({ sub: 'u1', email: 'a@b.c', roles: ['MEMBER'], permissions: [] } as any);
+
+    expect(scope.allChurches).toBe(true);
+    expect(scope.churchIds).toEqual([]);
+    expect(service.buildChurchWhere(scope)).toEqual({});
+  });
+
+  it('resolveScope: SELECTED mantém fail-closed pela lista', async () => {
+    prisma.userScope.findMany.mockResolvedValueOnce([{ type: 'TOP', value: 'top-1' }]);
+    prisma.userScopePolicy.findMany.mockResolvedValueOnce([{ type: 'TOP', mode: 'SELECTED' }]);
+
+    const scope = await service.resolveScope({ sub: 'u1', email: 'a@b.c', roles: ['MEMBER'], permissions: [] } as any);
+
+    expect(scope.allTops).toBe(false);
+    expect(scope.topIds).toEqual(['top-1']);
+    expect(service.buildTopWhere(scope)).toEqual({ id: { in: ['top-1'] } });
   });
 });

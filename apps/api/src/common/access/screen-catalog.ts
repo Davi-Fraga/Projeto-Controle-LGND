@@ -10,6 +10,12 @@ export type ScreenDef = {
   edit: string[];
   // Tipos de escopo aplicáveis a esta tela (vazio = sem recorte de dados).
   scopeTypes: UserScopeType[];
+  // Dimensões que SATISFAZEM o escopo principal da tela (change access-scope-bulk-selection).
+  // Default (quando ausente) = todas de `scopeTypes`. Ex.: Legendários = [CITY, CHURCH].
+  satisfyingScopeTypes?: UserScopeType[];
+  // Dimensões SUPLEMENTARES: ampliam detalhe/recorte mas NÃO satisfazem sozinhas o acesso
+  // principal (default = []). Ex.: Legendários = [TEAM] (equipe não satisfaz a geografia).
+  supplementalScopeTypes?: UserScopeType[];
   // Toggles de AÇÃO concedidos separadamente de VIEW/EDIT (change organograma-
   // navegacao-escalavel, decisão Q1): permite conceder ações finas — ex.: editar
   // pessoa sem poder mover. NÃO entram em permissionsForLevel; são concedidos à parte.
@@ -31,6 +37,9 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     // create/delete/restore de topo são administrativos → fora do "Ver e editar".
     edit: ['legendarios.update', 'legendarios.history.create'],
     scopeTypes: [UserScopeType.CITY, UserScopeType.TEAM, UserScopeType.CHURCH],
+    // A listagem é GEOGRÁFICA: só cidade/igreja satisfazem; equipe é suplementar (detalhe).
+    satisfyingScopeTypes: [UserScopeType.CITY, UserScopeType.CHURCH],
+    supplementalScopeTypes: [UserScopeType.TEAM],
   },
   {
     id: 'teams',
@@ -170,4 +179,14 @@ export function permissionsForLevel(screen: ScreenDef, level: 'VIEW' | 'EDIT'): 
 // Toggles de ação da tela (vazio quando não há). Concedidos à parte de VIEW/EDIT.
 export function screenActionToggles(screen: ScreenDef): string[] {
   return screen.actionToggles ?? [];
+}
+
+// Dimensões que satisfazem o escopo principal da tela (default: todas de scopeTypes).
+export function satisfyingScopeTypes(screen: ScreenDef): UserScopeType[] {
+  return screen.satisfyingScopeTypes ?? screen.scopeTypes;
+}
+
+// Dimensões suplementares (default: nenhuma) — não satisfazem sozinhas o acesso principal.
+export function supplementalScopeTypes(screen: ScreenDef): UserScopeType[] {
+  return screen.supplementalScopeTypes ?? [];
 }

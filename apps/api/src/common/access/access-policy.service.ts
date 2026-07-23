@@ -17,6 +17,13 @@ export type AccessScope = {
   legendaryCities: string[];
   // IDs de TopEvent em escopo.
   topIds: string[];
+  // Flags de dimensão IRRESTRITA (change access-scope-bulk-selection): política `ALL` daquele
+  // tipo. Independentes de `isAdmin`. Ausente = false (SELECTED/MISSING pelas listas acima).
+  // Quando `all*` é true, a lista correspondente é ignorada (o modo ALL domina a dimensão).
+  allCities?: boolean;
+  allTeams?: boolean;
+  allChurches?: boolean;
+  allTops?: boolean;
 };
 
 @Injectable()
@@ -28,15 +35,24 @@ export class AccessPolicyService {
       return this.unrestrictedScope();
     }
 
-    const [roleChurchIds, roleTeamIds, userScopes] = await Promise.all([
+    const [roleChurchIds, roleTeamIds, userScopes, policies] = await Promise.all([
       this.resolveSpiritualLeaderChurchIds(user),
       this.resolveTeamLeaderTeamIds(user),
       this.resolveUserScopes(user),
+      this.resolveUserScopePolicies(user.sub),
     ]);
 
-    const churchIds = this.union(roleChurchIds, userScopes.churchIds);
-    const teamIds = this.union(roleTeamIds, userScopes.teamIds);
-    const cityKeys = userScopes.cityKeys;
+    // Modo ALL domina a dimensão (change access-scope-bulk-selection): ignora a lista explícita
+    // e os vínculos derivados. Caso contrário, o efetivo SELECTED = explícito ∪ derivado do papel.
+    const allChurches = policies.get(UserScopeType.CHURCH) === 'ALL';
+    const allTeams = policies.get(UserScopeType.TEAM) === 'ALL';
+    const allTops = policies.get(UserScopeType.TOP) === 'ALL';
+    const allCities = policies.get(UserScopeType.CITY) === 'ALL';
+
+    const churchIds = allChurches ? [] : this.union(roleChurchIds, userScopes.churchIds);
+    const teamIds = allTeams ? [] : this.union(roleTeamIds, userScopes.teamIds);
+    const topIds = allTops ? [] : userScopes.topIds;
+    const cityKeys = allCities ? [] : userScopes.cityKeys;
     const legendaryCities = cityKeys.length
       ? await this.resolveLegendaryCities(cityKeys)
       : [];
@@ -48,7 +64,11 @@ export class AccessPolicyService {
       legendaryIds: [],
       cityKeys,
       legendaryCities,
-      topIds: userScopes.topIds,
+      topIds,
+      allCities,
+      allTeams,
+      allChurches,
+      allTops,
     };
   }
 
@@ -57,11 +77,15 @@ export class AccessPolicyService {
   // vale só nas telas Equipes/Organograma (buildTeamWhere), para não vazar membros
   // de equipe de outras cidades na listagem de legendários.
   buildLegendaryWhere(scope: AccessScope) {
-    if (scope.isAdmin) return {};
+    // CITY=ALL = "todos os Legendários" (geografia completa) → sem predicado.
+    if (scope.isAdmin || scope.allCities) return {};
 
     const OR: any[] = [];
 
-    if (scope.churchIds.length) {
+    if (scope.allChurches) {
+      // CHURCH=ALL: legendários de QUALQUER igreja (a dimensão Igreja é irrestrita).
+      OR.push({ churchId: { not: null } });
+    } else if (scope.churchIds.length) {
       OR.push({ churchId: { in: scope.churchIds } });
     }
 
@@ -77,7 +101,7 @@ export class AccessPolicyService {
   }
 
   buildTeamMembershipWhere(scope: AccessScope, teamId?: string) {
-    if (scope.isAdmin) {
+    if (scope.isAdmin || scope.allTeams) {
       return teamId ? { teamId } : {};
     }
 
@@ -92,7 +116,7 @@ export class AccessPolicyService {
     if (scope.isAdmin) return {};
 
     const geographic = this.buildLegendaryWhere(scope);
-    if (!scope.teamIds.length) return geographic;
+    if (!scope.teamIds.length && !scope.allTeams) return geographic;
 
     return {
       OR: [
@@ -112,24 +136,24 @@ export class AccessPolicyService {
   }
 
   buildTeamWhere(scope: AccessScope) {
-    if (scope.isAdmin) return {};
+    if (scope.isAdmin || scope.allTeams) return {};
     return scope.teamIds.length ? { id: { in: scope.teamIds } } : { id: { in: [] } };
   }
 
   buildChurchWhere(scope: AccessScope) {
-    if (scope.isAdmin) return {};
+    if (scope.isAdmin || scope.allChurches) return {};
     return scope.churchIds.length ? { id: { in: scope.churchIds } } : { id: { in: [] } };
   }
 
   buildTopWhere(scope: AccessScope) {
-    if (scope.isAdmin) return {};
+    if (scope.isAdmin || scope.allTops) return {};
     return scope.topIds.length ? { id: { in: scope.topIds } } : { id: { in: [] } };
   }
 
   // Filtro por cidade para entidades com campo `city` (ex.: SocialAction).
-  // Não-admin sem escopo de cidade não vê nada (fail-closed).
+  // Não-admin sem escopo de cidade não vê nada (fail-closed); CITY=ALL → sem predicado.
   buildCityWhere(scope: AccessScope) {
-    if (scope.isAdmin) return {};
+    if (scope.isAdmin || scope.allCities) return {};
     return scope.legendaryCities.length ? { city: { in: scope.legendaryCities } } : { id: { in: [] } };
   }
 
@@ -154,28 +178,32 @@ export class AccessPolicyService {
     return !scope.isAdmin;
   }
 
-  // Barreira de IDOR: nega se o usuário é restrito por cidade e a cidade pedida
-  // (key normalizada) não está no seu conjunto de escopos.
+  // Barreira de IDOR (tri-estado): admin ou dimensão ALL → libera; SELECTED → só ids do escopo;
+  // MISSING (lista vazia, sem ALL) → nega tudo (fail-closed).
   assertCityAllowed(scope: AccessScope, cityKey: string): void {
-    if (this.isCityRestricted(scope) && !scope.cityKeys.includes(cityKey)) {
+    if (scope.isAdmin || scope.allCities) return;
+    if (!scope.cityKeys.includes(cityKey)) {
       throw new ForbiddenException('City out of scope.');
     }
   }
 
   assertTeamAllowed(scope: AccessScope, teamId: string): void {
-    if (this.isTeamRestricted(scope) && !scope.teamIds.includes(teamId)) {
+    if (scope.isAdmin || scope.allTeams) return;
+    if (!scope.teamIds.includes(teamId)) {
       throw new ForbiddenException('Team out of scope.');
     }
   }
 
   assertChurchAllowed(scope: AccessScope, churchId: string): void {
-    if (this.isChurchRestricted(scope) && !scope.churchIds.includes(churchId)) {
+    if (scope.isAdmin || scope.allChurches) return;
+    if (!scope.churchIds.includes(churchId)) {
       throw new ForbiddenException('Church out of scope.');
     }
   }
 
   assertTopAllowed(scope: AccessScope, topId: string): void {
-    if (this.isTopRestricted(scope) && !scope.topIds.includes(topId)) {
+    if (scope.isAdmin || scope.allTops) return;
+    if (!scope.topIds.includes(topId)) {
       throw new ForbiddenException('TOP out of scope.');
     }
   }
@@ -247,6 +275,16 @@ export class AccessPolicyService {
         .filter((scope) => scope.type === UserScopeType.TOP)
         .map((scope) => scope.value),
     };
+  }
+
+  // Modo de política por tipo (change access-scope-bulk-selection). Há linha só quando
+  // SELECTED (com valores) ou ALL; ausência = MISSING (estado calculado).
+  private async resolveUserScopePolicies(userId: string): Promise<Map<UserScopeType, 'SELECTED' | 'ALL'>> {
+    const policies = await this.prisma.userScopePolicy.findMany({
+      where: { userId },
+      select: { type: true, mode: true },
+    });
+    return new Map(policies.map((policy) => [policy.type as UserScopeType, policy.mode as 'SELECTED' | 'ALL']));
   }
 
   // Resolve o escopo a partir do userId (carrega papéis do banco). Útil onde só

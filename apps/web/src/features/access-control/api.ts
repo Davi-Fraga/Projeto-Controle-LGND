@@ -1,5 +1,5 @@
 import { api } from '@/lib/api';
-import type { ScreenAccessLevel, UserScreenAccessControl } from '@central-da-manada/shared';
+import type { ScopeSelectionMode, ScreenAccessLevel, UserScreenAccessControl } from '@central-da-manada/shared';
 
 export type { UserScreenAccessControl };
 
@@ -38,5 +38,14 @@ export function addUserScope(userId: string, type: ScopeTypeValue, value: string
 export function removeUserScope(userId: string, scopeId: string) {
   return api<ScreenAccessResponse>(`/access-control/users/${userId}/scopes/${scopeId}`, {
     method: 'DELETE',
+  });
+}
+
+// Substituição ATÔMICA do escopo de um tipo (change access-scope-bulk-selection):
+// mode MISSING/SELECTED/ALL num único request; values = [] em MISSING/ALL.
+export function setScopeSelection(userId: string, type: ScopeTypeValue, mode: ScopeSelectionMode, values: string[]) {
+  return api<ScreenAccessResponse>(`/access-control/users/${userId}/scopes/${type}`, {
+    method: 'PUT',
+    body: JSON.stringify({ mode, values }),
   });
 }

@@ -1,11 +1,11 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
-import { SystemRole } from '@central-da-manada/shared';
+import { SystemRole, UserScopeType } from '@central-da-manada/shared';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AccessControlService } from './access-control.service';
-import { AddUserScopeDto, SetScreenLevelDto, SetScreenToggleDto } from './dto/access-control.dto';
+import { AddUserScopeDto, SetScopeSelectionDto, SetScreenLevelDto, SetScreenToggleDto } from './dto/access-control.dto';
 
 // Administrar acessos (conceder telas/escopos a QUALQUER usuário) é privilégio EXCLUSIVO
 // do administrador — guardado pelo PAPEL admin, nunca pela permissão `users.update`. Gatear
@@ -45,6 +45,17 @@ export class AccessControlController {
   @Post('users/:userId/scopes')
   async addScope(@Param('userId') userId: string, @Body() dto: AddUserScopeDto, @CurrentUser() user: { sub: string }) {
     return { data: await this.accessControl.addScope(userId, dto, user.sub) };
+  }
+
+  // Substituição atômica do escopo de um tipo (MISSING/SELECTED/ALL).
+  @Put('users/:userId/scopes/:type')
+  async setScopeSelection(
+    @Param('userId') userId: string,
+    @Param('type') type: UserScopeType,
+    @Body() dto: SetScopeSelectionDto,
+    @CurrentUser() user: { sub: string },
+  ) {
+    return { data: await this.accessControl.setScopeSelection(userId, type, dto, user.sub) };
   }
 
   @Delete('users/:userId/scopes/:scopeId')

@@ -112,4 +112,17 @@ describe('DashboardService (escopo)', () => {
     expect(result.totals.expertises).not.toBeNull();
     expect(result.totals.churches).not.toBeNull();
   });
+
+  // change access-scope-bulk-selection: dimensão em ALL conta o total inteiro (build*Where sem
+  // predicado) — mas SÓ quando a permissão de tela está presente.
+  it('TOP=ALL: contador conta a dimensão inteira (sem recorte) quando tem tops.read', async () => {
+    accessPolicy.resolveScope.mockResolvedValue({ isAdmin: false });
+    accessPolicy.buildTopWhere.mockReturnValue({}); // allTops → sem predicado restritivo
+    const member = { sub: 'u1', permissions: ['tops.read'] } as any;
+
+    await service.summary(member);
+
+    const topWhere = prisma.topEvent.count.mock.calls[0][0].where;
+    expect(topWhere).toEqual({ deletedAt: null }); // base sem recorte de escopo
+  });
 });

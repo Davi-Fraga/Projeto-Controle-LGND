@@ -1,24 +1,28 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { SystemRole } from '@central-da-manada/shared';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Permissions } from '../../common/decorators/permissions.decorator';
-import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AccessControlService } from './access-control.service';
 import { AddUserScopeDto, SetScreenLevelDto, SetScreenToggleDto } from './dto/access-control.dto';
 
+// Administrar acessos (conceder telas/escopos a QUALQUER usuário) é privilégio EXCLUSIVO
+// do administrador — guardado pelo PAPEL admin, nunca pela permissão `users.update`. Gatear
+// por `users.update` permitiria escalonamento: conceder "Usuários Ver e editar" a um não-admin
+// o deixaria conceder acesso a si mesmo (change access-scope-semantics-hardening).
 @Controller('access-control')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(SystemRole.COORDINATION_ADMIN)
 export class AccessControlController {
   constructor(private readonly accessControl: AccessControlService) {}
 
   @Get('users/:userId')
-  @Permissions('users.read')
   async getUser(@Param('userId') userId: string) {
     return { data: await this.accessControl.getUserScreenAccess(userId) };
   }
 
   @Put('users/:userId/screens/:screenId')
-  @Permissions('users.update')
   async setScreenLevel(
     @Param('userId') userId: string,
     @Param('screenId') screenId: string,
@@ -29,7 +33,6 @@ export class AccessControlController {
   }
 
   @Put('users/:userId/screens/:screenId/toggles')
-  @Permissions('users.update')
   async setScreenToggle(
     @Param('userId') userId: string,
     @Param('screenId') screenId: string,
@@ -40,13 +43,11 @@ export class AccessControlController {
   }
 
   @Post('users/:userId/scopes')
-  @Permissions('users.update')
   async addScope(@Param('userId') userId: string, @Body() dto: AddUserScopeDto, @CurrentUser() user: { sub: string }) {
     return { data: await this.accessControl.addScope(userId, dto, user.sub) };
   }
 
   @Delete('users/:userId/scopes/:scopeId')
-  @Permissions('users.update')
   async removeScope(@Param('userId') userId: string, @Param('scopeId') scopeId: string, @CurrentUser() user: { sub: string }) {
     return { data: await this.accessControl.removeScope(userId, scopeId, user.sub) };
   }

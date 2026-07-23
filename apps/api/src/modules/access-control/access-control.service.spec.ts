@@ -68,6 +68,13 @@ describe('AccessControlService (por tela)', () => {
       expect(byId['legendarios'].level).toBe(ScreenAccessLevel.NONE);
       expect(byId['teams'].scopes).toEqual([{ id: 's1', type: 'TEAM', value: 'team-seg' }]);
       expect(byId['churches'].scopes).toEqual([]);
+      // scopeMissing: churches é escopável, concedida (EDIT) e sem escopo → estado inválido.
+      expect(byId['churches'].scopeMissing).toBe(true);
+      // teams é escopável mas TEM escopo → ok.
+      expect(byId['teams'].scopeMissing).toBe(false);
+      // legendarios está em NONE → não marca. dashboard é global (scopeTypes vazio) → nunca marca.
+      expect(byId['legendarios'].scopeMissing).toBe(false);
+      expect(byId['dashboard'].scopeMissing).toBe(false);
     });
 
     it('função (não-admin) sem concessões => todas as telas NONE', async () => {

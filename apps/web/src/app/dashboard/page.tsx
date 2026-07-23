@@ -63,19 +63,21 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
+  // Cada card exige a permissão de tela da entidade e um valor não-nulo (o backend
+  // devolve `null` para quem não tem a permissão — não vaza contagem global).
   const cardConfig = summary
     ? [
-        { label: 'Legendários', value: summary.totals.legendarios, icon: <Users className="h-5 w-5" /> },
-        { label: 'Legendários ativos', value: summary.totals.activeLegendarios, icon: <UserCheck className="h-5 w-5" /> },
-        { label: 'Equipes ativas', value: summary.totals.activeTeams, icon: <Shield className="h-5 w-5" /> },
-        { label: 'TOPs', value: summary.totals.tops, icon: <MapPin className="h-5 w-5" /> },
-        { label: 'Famílias', value: summary.totals.families, icon: <Heart className="h-5 w-5" /> },
-        { label: 'Igrejas', value: summary.totals.churches, icon: <Compass className="h-5 w-5" /> },
-        { label: 'Cidades', value: summary.totals.cities, icon: <Map className="h-5 w-5" /> },
-        { label: 'Expertises', value: summary.totals.expertises, icon: <Wrench className="h-5 w-5" /> },
-        { label: 'Interesse social', value: summary.totals.socialActionInterest, icon: <HeartHandshake className="h-5 w-5" /> },
-        { label: 'Ações planejadas', value: summary.totals.plannedSocialActions, icon: <Calendar className="h-5 w-5" /> },
-      ]
+        { label: 'Legendários', value: summary.totals.legendarios, permission: 'legendarios.read', icon: <Users className="h-5 w-5" /> },
+        { label: 'Legendários ativos', value: summary.totals.activeLegendarios, permission: 'legendarios.read', icon: <UserCheck className="h-5 w-5" /> },
+        { label: 'Equipes ativas', value: summary.totals.activeTeams, permission: 'teams.read', icon: <Shield className="h-5 w-5" /> },
+        { label: 'TOPs', value: summary.totals.tops, permission: 'tops.read', icon: <MapPin className="h-5 w-5" /> },
+        { label: 'Famílias', value: summary.totals.families, permission: 'tops.families.read', icon: <Heart className="h-5 w-5" /> },
+        { label: 'Igrejas', value: summary.totals.churches, permission: 'churches.read', icon: <Compass className="h-5 w-5" /> },
+        { label: 'Cidades', value: summary.totals.cities, permission: 'legendarios.read', icon: <Map className="h-5 w-5" /> },
+        { label: 'Expertises', value: summary.totals.expertises, permission: 'expertises.read', icon: <Wrench className="h-5 w-5" /> },
+        { label: 'Interesse social', value: summary.totals.socialActionInterest, permission: 'legendarios.read', icon: <HeartHandshake className="h-5 w-5" /> },
+        { label: 'Ações planejadas', value: summary.totals.plannedSocialActions, permission: 'social-actions.read', icon: <Calendar className="h-5 w-5" /> },
+      ].filter((card) => card.value !== null && hasPermission(user, card.permission))
     : [];
 
   return (
@@ -153,7 +155,7 @@ export default function DashboardPage() {
             <DashboardCard
               key={card.label}
               label={card.label}
-              value={card.value}
+              value={card.value ?? 0}
               icon={card.icon}
             />
           ))}
@@ -187,7 +189,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {summary.highlightedTop && (
+          {summary.highlightedTop && summary.highlightedTopMetrics && (
             <>
               <div className="grid gap-px bg-zinc-800 grid-cols-2 sm:grid-cols-4">
                 <Mini label="Participantes" value={summary.highlightedTopMetrics.participants} />

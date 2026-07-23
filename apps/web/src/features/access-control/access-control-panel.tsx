@@ -178,11 +178,16 @@ function ScreenRow({
   const hasToggles = screen.actionToggles.length > 0;
 
   return (
-    <section className="rounded-xl border border-zinc-800 bg-[#111113] p-4">
+    <section className={`rounded-xl border bg-[#111113] p-4 ${screen.scopeMissing ? 'border-amber-500/60' : 'border-zinc-800'}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <ShieldCheck className={`h-4 w-4 ${granted ? 'text-orange-500' : 'text-zinc-600'}`} />
           <span className="text-sm font-bold text-white">{screen.label}</span>
+          {screen.scopeMissing && (
+            <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-400">
+              Sem escopo
+            </span>
+          )}
         </div>
         <div className="inline-flex overflow-hidden rounded-lg border border-zinc-800">
           {levels.map((l) => (
@@ -226,7 +231,9 @@ function ScreenRow({
           <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Escopo (a qual fatia)</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {screen.scopes.length === 0 ? (
-              <span className="text-xs text-zinc-600">Sem restrição — acesso a tudo desta tela.</span>
+              <span className="text-xs font-semibold text-amber-400">
+                ⚠ Sem escopo: este usuário não verá nenhum dado desta tela. Adicione ao menos um escopo abaixo.
+              </span>
             ) : (
               screen.scopes.map((scope) => (
                 <span key={scope.id} className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-200">

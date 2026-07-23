@@ -1,18 +1,25 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   PermissionEffect,
+  ScopeSelectionMode,
+  ScopeValueSource,
   ScreenAccessLevel,
   UserScopeType,
   type ScreenScopeEntry,
+  type ScreenScopeState,
+  type SetScopeSelectionInput,
   type UserScreenAccessControl,
 } from '@central-da-manada/shared';
 import { PrismaService } from '../../database/prisma.service';
+import { AccessPolicyService, type AccessScope } from '../../common/access/access-policy.service';
 import { AuditService } from '../audit/audit.service';
 import { EffectivePermissionsService } from '../../common/access/effective-permissions.service';
 import { roleContributesBase } from '../../common/access/access.constants';
-import { SCREEN_CATALOG, getScreen, permissionsForLevel, screenActionToggles } from '../../common/access/screen-catalog';
+import { SCREEN_CATALOG, getScreen, permissionsForLevel, satisfyingScopeTypes, screenActionToggles } from '../../common/access/screen-catalog';
 import { normalizeCityKey } from '../../common/org-chart/org-chart.util';
 import { AddUserScopeDto } from './dto/access-control.dto';
+
+const MAX_SELECTED = 500;
 
 const userAccessInclude = {
   roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
@@ -26,6 +33,7 @@ export class AccessControlService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly effectivePermissions: EffectivePermissionsService,
+    private readonly accessPolicy: AccessPolicyService,
   ) {}
 
   // Estado de acesso de um usuário POR TELA (o admin nunca vê permissions cruas).
@@ -37,6 +45,17 @@ export class AccessControlService {
     if (!user) throw new NotFoundException('User not found.');
 
     const effective = this.computeEffective(user);
+
+    // Estado de escopo por tipo (change access-scope-bulk-selection): configurado x efetivo.
+    const [policies, scope] = await Promise.all([
+      this.prisma.userScopePolicy.findMany({ where: { userId }, select: { type: true, mode: true } }),
+      this.accessPolicy.resolveScopeByUserId(userId),
+    ]);
+    const policyByType = new Map(policies.map((policy) => [policy.type as UserScopeType, policy.mode as ScopeSelectionMode]));
+    const baseStateByType = new Map<UserScopeType, Omit<ScreenScopeState, 'satisfying'>>();
+    for (const type of Object.values(UserScopeType)) {
+      baseStateByType.set(type, this.buildScopeBaseState(type, user.scopes, policyByType.get(type), scope));
+    }
 
     const screens = SCREEN_CATALOG.map((screen) => {
       const supportsEdit = screen.edit.length > 0;
@@ -54,14 +73,65 @@ export class AccessControlService {
 
       const actionToggles = screenActionToggles(screen).map((key) => ({ key, granted: effective.has(key) }));
 
-      // Estado inválido (change access-scope-semantics-hardening): tela escopável concedida
-      // sem nenhum escopo → fail-closed faz o usuário "não ver nada". A UI sinaliza/orienta.
-      const scopeMissing = screen.scopeTypes.length > 0 && level !== ScreenAccessLevel.NONE && scopes.length === 0;
+      const satisfying = satisfyingScopeTypes(screen);
+      const scopeStates: ScreenScopeState[] = screen.scopeTypes.map((type) => ({
+        ...baseStateByType.get(type)!,
+        satisfying: satisfying.includes(type),
+      }));
 
-      return { id: screen.id, label: screen.label, level, supportsEdit, scopeTypes: screen.scopeTypes, scopes, actionToggles, scopeMissing };
+      // Estado inválido (refinado na change access-scope-bulk-selection): tela concedida, com
+      // dimensão SATISFATÓRIA, mas NENHUMA satisfatória tem escopo EFETIVO (SELECTED com valores,
+      // ALL, ou derivado do papel). Escopo apenas suplementar (ex.: TEAM em Legendários) NÃO conta.
+      const scopeMissing =
+        level !== ScreenAccessLevel.NONE &&
+        satisfying.length > 0 &&
+        !satisfying.some((type) => this.hasEffectiveScope(type, scope));
+
+      return { id: screen.id, label: screen.label, level, supportsEdit, scopeTypes: screen.scopeTypes, scopes, actionToggles, scopeMissing, scopeStates };
     });
 
     return { userId: user.id, roles: user.roles.map((userRole) => userRole.role.name), screens };
+  }
+
+  private hasEffectiveScope(type: UserScopeType, scope: AccessScope): boolean {
+    if (scope.isAdmin) return true; // admin é irrestrito → nunca "sem escopo".
+    const { all, ids } = this.effectiveDimension(type, scope);
+    return all || ids.length > 0;
+  }
+
+  private effectiveDimension(type: UserScopeType, scope: AccessScope): { all: boolean; ids: string[] } {
+    switch (type) {
+      case UserScopeType.CITY:
+        return { all: !!scope.allCities, ids: scope.cityKeys };
+      case UserScopeType.TEAM:
+        return { all: !!scope.allTeams, ids: scope.teamIds };
+      case UserScopeType.CHURCH:
+        return { all: !!scope.allChurches, ids: scope.churchIds };
+      default:
+        return { all: !!scope.allTops, ids: scope.topIds };
+    }
+  }
+
+  private buildScopeBaseState(
+    type: UserScopeType,
+    allScopes: { type: string; value: string }[],
+    policyMode: ScopeSelectionMode | undefined,
+    scope: AccessScope,
+  ): Omit<ScreenScopeState, 'satisfying'> {
+    const explicitValues = allScopes.filter((s) => s.type === type).map((s) => s.value);
+    const configuredMode =
+      policyMode === ScopeSelectionMode.ALL
+        ? ScopeSelectionMode.ALL
+        : explicitValues.length
+          ? ScopeSelectionMode.SELECTED
+          : ScopeSelectionMode.MISSING;
+    const { all, ids } = this.effectiveDimension(type, scope);
+    const effectiveMode = all ? ScopeSelectionMode.ALL : ids.length ? ScopeSelectionMode.SELECTED : ScopeSelectionMode.MISSING;
+    const explicitSet = new Set(explicitValues);
+    const effectiveValues = all
+      ? []
+      : ids.map((value) => ({ value, sources: [explicitSet.has(value) ? ScopeValueSource.EXPLICIT : ScopeValueSource.ROLE_DERIVED] }));
+    return { type, configuredMode, configuredValues: explicitValues, effectiveMode, effectiveValues };
   }
 
   // Define o nível de acesso de UMA tela, traduzindo para o conjunto de overrides
@@ -154,17 +224,74 @@ export class AccessControlService {
     return this.getUserScreenAccess(userId);
   }
 
-  // Adiciona um escopo (1-N). Valida a combinação tela×escopo (permission de leitura).
+  // Substituição ATÔMICA do escopo de um tipo (change access-scope-bulk-selection):
+  // MISSING (limpa) / SELECTED (1..500 ids únicos válidos) / ALL (política, sem valores).
+  // Valida tudo ANTES de escrever; transação garante ausência de estado parcial.
+  async setScopeSelection(userId: string, type: UserScopeType, input: SetScopeSelectionInput, actorUserId?: string): Promise<UserScreenAccessControl> {
+    await this.ensureUserExists(userId);
+    if (!Object.values(UserScopeType).includes(type)) {
+      throw new BadRequestException(`Unknown scope type: ${type}`);
+    }
+    const values = input.values ?? [];
+
+    if (input.mode === ScopeSelectionMode.SELECTED) {
+      if (values.length < 1) throw new BadRequestException('SELECTED exige ao menos um valor.');
+      if (values.length > MAX_SELECTED) throw new BadRequestException(`SELECTED aceita no máximo ${MAX_SELECTED} valores — reduza a seleção ou use "Todos".`);
+      if (new Set(values).size !== values.length) throw new BadRequestException('Valores de escopo duplicados.');
+      await this.assertScopeAllowed(userId, type);
+      const normalized: string[] = [];
+      for (const value of values) normalized.push(await this.normalizeScopeValue(type, value)); // 400 se inexistente/tipo errado
+      const unique = Array.from(new Set(normalized));
+      await this.prisma.$transaction(async (tx) => {
+        await tx.userScope.deleteMany({ where: { userId, type } });
+        await tx.userScope.createMany({ data: unique.map((value) => ({ userId, type, value })) });
+        await tx.userScopePolicy.upsert({
+          where: { userId_type: { userId, type } },
+          update: { mode: ScopeSelectionMode.SELECTED },
+          create: { userId, type, mode: ScopeSelectionMode.SELECTED },
+        });
+      });
+    } else if (input.mode === ScopeSelectionMode.ALL) {
+      if (values.length) throw new BadRequestException('ALL não aceita valores.');
+      await this.assertScopeAllowed(userId, type);
+      await this.prisma.$transaction(async (tx) => {
+        await tx.userScope.deleteMany({ where: { userId, type } });
+        await tx.userScopePolicy.upsert({
+          where: { userId_type: { userId, type } },
+          update: { mode: ScopeSelectionMode.ALL },
+          create: { userId, type, mode: ScopeSelectionMode.ALL },
+        });
+      });
+    } else {
+      if (values.length) throw new BadRequestException('MISSING não aceita valores.');
+      await this.prisma.$transaction(async (tx) => {
+        await tx.userScope.deleteMany({ where: { userId, type } });
+        await tx.userScopePolicy.deleteMany({ where: { userId, type } });
+      });
+    }
+
+    await this.audit.create({ actorUserId, entityType: 'UserScope', entityId: userId, action: 'set-selection', after: { type, mode: input.mode } });
+    return this.getUserScreenAccess(userId);
+  }
+
+  // Adiciona um escopo (1-N). Valida a combinação tela×escopo e o modo (409 em ALL).
   async addScope(userId: string, dto: AddUserScopeDto, actorUserId?: string): Promise<UserScreenAccessControl> {
     await this.ensureUserExists(userId);
 
     const value = await this.normalizeScopeValue(dto.type, dto.value);
     await this.assertScopeAllowed(userId, dto.type);
+    await this.assertNotAllMode(userId, dto.type);
 
     await this.prisma.userScope.upsert({
       where: { userId_type_value: { userId, type: dto.type, value } },
       update: {},
       create: { userId, type: dto.type, value },
+    });
+    // A dimensão passa a ter valores explícitos → garante política SELECTED.
+    await this.prisma.userScopePolicy.upsert({
+      where: { userId_type: { userId, type: dto.type } },
+      update: { mode: ScopeSelectionMode.SELECTED },
+      create: { userId, type: dto.type, mode: ScopeSelectionMode.SELECTED },
     });
 
     await this.audit.create({ actorUserId, entityType: 'UserScope', entityId: userId, action: 'add', after: { type: dto.type, value } });
@@ -174,10 +301,25 @@ export class AccessControlService {
   async removeScope(userId: string, scopeId: string, actorUserId?: string): Promise<UserScreenAccessControl> {
     const scope = await this.prisma.userScope.findFirst({ where: { id: scopeId, userId } });
     if (!scope) throw new NotFoundException('Scope not found for this user.');
+    await this.assertNotAllMode(userId, scope.type as UserScopeType);
 
     await this.prisma.userScope.delete({ where: { id: scope.id } });
+    // Removeu o último valor do tipo → volta a MISSING (remove a política).
+    const remaining = await this.prisma.userScope.count({ where: { userId, type: scope.type } });
+    if (remaining === 0) {
+      await this.prisma.userScopePolicy.deleteMany({ where: { userId, type: scope.type } });
+    }
+
     await this.audit.create({ actorUserId, entityType: 'UserScope', entityId: userId, action: 'remove', before: { type: scope.type, value: scope.value } });
     return this.getUserScreenAccess(userId);
+  }
+
+  // Operação unitária é incompatível com dimensão em ALL → 409 (o cliente deve usar o PUT).
+  private async assertNotAllMode(userId: string, type: UserScopeType) {
+    const policy = await this.prisma.userScopePolicy.findUnique({ where: { userId_type: { userId, type } } });
+    if (policy?.mode === ScopeSelectionMode.ALL) {
+      throw new ConflictException('SCOPE_MODE_CONFLICT: dimensão em "Todos"; use a substituição em lote (PUT) para alterar.');
+    }
   }
 
   private upsertOverride(userId: string, permissionId: string, effect: PermissionEffect) {

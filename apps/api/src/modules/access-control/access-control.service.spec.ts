@@ -1,5 +1,5 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { ScreenAccessLevel, UserScopeType } from '@central-da-manada/shared';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { ScopeSelectionMode, ScreenAccessLevel, UserScopeType } from '@central-da-manada/shared';
 import { AccessControlService } from './access-control.service';
 import { getScreen, permissionsForLevel } from '../../common/access/screen-catalog';
 
@@ -21,10 +21,13 @@ function buildUser(
   };
 }
 
+const emptyScope = () => ({ isAdmin: false, churchIds: [], teamIds: [], legendaryIds: [], cityKeys: [], legendaryCities: [], topIds: [] });
+
 describe('AccessControlService (por tela)', () => {
   let prisma: any;
   let audit: any;
   let effective: any;
+  let accessPolicy: any;
   let service: AccessControlService;
 
   beforeEach(() => {
@@ -32,15 +35,18 @@ describe('AccessControlService (por tela)', () => {
       user: { findFirst: jest.fn() },
       permission: { findMany: jest.fn().mockResolvedValue([]) },
       userPermissionOverride: { upsert: jest.fn(), deleteMany: jest.fn() },
-      userScope: { upsert: jest.fn(), findFirst: jest.fn(), delete: jest.fn() },
+      userScope: { upsert: jest.fn(), findFirst: jest.fn(), delete: jest.fn(), deleteMany: jest.fn(), createMany: jest.fn(), count: jest.fn().mockResolvedValue(0) },
+      userScopePolicy: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn(), deleteMany: jest.fn() },
       team: { findFirst: jest.fn() },
       church: { findFirst: jest.fn() },
       topEvent: { findFirst: jest.fn() },
       legendary: { findMany: jest.fn().mockResolvedValue([]) },
+      $transaction: jest.fn(async (cb: any) => cb(prisma)),
     };
     audit = { create: jest.fn() };
     effective = { resolveKeys: jest.fn().mockResolvedValue([]) };
-    service = new AccessControlService(prisma, audit, effective);
+    accessPolicy = { resolveScopeByUserId: jest.fn().mockResolvedValue(emptyScope()) };
+    service = new AccessControlService(prisma, audit, effective, accessPolicy);
   });
 
   describe('getUserScreenAccess — telas, não permissions', () => {
@@ -62,6 +68,8 @@ describe('AccessControlService (por tela)', () => {
           [{ id: 's1', type: 'TEAM', value: 'team-seg' }],
         ),
       );
+      // Efetivo: só TEAM tem escopo (satisfatório p/ Equipes; suplementar p/ Legendários).
+      accessPolicy.resolveScopeByUserId.mockResolvedValue({ ...emptyScope(), teamIds: ['team-seg'] });
 
       const acl = await service.getUserScreenAccess('u1');
       const byId = Object.fromEntries(acl.screens.map((s) => [s.id, s]));
@@ -260,6 +268,65 @@ describe('AccessControlService (por tela)', () => {
     it('rejeita remover escopo de outro usuário', async () => {
       prisma.userScope.findFirst.mockResolvedValueOnce(null);
       await expect(service.removeScope('u1', 's-x')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  // change access-scope-bulk-selection: substituição atômica + tri-estado.
+  describe('setScopeSelection — substituição atômica', () => {
+    beforeEach(() => {
+      prisma.user.findFirst.mockResolvedValue(buildUser([]));
+      effective.resolveKeys.mockResolvedValue(viewOf('tops')); // tela TOPs concedida → elegível p/ TOP
+    });
+
+    it('SELECTED vazio → 400', async () => {
+      await expect(service.setScopeSelection('u1', UserScopeType.TOP, { mode: ScopeSelectionMode.SELECTED, values: [] })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('ALL com valores → 400', async () => {
+      await expect(service.setScopeSelection('u1', UserScopeType.TOP, { mode: ScopeSelectionMode.ALL, values: ['x'] })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('SELECTED com duplicados → 400', async () => {
+      await expect(service.setScopeSelection('u1', UserScopeType.TOP, { mode: ScopeSelectionMode.SELECTED, values: ['a', 'a'] })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('ALL: remove valores explícitos e grava política ALL', async () => {
+      await service.setScopeSelection('u1', UserScopeType.TOP, { mode: ScopeSelectionMode.ALL, values: [] }, 'admin');
+      expect(prisma.userScope.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1', type: UserScopeType.TOP } });
+      expect(prisma.userScopePolicy.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ create: { userId: 'u1', type: UserScopeType.TOP, mode: ScopeSelectionMode.ALL } }),
+      );
+    });
+
+    it('MISSING: limpa valores e política', async () => {
+      await service.setScopeSelection('u1', UserScopeType.TOP, { mode: ScopeSelectionMode.MISSING, values: [] }, 'admin');
+      expect(prisma.userScope.deleteMany).toHaveBeenCalled();
+      expect(prisma.userScopePolicy.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1', type: UserScopeType.TOP } });
+    });
+
+    it('SELECTED válido: substitui valores e grava política SELECTED', async () => {
+      prisma.topEvent.findFirst.mockResolvedValue({ id: 'top-1' });
+      await service.setScopeSelection('u1', UserScopeType.TOP, { mode: ScopeSelectionMode.SELECTED, values: ['top-1'] }, 'admin');
+      expect(prisma.userScope.createMany).toHaveBeenCalledWith({ data: [{ userId: 'u1', type: UserScopeType.TOP, value: 'top-1' }] });
+      expect(prisma.userScopePolicy.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ create: { userId: 'u1', type: UserScopeType.TOP, mode: ScopeSelectionMode.SELECTED } }),
+      );
+    });
+  });
+
+  describe('unitário policy-aware — 409 SCOPE_MODE_CONFLICT em ALL', () => {
+    it('addScope numa dimensão em ALL → 409', async () => {
+      prisma.user.findFirst.mockResolvedValue(buildUser([]));
+      effective.resolveKeys.mockResolvedValue(viewOf('tops'));
+      prisma.topEvent.findFirst.mockResolvedValue({ id: 'top-1' });
+      prisma.userScopePolicy.findUnique.mockResolvedValue({ mode: ScopeSelectionMode.ALL });
+      await expect(service.addScope('u1', { type: UserScopeType.TOP, value: 'top-1' })).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('removeScope numa dimensão em ALL → 409', async () => {
+      prisma.userScope.findFirst.mockResolvedValue({ id: 's1', type: 'TOP', value: 'top-1' });
+      prisma.userScopePolicy.findUnique.mockResolvedValue({ mode: ScopeSelectionMode.ALL });
+      await expect(service.removeScope('u1', 's1')).rejects.toBeInstanceOf(ConflictException);
     });
   });
 });

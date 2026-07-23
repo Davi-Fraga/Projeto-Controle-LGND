@@ -12,6 +12,7 @@ describe('TopsService', () => {
   let service: TopsService;
   let prisma: any;
   let audit: any;
+  let accessPolicy: any;
 
   beforeEach(() => {
     prisma = {
@@ -26,8 +27,28 @@ describe('TopsService', () => {
       topServant: { findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn(), create: jest.fn(), update: jest.fn() },
     };
     audit = { create: jest.fn() };
-    const accessPolicy = { resolveScope: jest.fn().mockResolvedValue({ isAdmin: true }), buildTopWhere: jest.fn().mockReturnValue({}) } as any;
+    accessPolicy = { resolveScope: jest.fn().mockResolvedValue({ isAdmin: true }), buildTopWhere: jest.fn().mockReturnValue({}) } as any;
     service = new TopsService(prisma, audit, accessPolicy);
+  });
+
+  it('scopes TOP options with the same policy as the main list', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, topIds: ['top-1'] });
+    accessPolicy.buildTopWhere.mockReturnValueOnce({ id: { in: ['top-1'] } });
+    prisma.topEvent.findMany.mockResolvedValueOnce([]);
+
+    await service.options({ limit: 10 }, {
+      sub: 'user-1',
+      email: 'user@example.com',
+      roles: ['MEMBER'],
+      permissions: ['tops.read'],
+    });
+
+    expect(prisma.topEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        AND: [{ id: { in: ['top-1'] } }],
+      }),
+      take: 10,
+    }));
   });
 
   it('creates TOP', async () => {

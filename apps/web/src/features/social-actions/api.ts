@@ -1,6 +1,10 @@
 import { api } from '@/lib/api';
 import type { Legendary, PaginatedResponse, SocialAction, SocialActionParticipant, SocialActionParticipantStatus, SocialActionStatus } from '@central-da-manada/shared';
 
+export type VolunteerSuggestion = Pick<Legendary, 'id' | 'fullName' | 'lgndNumber' | 'city'> & {
+  profession?: { id: string; name: string } | null;
+};
+
 export type SocialActionPayload = {
   title: string;
   description?: string | null;
@@ -49,4 +53,4 @@ export const getSocialActionParticipants = (id: string) => api<{ data: SocialAct
 export const addSocialActionParticipant = (id: string, payload: SocialActionParticipantPayload) => api<{ data: SocialActionParticipant }>(`/social-actions/${id}/participants`, { method: 'POST', body: JSON.stringify(payload) });
 export const updateSocialActionParticipant = (id: string, participantId: string, payload: SocialActionParticipantPayload) => api<{ data: SocialActionParticipant }>(`/social-actions/${id}/participants/${participantId}`, { method: 'PATCH', body: JSON.stringify(payload) });
 export const removeSocialActionParticipant = (id: string, participantId: string) => api<{ data: SocialActionParticipant }>(`/social-actions/${id}/participants/${participantId}`, { method: 'DELETE' });
-export const getVolunteerSuggestions = (filters: Record<string, unknown>) => api<PaginatedResponse<Legendary>>(`/social-actions/volunteers/suggestions${query(filters) ? `?${query(filters)}` : ''}`);
+export const getVolunteerSuggestions = (filters: Record<string, unknown>) => api<PaginatedResponse<VolunteerSuggestion>>(`/social-actions/volunteers/suggestions${query(filters) ? `?${query(filters)}` : ''}`);

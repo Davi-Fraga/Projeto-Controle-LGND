@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TeamMembershipStatus, TeamStatus } from '@central-da-manada/shared';
 import { TeamsService } from './teams.service';
 
@@ -33,8 +33,9 @@ describe('TeamsService', () => {
     };
     audit = { create: jest.fn() };
     accessPolicy = {
-      resolveScope: jest.fn(),
+      resolveScope: jest.fn().mockResolvedValue({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] }),
       buildTeamWhere: jest.fn(),
+      assertTeamAllowed: jest.fn(),
     };
     service = new TeamsService(prisma, audit, accessPolicy);
   });
@@ -113,12 +114,36 @@ describe('TeamsService', () => {
 
   it('findMembers returns 404 when teamId is outside scope', async () => {
     accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: ['other-team'], legendaryIds: [] });
+    accessPolicy.assertTeamAllowed.mockImplementationOnce(() => {
+      throw new ForbiddenException('Team out of scope.');
+    });
 
     await expect(
       service.findMembers('team-1', { page: 1, perPage: 10 }, coordinatorUser),
     ).rejects.toBeInstanceOf(NotFoundException);
 
     expect(prisma.team.findFirst).not.toHaveBeenCalled();
+    expect(prisma.teamMembership.findMany).not.toHaveBeenCalled();
+  });
+
+  it('findMembers accepts TEAM=ALL through the canonical assertion', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({
+      isAdmin: false,
+      teamIds: [],
+      allTeams: true,
+    });
+    prisma.team.findFirst.mockResolvedValueOnce({ id: 'team-any', name: 'Midia', _count: { memberships: 0 } });
+    prisma.teamMembership.findMany.mockResolvedValueOnce([]);
+    prisma.teamMembership.count.mockResolvedValueOnce(0);
+
+    await expect(
+      service.findMembers('team-any', { page: 1, perPage: 10 }, coordinatorUser),
+    ).resolves.toEqual(expect.objectContaining({ data: [] }));
+
+    expect(accessPolicy.assertTeamAllowed).toHaveBeenCalledWith(
+      expect.objectContaining({ allTeams: true }),
+      'team-any',
+    );
   });
 
   it('findMembers succeeds for admin for any team', async () => {
@@ -194,7 +219,7 @@ describe('TeamsService', () => {
     const result = await service.update('team-1', {
       coordinatorLegendaryId: 'legendary-1',
       deputyCoordinatorLegendaryId: 'legendary-2',
-    });
+    }, adminUser);
 
     expect(result.coordinatorLegendaryId).toBe('legendary-1');
     expect(audit.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'update_coordinator' }));
@@ -211,7 +236,7 @@ describe('TeamsService', () => {
       service.update('team-1', {
         coordinatorLegendaryId: 'legendary-1',
         deputyCoordinatorLegendaryId: 'legendary-1',
-      }),
+      }, adminUser),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -230,7 +255,7 @@ describe('TeamsService', () => {
     const result = await service.addMember('team-1', {
       legendaryId: 'legendary-1',
       role: 'Editor',
-    });
+    }, adminUser);
 
     expect(result.role).toBe('Editor');
     expect(audit.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'add_member' }));
@@ -245,7 +270,7 @@ describe('TeamsService', () => {
       service.addMember('team-1', {
         legendaryId: 'legendary-1',
         role: 'Editor',
-      }),
+      }, adminUser),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -263,9 +288,120 @@ describe('TeamsService', () => {
       endedAt: new Date(),
     });
 
-    const result = await service.deactivateMember('team-1', 'membership-1');
+    const result = await service.deactivateMember('team-1', 'membership-1', adminUser);
 
     expect(result.status).toBe(TeamMembershipStatus.INACTIVE);
     expect(audit.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'deactivate_member' }));
+  });
+
+  it('does not update a team outside the effective scope and returns 404', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({
+      isAdmin: false,
+      teamIds: ['team-derived'],
+    });
+    accessPolicy.assertTeamAllowed.mockImplementationOnce(() => {
+      throw new ForbiddenException('Team out of scope.');
+    });
+
+    await expect(
+      service.update('team-external', { name: 'Nope' }, coordinatorUser),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.team.findFirst).not.toHaveBeenCalled();
+    expect(prisma.team.update).not.toHaveBeenCalled();
+    expect(audit.create).not.toHaveBeenCalled();
+  });
+
+  it('stops every scoped mutation before writes when the parent team is external', async () => {
+    const attempts = [
+      () => service.deactivate('team-external', coordinatorUser),
+      () => service.restore('team-external', coordinatorUser),
+      () => service.addMember('team-external', { legendaryId: 'l1', role: 'Editor' }, coordinatorUser),
+      () => service.updateMember('team-external', 'membership-1', { role: 'Lead' }, coordinatorUser),
+      () => service.deactivateMember('team-external', 'membership-1', coordinatorUser),
+    ];
+
+    for (const attempt of attempts) {
+      accessPolicy.resolveScope.mockResolvedValueOnce({
+        isAdmin: false,
+        teamIds: ['team-allowed'],
+      });
+      accessPolicy.assertTeamAllowed.mockImplementationOnce(() => {
+        throw new ForbiddenException('Team out of scope.');
+      });
+      await expect(attempt()).rejects.toBeInstanceOf(NotFoundException);
+    }
+
+    expect(prisma.team.update).not.toHaveBeenCalled();
+    expect(prisma.teamMembership.create).not.toHaveBeenCalled();
+    expect(prisma.teamMembership.update).not.toHaveBeenCalled();
+    expect(audit.create).not.toHaveBeenCalled();
+  });
+
+  it('allows an update with TEAM=ALL and keeps the authenticated audit actor', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({
+      isAdmin: false,
+      teamIds: [],
+      allTeams: true,
+    });
+    prisma.team.findFirst.mockResolvedValueOnce({
+      id: 'team-any',
+      name: 'Midia',
+      description: null,
+      coordinatorLegendaryId: null,
+      deputyCoordinatorLegendaryId: null,
+      _count: { memberships: 0 },
+    });
+    prisma.team.update.mockResolvedValueOnce({
+      id: 'team-any',
+      name: 'Midia',
+      description: 'Nova',
+      coordinatorLegendaryId: null,
+      deputyCoordinatorLegendaryId: null,
+      _count: { memberships: 0 },
+    });
+
+    await service.update('team-any', { description: 'Nova' }, coordinatorUser);
+
+    expect(accessPolicy.assertTeamAllowed).toHaveBeenCalledWith(
+      expect.objectContaining({ allTeams: true }),
+      'team-any',
+    );
+    expect(audit.create).toHaveBeenCalledWith(
+      expect.objectContaining({ actorUserId: coordinatorUser.sub }),
+    );
+  });
+
+  it('uses the authenticated user as audit actor for an in-scope derived team', async () => {
+    accessPolicy.resolveScope.mockResolvedValueOnce({
+      isAdmin: false,
+      teamIds: ['team-1'],
+    });
+    prisma.team.findFirst
+      .mockResolvedValueOnce({
+        id: 'team-1',
+        name: 'Midia',
+        coordinatorLegendaryId: null,
+        deputyCoordinatorLegendaryId: null,
+        _count: { memberships: 0 },
+      })
+      .mockResolvedValueOnce(null);
+    prisma.team.update.mockResolvedValueOnce({
+      id: 'team-1',
+      name: 'Midia Nova',
+      coordinatorLegendaryId: null,
+      deputyCoordinatorLegendaryId: null,
+      _count: { memberships: 0 },
+    });
+
+    await service.update('team-1', { name: 'Midia Nova' }, coordinatorUser);
+
+    expect(accessPolicy.assertTeamAllowed).toHaveBeenCalledWith(
+      expect.objectContaining({ teamIds: ['team-1'] }),
+      'team-1',
+    );
+    expect(audit.create).toHaveBeenCalledWith(
+      expect.objectContaining({ actorUserId: coordinatorUser.sub, action: 'update' }),
+    );
   });
 });

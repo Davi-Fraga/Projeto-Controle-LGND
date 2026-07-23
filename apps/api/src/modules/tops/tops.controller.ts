@@ -20,7 +20,7 @@ import { OrgChartQueryDto } from './dto/org-chart.dto';
 export class TopsController {
   constructor(private readonly tops: TopsService) {}
   @Get() @Permissions('tops.read') findAll(@Query() q: TopQueryDto, @CurrentUser() user: AuthenticatedUser) { return this.tops.findAll(q, user); }
-  @Get('options') @Permissions('tops.read') async options(@Query() q: OptionsQueryDto) { return { data: await this.tops.options(q) }; }
+  @Get('options') @Permissions('tops.read') async options(@Query() q: OptionsQueryDto, @CurrentUser() user: AuthenticatedUser) { return { data: await this.tops.options(q, user) }; }
   @Get(':id') @Permissions('tops.read') async findOne(@Param('id') id: string) { return { data: await this.tops.findOne(id) }; }
   @Get(':id/org-chart') @Permissions('tops.read') async orgChart(@Param('id') id: string, @Query() q: OrgChartQueryDto) { return { data: await this.tops.getOrgChart(id, q.view) }; }
   @Post() @Permissions('tops.create') async create(@Body() dto: CreateTopDto, @CurrentUser() u: { sub: string }) { return { data: await this.tops.create(dto, u.sub) }; }

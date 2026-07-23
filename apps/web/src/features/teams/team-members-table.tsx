@@ -10,9 +10,15 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 type Props = {
   teamId: string;
+  capabilities: {
+    addMembership: boolean;
+    updateMembership: boolean;
+    removeMembership: boolean;
+    updateLegendary: boolean;
+  };
 };
 
-export function TeamMembersTable({ teamId }: Props) {
+export function TeamMembersTable({ teamId, capabilities }: Props) {
   const [members, setMembers] = useState<TeamMembership[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -44,12 +50,14 @@ export function TeamMembersTable({ teamId }: Props) {
         </div>
         <div className="flex flex-1 max-w-md gap-3">
           <input className="input" placeholder="Buscar membro..." value={search} onChange={(event) => setSearch(event.target.value)} />
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex h-11 shrink-0 items-center justify-center rounded-lg bg-orange-600 px-4 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500"
-          >
-            Adicionar Membro
-          </button>
+          {capabilities.addMembership ? (
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex h-11 shrink-0 items-center justify-center rounded-lg bg-orange-600 px-4 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500"
+            >
+              Adicionar Membro
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -107,18 +115,30 @@ export function TeamMembersTable({ teamId }: Props) {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-850 hover:text-zinc-100"
-                          onClick={() => setEditing(member)}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          className="flex h-8 items-center gap-1.5 rounded-lg border border-rose-900/30 bg-rose-950/20 px-3 text-xs font-bold uppercase tracking-wider text-rose-400 transition-all hover:bg-rose-950/50 hover:text-rose-300"
-                          onClick={() => setDeactivatingId(member.id)}
-                        >
-                          Inativar
-                        </button>
+                        {capabilities.updateLegendary && member.legendary ? (
+                          <Link
+                            href={`/dashboard/legendarios/${member.legendaryId}/editar?fromTeamId=${encodeURIComponent(teamId)}`}
+                            className="flex h-8 items-center gap-1.5 rounded-lg bg-orange-600 px-3 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500"
+                          >
+                            Editar cadastro
+                          </Link>
+                        ) : null}
+                        {capabilities.updateMembership ? (
+                          <button
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
+                            onClick={() => setEditing(member)}
+                          >
+                            Editar vínculo
+                          </button>
+                        ) : null}
+                        {capabilities.removeMembership ? (
+                          <button
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-rose-900/30 bg-rose-950/20 px-3 text-xs font-bold uppercase tracking-wider text-rose-400 transition-all hover:bg-rose-950/50 hover:text-rose-300"
+                            onClick={() => setDeactivatingId(member.id)}
+                          >
+                            Inativar
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

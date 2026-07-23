@@ -82,7 +82,7 @@ export default function LegendarioDetalhePage() {
         </div>
         {hasPermission(user, 'legendarios.update') ? (
           <Link
-            href={`/dashboard/legendarios/${legendario.id}/editar`}
+            href={`/dashboard/legendarios/${legendario.id}/editar${fromTeamId ? `?fromTeamId=${fromTeamId}` : ''}`}
             className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500 text-center"
           >
             Editar Cadastro

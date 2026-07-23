@@ -16,7 +16,7 @@ describe('TeamMemberForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Selecione' }));
     fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'Apoio' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar membro' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar membro' }));
 
     await waitFor(() => expect(addTeamMember).toHaveBeenCalledWith('tm1', expect.objectContaining({ legendaryId: 'lgnd-1' })));
   });
@@ -24,5 +24,7 @@ describe('TeamMemberForm', () => {
   it('na edição o combobox de legendário fica desabilitado', () => {
     render(<TeamMemberForm teamId="tm1" member={{ id: 'm1', legendaryId: 'lgnd-9', role: 'X', status: 'ACTIVE' } as any} onSaved={vi.fn()} onCancel={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Selecione' })).toBeDisabled();
+    expect(screen.getByRole('heading', { name: 'Editar vínculo com a equipe' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Salvar vínculo' })).toBeInTheDocument();
   });
 });

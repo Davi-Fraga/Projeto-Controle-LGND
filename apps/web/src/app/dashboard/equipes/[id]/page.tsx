@@ -9,11 +9,12 @@ import type { Team } from '@/features/teams/types';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatTeamName } from '@/lib/teams';
+import { hasPermission } from '@/lib/permissions';
 
 export default function TeamDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { loading: authLoading } = useRequireAuth();
+  const { loading: authLoading, user } = useRequireAuth();
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -60,7 +61,15 @@ export default function TeamDetailPage() {
 
       {/* Team Members List */}
       <div className="rounded-xl border border-zinc-800 bg-[#111113] p-5 shadow-lg">
-        <TeamMembersTable teamId={team.id} />
+        <TeamMembersTable
+          teamId={team.id}
+          capabilities={{
+            addMembership: hasPermission(user, 'teams.members.add'),
+            updateMembership: hasPermission(user, 'teams.members.update'),
+            removeMembership: hasPermission(user, 'teams.members.remove'),
+            updateLegendary: hasPermission(user, 'legendarios.update'),
+          }}
+        />
       </div>
     </div>
   );
@@ -74,4 +83,3 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
     </section>
   );
 }
-

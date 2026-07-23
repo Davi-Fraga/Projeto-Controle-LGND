@@ -1,4 +1,12 @@
-import { SCREEN_CATALOG, getScreen, permissionsForLevel, screenActionToggles } from './screen-catalog';
+import { UserScopeType } from '@central-da-manada/shared';
+import {
+  SCREEN_CATALOG,
+  getScreen,
+  permissionsForLevel,
+  screenActionToggles,
+  satisfyingScopeTypes,
+  supplementalScopeTypes,
+} from './screen-catalog';
 
 // Criar/excluir/restaurar de entidade de topo é ação administrativa: NÃO pode
 // constar em nenhum conjunto concedível por tela (só o admin as tem via base).
@@ -28,6 +36,21 @@ describe('screen-catalog', () => {
     expect(grantable.has('teams.members.add')).toBe(true);
     expect(grantable.has('tops.participants.add')).toBe(true);
     expect(grantable.has('tops.families.create')).toBe(true); // família dentro do TOP do escopo
+  });
+
+  // Higiene do catálogo (change access-scope-semantics-hardening).
+  it('não expõe a tela fantasma "Famílias" (o domínio real é tops.families.*)', () => {
+    expect(getScreen('families')).toBeUndefined();
+    expect(grantable.has('families.read')).toBe(false);
+    expect(grantable.has('families.update')).toBe(false);
+  });
+
+  it('não expõe a tela "Usuários" (administração é role-gated; users.* fica só-admin)', () => {
+    expect(getScreen('users')).toBeUndefined();
+    // users.update gera password-reset — não pode ser concedível por tela.
+    expect(grantable.has('users.update')).toBe(false);
+    expect(grantable.has('users.read')).toBe(false);
+    expect(grantable.has('audit.read')).toBe(false);
   });
 });
 
@@ -64,5 +87,43 @@ describe('screen-catalog action toggles (organograma)', () => {
   it('org-chart concede organogram.person.edit no nível EDIT (Fase 2)', () => {
     const orgChart = getScreen('org-chart')!;
     expect(permissionsForLevel(orgChart, 'EDIT')).toContain('organogram.person.edit');
+  });
+});
+
+// change alinhar-abas-controle-acessos: tela Líderes Espirituais independente de Igrejas.
+describe('screen-catalog — Líderes Espirituais', () => {
+  const grantable = new Set(SCREEN_CATALOG.flatMap((s) => [...s.view, ...s.edit]));
+
+  it('declara a tela spiritual-leaders VIEW-only com escopo CHURCH', () => {
+    const s = getScreen('spiritual-leaders');
+    expect(s).toBeDefined();
+    expect(s!.label).toBe('Líderes Espirituais');
+    expect(s!.view).toEqual(['spiritual-leaders.read']);
+    expect(s!.edit).toEqual([]);
+    expect(s!.scopeTypes).toEqual([UserScopeType.CHURCH]);
+  });
+
+  it('torna spiritual-leaders.read concedível por tela, sem tocar em churches.*', () => {
+    expect(grantable.has('spiritual-leaders.read')).toBe(true);
+    // Independência: a tela de Líderes NÃO concede permissões de Igrejas.
+    const s = getScreen('spiritual-leaders')!;
+    expect([...s.view, ...s.edit].some((k) => k.startsWith('churches.'))).toBe(false);
+  });
+});
+
+// change access-scope-bulk-selection: dimensões satisfatórias x suplementares.
+describe('screen-catalog — satisfying/supplemental', () => {
+  it('Legendários: CITY/CHURCH satisfazem, TEAM é suplementar', () => {
+    const leg = getScreen('legendarios')!;
+    expect(satisfyingScopeTypes(leg)).toEqual([UserScopeType.CITY, UserScopeType.CHURCH]);
+    expect(supplementalScopeTypes(leg)).toEqual([UserScopeType.TEAM]);
+  });
+
+  it('demais telas escopáveis: satisfying = scopeTypes; supplemental vazio (default)', () => {
+    for (const id of ['churches', 'teams', 'tops', 'social-actions', 'map', 'reports', 'spiritual-leaders']) {
+      const s = getScreen(id)!;
+      expect(satisfyingScopeTypes(s)).toEqual(s.scopeTypes);
+      expect(supplementalScopeTypes(s)).toEqual([]);
+    }
   });
 });

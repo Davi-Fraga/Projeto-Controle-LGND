@@ -43,26 +43,26 @@ export class TeamsController {
 
   @Patch(':id')
   @Permissions('teams.update')
-  async update(@Param('id') id: string, @Body() dto: UpdateTeamDto, @CurrentUser() user: { sub: string }) {
-    return { data: await this.teamsService.update(id, dto, user.sub) };
+  async update(@Param('id') id: string, @Body() dto: UpdateTeamDto, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.teamsService.update(id, dto, user) };
   }
 
   @Patch(':id/deactivate')
   @Permissions('teams.delete')
-  async deactivate(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
-    return { data: await this.teamsService.deactivate(id, user.sub) };
+  async deactivate(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.teamsService.deactivate(id, user) };
   }
 
   @Patch(':id/restore')
   @Permissions('teams.restore')
-  async restore(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
-    return { data: await this.teamsService.restore(id, user.sub) };
+  async restore(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.teamsService.restore(id, user) };
   }
 
   @Delete(':id')
   @Permissions('teams.delete')
-  async delete(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
-    return { data: await this.teamsService.deactivate(id, user.sub) };
+  async delete(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.teamsService.deactivate(id, user) };
   }
 
   @Get(':id/members')
@@ -73,8 +73,8 @@ export class TeamsController {
 
   @Post(':id/members')
   @Permissions('teams.members.add')
-  async addMember(@Param('id') id: string, @Body() dto: AddTeamMemberDto, @CurrentUser() user: { sub: string }) {
-    return { data: await this.teamsService.addMember(id, dto, user.sub) };
+  async addMember(@Param('id') id: string, @Body() dto: AddTeamMemberDto, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.teamsService.addMember(id, dto, user) };
   }
 
   @Patch(':id/members/:membershipId')
@@ -83,20 +83,20 @@ export class TeamsController {
     @Param('id') id: string,
     @Param('membershipId') membershipId: string,
     @Body() dto: UpdateTeamMemberDto,
-    @CurrentUser() user: { sub: string },
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return { data: await this.teamsService.updateMember(id, membershipId, dto, user.sub) };
+    return { data: await this.teamsService.updateMember(id, membershipId, dto, user) };
   }
 
   @Patch(':id/members/:membershipId/deactivate')
   @Permissions('teams.members.remove')
-  async deactivateMember(@Param('id') id: string, @Param('membershipId') membershipId: string, @CurrentUser() user: { sub: string }) {
-    return { data: await this.teamsService.deactivateMember(id, membershipId, user.sub) };
+  async deactivateMember(@Param('id') id: string, @Param('membershipId') membershipId: string, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.teamsService.deactivateMember(id, membershipId, user) };
   }
 
   @Delete(':id/members/:membershipId')
   @Permissions('teams.members.remove')
-  async deleteMember(@Param('id') id: string, @Param('membershipId') membershipId: string, @CurrentUser() user: { sub: string }) {
-    return { data: await this.teamsService.deactivateMember(id, membershipId, user.sub) };
+  async deleteMember(@Param('id') id: string, @Param('membershipId') membershipId: string, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.teamsService.deactivateMember(id, membershipId, user) };
   }
 }

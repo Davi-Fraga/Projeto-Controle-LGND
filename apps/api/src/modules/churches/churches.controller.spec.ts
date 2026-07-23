@@ -42,10 +42,12 @@ describe('ChurchesController (listagens com busca)', () => {
     expect(service.spiritualLeadersView).toHaveBeenCalledWith(user, 'amilton');
   });
 
-  it('ambos os endpoints exigem a permission churches.read', () => {
+  it('spiritual-leaders exige a permission dedicada; os demais endpoints ficam em churches.read', () => {
     const reflector = new Reflector();
+    // change alinhar-abas: a view de Líderes tem permission própria, independente de Igrejas.
+    expect(reflector.get(PERMISSIONS_KEY, controller.spiritualLeaders)).toEqual(['spiritual-leaders.read']);
     expect(reflector.get(PERMISSIONS_KEY, controller.findAll)).toEqual(['churches.read']);
-    expect(reflector.get(PERMISSIONS_KEY, controller.spiritualLeaders)).toEqual(['churches.read']);
+    expect(reflector.get(PERMISSIONS_KEY, controller.findOne)).toEqual(['churches.read']);
   });
 
   it('POST e PATCH repassam o usuário autenticado completo ao service', async () => {

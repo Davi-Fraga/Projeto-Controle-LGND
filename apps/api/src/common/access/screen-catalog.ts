@@ -10,6 +10,12 @@ export type ScreenDef = {
   edit: string[];
   // Tipos de escopo aplicáveis a esta tela (vazio = sem recorte de dados).
   scopeTypes: UserScopeType[];
+  // Dimensões que SATISFAZEM o escopo principal da tela (change access-scope-bulk-selection).
+  // Default (quando ausente) = todas de `scopeTypes`. Ex.: Legendários = [CITY, CHURCH].
+  satisfyingScopeTypes?: UserScopeType[];
+  // Dimensões SUPLEMENTARES: ampliam detalhe/recorte mas NÃO satisfazem sozinhas o acesso
+  // principal (default = []). Ex.: Legendários = [TEAM] (equipe não satisfaz a geografia).
+  supplementalScopeTypes?: UserScopeType[];
   // Toggles de AÇÃO concedidos separadamente de VIEW/EDIT (change organograma-
   // navegacao-escalavel, decisão Q1): permite conceder ações finas — ex.: editar
   // pessoa sem poder mover. NÃO entram em permissionsForLevel; são concedidos à parte.
@@ -31,6 +37,9 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     // create/delete/restore de topo são administrativos → fora do "Ver e editar".
     edit: ['legendarios.update', 'legendarios.history.create'],
     scopeTypes: [UserScopeType.CITY, UserScopeType.TEAM, UserScopeType.CHURCH],
+    // A listagem é GEOGRÁFICA: só cidade/igreja satisfazem; equipe é suplementar (detalhe).
+    satisfyingScopeTypes: [UserScopeType.CITY, UserScopeType.CHURCH],
+    supplementalScopeTypes: [UserScopeType.TEAM],
   },
   {
     id: 'teams',
@@ -45,6 +54,16 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     label: 'Igrejas',
     view: ['churches.read'],
     edit: ['churches.update'],
+    scopeTypes: [UserScopeType.CHURCH],
+  },
+  {
+    id: 'spiritual-leaders',
+    label: 'Líderes Espirituais',
+    // Vista de Igrejas (líderes) com permission DEDICADA e independente de churches.*
+    // (change alinhar-abas-controle-acessos). VIEW-only; escopo por Igreja. Conceder esta
+    // tela NÃO concede Igrejas e vice-versa; o backfill preserva quem já via via churches.read.
+    view: ['spiritual-leaders.read'],
+    edit: [],
     scopeTypes: [UserScopeType.CHURCH],
   },
   {
@@ -98,13 +117,9 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     // Toggles de ação (Q1): concedidos à parte do EDIT — reordenar < mover < estrutural.
     actionToggles: ['organogram.group.reorder', 'organogram.group.move', 'organogram.structure.change'],
   },
-  {
-    id: 'families',
-    label: 'Famílias',
-    view: ['families.read'],
-    edit: ['families.update'],
-    scopeTypes: [],
-  },
+  // REMOVIDO (change access-scope-semantics-hardening): a tela "Famílias" (families.read/
+  // families.update) era FANTASMA — nenhum controller a aplicava. O domínio real de famílias
+  // é `tops.families.*`, sob a tela TOPs. Concedê-la não tinha efeito; não reintroduzir.
   {
     id: 'social-actions',
     label: 'Ações Sociais',
@@ -144,13 +159,12 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     edit: [],
     scopeTypes: [UserScopeType.CITY],
   },
-  {
-    id: 'users',
-    label: 'Usuários',
-    view: ['users.read', 'audit.read'],
-    edit: ['users.update'],
-    scopeTypes: [],
-  },
+  // REMOVIDO (change access-scope-semantics-hardening): a tela "Usuários" era INCOERENTE —
+  // o catálogo anunciava users.*/audit.read, mas a gestão de usuários (/users) e a própria
+  // administração de acessos (/access-control) são guardadas por PAPEL admin (RolesGuard),
+  // ignorando essas permissions. Pior: seu EDIT concedia `users.update`, que gera links de
+  // redefinição de senha (password-reset) — capacidade que DEVE ser só do admin. Tirar a tela
+  // impede delegá-la e mantém users.* como capacidade exclusiva do admin (via base do papel).
 ];
 
 export function getScreen(id: string): ScreenDef | undefined {
@@ -165,4 +179,14 @@ export function permissionsForLevel(screen: ScreenDef, level: 'VIEW' | 'EDIT'): 
 // Toggles de ação da tela (vazio quando não há). Concedidos à parte de VIEW/EDIT.
 export function screenActionToggles(screen: ScreenDef): string[] {
   return screen.actionToggles ?? [];
+}
+
+// Dimensões que satisfazem o escopo principal da tela (default: todas de scopeTypes).
+export function satisfyingScopeTypes(screen: ScreenDef): UserScopeType[] {
+  return screen.satisfyingScopeTypes ?? screen.scopeTypes;
+}
+
+// Dimensões suplementares (default: nenhuma) — não satisfazem sozinhas o acesso principal.
+export function supplementalScopeTypes(screen: ScreenDef): UserScopeType[] {
+  return screen.supplementalScopeTypes ?? [];
 }

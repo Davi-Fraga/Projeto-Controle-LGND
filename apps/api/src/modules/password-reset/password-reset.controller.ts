@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { SystemRole } from '@central-da-manada/shared';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Permissions } from '../../common/decorators/permissions.decorator';
-import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PasswordResetService } from './password-reset.service';
 import { CreatePasswordResetDto, ResetPasswordDto } from './dto/password-reset.dto';
@@ -10,10 +11,10 @@ import { CreatePasswordResetDto, ResetPasswordDto } from './dto/password-reset.d
 export class PasswordResetController {
   constructor(private readonly passwordReset: PasswordResetService) {}
 
-  // Só admin (users.update) gera links de redefinição.
+  // Somente o papel sistêmico de administrador gera links de redefinição.
   @Post()
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions('users.update')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(SystemRole.COORDINATION_ADMIN)
   async create(@Body() dto: CreatePasswordResetDto, @CurrentUser() user: { sub: string }) {
     return { data: await this.passwordReset.create(dto.userId, user.sub) };
   }

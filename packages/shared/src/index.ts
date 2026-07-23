@@ -160,6 +160,43 @@ export type ScreenScopeEntry = {
   label?: string | null;
 };
 
+// Modo de seleção por dimensão (change access-scope-bulk-selection). MISSING é calculado.
+export enum ScopeSelectionMode {
+  MISSING = 'MISSING',
+  SELECTED = 'SELECTED',
+  ALL = 'ALL',
+}
+
+// Origem de um valor de escopo efetivo.
+export enum ScopeValueSource {
+  EXPLICIT = 'EXPLICIT',
+  ROLE_DERIVED = 'ROLE_DERIVED',
+}
+
+export type ScopeValueEntry = {
+  value: string;
+  label?: string | null;
+  sources: ScopeValueSource[];
+};
+
+// Estado de UMA dimensão de escopo de uma tela (configurado explícito vs efetivo).
+export type ScreenScopeState = {
+  type: UserScopeType;
+  // true = esta dimensão SATISFAZ o escopo principal da tela (vs suplementar).
+  satisfying: boolean;
+  configuredMode: ScopeSelectionMode; // configuração explícita: MISSING | SELECTED | ALL
+  configuredValues: string[]; // ids explícitos (vazio em MISSING/ALL)
+  effectiveMode: ScopeSelectionMode; // após compor com vínculos derivados do papel
+  effectiveValues: ScopeValueEntry[]; // união dedup explícito+derivado (preenchida em SELECTED)
+};
+
+// Payload da substituição ATÔMICA do escopo de um tipo (PUT .../scopes/:type).
+// [] em MISSING/ALL; 1..500 valores únicos em SELECTED.
+export type SetScopeSelectionInput = {
+  mode: ScopeSelectionMode;
+  values: string[];
+};
+
 // Um toggle de ação de uma tela (concedido à parte de VIEW/EDIT), com seu estado.
 export type ScreenActionToggle = {
   key: string;
@@ -179,6 +216,14 @@ export type ScreenAccessEntry = {
   scopes: ScreenScopeEntry[];
   // toggles de ação concedíveis à parte do nível (ex.: organograma: reordenar/mover/estrutural)
   actionToggles: ScreenActionToggle[];
+  // true quando a tela é escopável (scopeTypes não-vazio), está concedida (VIEW/EDIT) e NÃO
+  // tem nenhum escopo: estado inválido — fail-closed faz o usuário "não ver nada". A UI deve
+  // sinalizar e orientar a adicionar um escopo. Telas globais (scopeTypes vazio) nunca marcam.
+  scopeMissing: boolean;
+  // Estado por dimensão de escopo (change access-scope-bulk-selection): modo configurado x
+  // efetivo, valores e origem — alimenta o multi-select (Todos/Selecionados) e os chips derivados.
+  // Opcional na fase de migração; o backend passa a sempre preencher (ver access-control.service).
+  scopeStates?: ScreenScopeState[];
 };
 
 export type UserScreenAccessControl = {
@@ -592,3 +637,4 @@ export type TopPreRegistration = {
 };
 
 export * from './normalization';
+export * from './nav-manifest';

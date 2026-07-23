@@ -32,11 +32,7 @@ export class SocialActionsService {
   }
 
   async findOne(id: string, user: AuthenticatedUser) {
-    const scope = await this.accessPolicy.resolveScope(user);
-    const where: any = { id, deletedAt: null };
-    if (!scope.isAdmin) where.AND = [this.accessPolicy.buildCityWhere(scope)];
-    const action = await this.prisma.socialAction.findFirst({ where, include: includeAction });
-    if (!action) throw new NotFoundException('Social action not found.');
+    const action = await this.findExisting(id, user);
     return this.toActionResponse(action);
   }
 
@@ -48,21 +44,21 @@ export class SocialActionsService {
     return this.toActionResponse(action);
   }
 
-  async update(id: string, dto: UpdateSocialActionDto, actorUserId?: string) {
-    const before = await this.findExisting(id);
+  async update(id: string, dto: UpdateSocialActionDto, user: AuthenticatedUser) {
+    const before = await this.findExisting(id, user);
     const start = dto.startDate ?? before.startDate;
     const end = dto.endDate ?? before.endDate;
     this.validateDates(start, end);
     if (dto.responsibleLegendaryId) await this.ensureLegendaryExists(dto.responsibleLegendaryId);
     const after = await this.prisma.socialAction.update({ where: { id }, data: this.toActionData(dto), include: includeAction });
-    await this.audit.create({ actorUserId, entityType: 'SocialAction', entityId: id, action: 'update', before: this.toActionResponse(before), after: this.toActionResponse(after) });
+    await this.audit.create({ actorUserId: user.sub, entityType: 'SocialAction', entityId: id, action: 'update', before: this.toActionResponse(before), after: this.toActionResponse(after) });
     return this.toActionResponse(after);
   }
 
-  async complete(id: string, dto: CompleteSocialActionDto, actorUserId?: string) {
-    const before = await this.findExisting(id);
+  async complete(id: string, dto: CompleteSocialActionDto, user: AuthenticatedUser) {
+    const before = await this.findExisting(id, user);
     const after = await this.prisma.socialAction.update({ where: { id }, data: { status: SocialActionStatus.COMPLETED, resultSummary: dto.resultSummary.trim() }, include: includeAction });
-    await this.audit.create({ actorUserId, entityType: 'SocialAction', entityId: id, action: 'complete', before: this.toActionResponse(before), after: this.toActionResponse(after) });
+    await this.audit.create({ actorUserId: user.sub, entityType: 'SocialAction', entityId: id, action: 'complete', before: this.toActionResponse(before), after: this.toActionResponse(after) });
     const participants = await this.prisma.socialActionParticipant.findMany({ where: { socialActionId: id, deletedAt: null, status: { not: SocialActionParticipantStatus.CANCELLED } } });
     if (participants.length) {
       await this.prisma.legendaryHistory.createMany({
@@ -71,7 +67,7 @@ export class SocialActionsService {
           type: LegendaryHistoryType.SOCIAL_ACTION_COMPLETED,
           title: 'Participou de ação social concluída',
           description: `Ação social concluída: ${after.title}.`,
-          actorUserId,
+          actorUserId: user.sub,
           socialActionId: id,
         })),
       });
@@ -79,37 +75,38 @@ export class SocialActionsService {
     return this.toActionResponse(after);
   }
 
-  async cancel(id: string, actorUserId?: string) {
-    const before = await this.findExisting(id);
+  async cancel(id: string, user: AuthenticatedUser) {
+    const before = await this.findExisting(id, user);
     const after = await this.prisma.socialAction.update({ where: { id }, data: { status: SocialActionStatus.CANCELLED }, include: includeAction });
-    await this.audit.create({ actorUserId, entityType: 'SocialAction', entityId: id, action: 'cancel', before: this.toActionResponse(before), after: this.toActionResponse(after) });
+    await this.audit.create({ actorUserId: user.sub, entityType: 'SocialAction', entityId: id, action: 'cancel', before: this.toActionResponse(before), after: this.toActionResponse(after) });
     return this.toActionResponse(after);
   }
 
-  async delete(id: string, actorUserId?: string) {
-    const before = await this.findExisting(id);
+  async delete(id: string, user: AuthenticatedUser) {
+    const before = await this.findExisting(id, user);
     const after = await this.prisma.socialAction.update({ where: { id }, data: { deletedAt: new Date(), status: SocialActionStatus.CANCELLED }, include: includeAction });
-    await this.audit.create({ actorUserId, entityType: 'SocialAction', entityId: id, action: 'delete', before: this.toActionResponse(before), after: this.toActionResponse(after) });
+    await this.audit.create({ actorUserId: user.sub, entityType: 'SocialAction', entityId: id, action: 'delete', before: this.toActionResponse(before), after: this.toActionResponse(after) });
     return this.toActionResponse(after);
   }
 
-  async participants(id: string) {
-    await this.findExisting(id);
+  async participants(id: string, user: AuthenticatedUser) {
+    await this.findExisting(id, user);
     return this.prisma.socialActionParticipant.findMany({ where: { socialActionId: id, deletedAt: null }, include: includeParticipant, orderBy: { createdAt: 'asc' } });
   }
 
-  async addParticipant(id: string, dto: AddSocialActionParticipantDto, actorUserId?: string) {
-    const action = await this.findExisting(id);
-    await this.ensureLegendaryExists(dto.legendaryId);
+  async addParticipant(id: string, dto: AddSocialActionParticipantDto, user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    const action = await this.findExisting(id, user, scope);
+    await this.ensureLegendaryExists(dto.legendaryId, scope);
     await this.ensureParticipantAvailable(id, dto.legendaryId);
     const participant = await this.prisma.socialActionParticipant.create({ data: { socialActionId: id, legendaryId: dto.legendaryId, role: dto.role?.trim() || null, status: dto.status, attended: dto.attended ?? false, notes: dto.notes?.trim() || null }, include: includeParticipant });
-    await this.audit.create({ actorUserId, entityType: 'SocialActionParticipant', entityId: participant.id, action: 'add_participant', after: participant });
-    await this.createHistory(dto.legendaryId, LegendaryHistoryType.SOCIAL_ACTION_JOINED, 'Entrou em ação social', `Entrou na ação social ${action.title}.`, actorUserId, id);
+    await this.audit.create({ actorUserId: user.sub, entityType: 'SocialActionParticipant', entityId: participant.id, action: 'add_participant', after: participant });
+    await this.createHistory(dto.legendaryId, LegendaryHistoryType.SOCIAL_ACTION_JOINED, 'Entrou em ação social', `Entrou na ação social ${action.title}.`, user.sub, id);
     return participant;
   }
 
-  async updateParticipant(id: string, participantId: string, dto: UpdateSocialActionParticipantDto, actorUserId?: string) {
-    await this.findExisting(id);
+  async updateParticipant(id: string, participantId: string, dto: UpdateSocialActionParticipantDto, user: AuthenticatedUser) {
+    await this.findExisting(id, user);
     const before = await this.findParticipant(id, participantId);
     const after = await this.prisma.socialActionParticipant.update({
       where: { id: participantId },
@@ -121,20 +118,22 @@ export class SocialActionsService {
       },
       include: includeParticipant
     });
-    await this.audit.create({ actorUserId, entityType: 'SocialActionParticipant', entityId: participantId, action: 'update_participant', before, after });
+    await this.audit.create({ actorUserId: user.sub, entityType: 'SocialActionParticipant', entityId: participantId, action: 'update_participant', before, after });
     return after;
   }
 
-  async removeParticipant(id: string, participantId: string, actorUserId?: string) {
+  async removeParticipant(id: string, participantId: string, user: AuthenticatedUser) {
+    await this.findExisting(id, user);
     const before = await this.findParticipant(id, participantId);
     const after = await this.prisma.socialActionParticipant.update({ where: { id: participantId }, data: { status: SocialActionParticipantStatus.CANCELLED, deletedAt: new Date() }, include: includeParticipant });
-    await this.audit.create({ actorUserId, entityType: 'SocialActionParticipant', entityId: participantId, action: 'remove_participant', before, after });
-    await this.createHistory(before.legendaryId, LegendaryHistoryType.SOCIAL_ACTION_LEFT, 'Saiu de ação social', 'Participação em ação social cancelada.', actorUserId, id);
+    await this.audit.create({ actorUserId: user.sub, entityType: 'SocialActionParticipant', entityId: participantId, action: 'remove_participant', before, after });
+    await this.createHistory(before.legendaryId, LegendaryHistoryType.SOCIAL_ACTION_LEFT, 'Saiu de ação social', 'Participação em ação social cancelada.', user.sub, id);
     return after;
   }
 
-  async suggestions(query: VolunteerSuggestionsQueryDto) {
+  async suggestions(query: VolunteerSuggestionsQueryDto, user: AuthenticatedUser) {
     const { page, perPage, skip, take } = getPagination(query);
+    const scope = await this.accessPolicy.resolveScope(user);
     const where: any = {
       deletedAt: null,
       socialActionInterest: query.socialActionInterest ? query.socialActionInterest === 'true' : true,
@@ -142,20 +141,46 @@ export class SocialActionsService {
       professionId: query.professionId,
       expertises: query.expertiseId ? { some: { expertiseId: query.expertiseId } } : undefined,
     };
+    if (!scope.isAdmin) {
+      where.AND = [this.accessPolicy.buildLegendaryWhere(scope)];
+    }
     const [items, total] = await Promise.all([
-      this.prisma.legendary.findMany({ where, include: { church: true, profession: true, expertises: { include: { expertise: true } } }, orderBy: { fullName: 'asc' }, skip, take }),
+      this.prisma.legendary.findMany({
+        where,
+        select: {
+          id: true,
+          fullName: true,
+          lgndNumber: true,
+          city: true,
+          profession: { select: { id: true, name: true } },
+        },
+        orderBy: { fullName: 'asc' },
+        skip,
+        take,
+      }),
       this.prisma.legendary.count({ where }),
     ]);
-    return toPaginatedResponse(items.map((item: any) => ({ ...item, expertises: item.expertises.map((entry: any) => entry.expertise) })), total, page, perPage);
+    return toPaginatedResponse(items, total, page, perPage);
   }
 
-  private async findExisting(id: string) {
-    const action = await this.prisma.socialAction.findFirst({ where: { id, deletedAt: null }, include: includeAction });
+  private async findExisting(id: string, user: AuthenticatedUser, resolvedScope?: Awaited<ReturnType<AccessPolicyService['resolveScope']>>) {
+    const scope = resolvedScope ?? await this.accessPolicy.resolveScope(user);
+    const where: any = { id, deletedAt: null };
+    if (!scope.isAdmin) {
+      where.AND = [this.accessPolicy.buildCityWhere(scope)];
+    }
+    const action = await this.prisma.socialAction.findFirst({ where, include: includeAction });
     if (!action) throw new NotFoundException('Social action not found.');
     return action;
   }
   private async findParticipant(socialActionId: string, id: string) { const item = await this.prisma.socialActionParticipant.findFirst({ where: { id, socialActionId, deletedAt: null }, include: includeParticipant }); if (!item) throw new NotFoundException('Participant not found.'); return item; }
-  private async ensureLegendaryExists(id: string) { if (!(await this.prisma.legendary.findFirst({ where: { id, deletedAt: null } }))) throw new BadRequestException('Legendary does not exist.'); }
+  private async ensureLegendaryExists(id: string, scope?: Awaited<ReturnType<AccessPolicyService['resolveScope']>>) {
+    const where: any = { id, deletedAt: null };
+    if (scope && !scope.isAdmin) {
+      where.AND = [this.accessPolicy.buildLegendaryWhere(scope)];
+    }
+    if (!(await this.prisma.legendary.findFirst({ where }))) throw new BadRequestException('Legendary does not exist.');
+  }
   private async ensureParticipantAvailable(socialActionId: string, legendaryId: string) { if (await this.prisma.socialActionParticipant.findFirst({ where: { socialActionId, legendaryId, deletedAt: null, status: { not: SocialActionParticipantStatus.CANCELLED } } })) throw new BadRequestException('Legendary already participates in this social action.'); }
   private validateDates(start: Date, end: Date) { if (end < start) throw new BadRequestException('End date cannot be before start date.'); }
   private toActionData(dto: Partial<CreateSocialActionDto & UpdateSocialActionDto>) { const data: any = {}; for (const key of ['title','description','location','city','startDate','endDate','status','responsibleLegendaryId','notes','resultSummary']) if (key in dto) data[key] = typeof (dto as any)[key] === 'string' ? ((dto as any)[key].trim() || null) : (dto as any)[key]; return data; }

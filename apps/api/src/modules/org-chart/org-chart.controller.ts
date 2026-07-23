@@ -25,7 +25,7 @@ export class OrgChartController {
   @Get('tops/options') @Permissions('tops.read') async topOptions(@CurrentUser() user: AuthenticatedUser) { return { data: await this.orgChart.getTopOptions(user) }; }
   @Get('cities/options') @Permissions('legendarios.read') async cityOptions(@CurrentUser() user: AuthenticatedUser) { return { data: await this.orgChart.getCityOptions(user) }; }
   @Get('teams/:teamId') @Permissions('teams.read') async team(@Param('teamId') teamId: string, @Query() q: DepthQueryDto, @CurrentUser() user: AuthenticatedUser) { return { data: this.withDepth(await this.orgChart.getTeamChart(teamId, user), q.depth) }; }
-  @Get('coordinators') @Permissions('teams.read') async coordinators(@Query() q: DepthQueryDto) { return { data: this.withDepth(await this.orgChart.getCoordinatorsChart(), q.depth) }; }
+  @Get('coordinators') @Permissions('teams.read') async coordinators(@Query() q: DepthQueryDto, @CurrentUser() user: AuthenticatedUser) { return { data: this.withDepth(await this.orgChart.getCoordinatorsChart(user), q.depth) }; }
   @Get('cities') @Permissions('legendarios.read') async cities(@Query() q: CitiesQueryDto, @CurrentUser() user: AuthenticatedUser) {
     if (!q.city) return { data: { id: 'cities:root', kind: 'root', label: 'Cidades', count: 0, children: [] } };
     return { data: this.withDepth(await this.orgChart.getCitiesChart(q.mode, q.city, user), q.depth) };

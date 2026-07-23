@@ -49,6 +49,9 @@ describe('GET /churches/search (HTTP scope)', () => {
       userScope: {
         findMany: jest.fn().mockResolvedValue([{ type: 'CITY', value: 'goiania' }]),
       },
+      userScopePolicy: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       legendary: {
         findMany: jest.fn().mockResolvedValue([{ city: 'Goiânia' }, { city: 'Brasília' }]),
       },

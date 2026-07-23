@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/features/auth/actions';
 import { getDashboardSummary, type DashboardSummary } from '@/features/dashboard/api';
 import type { CurrentUser } from '@/features/auth/types';
 import { hasPermission } from '@/lib/permissions';
+import { firstAllowedRoute } from '@central-da-manada/shared';
 import { DashboardCard } from '@/components/ui/DashboardCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
@@ -36,6 +37,13 @@ export default function DashboardPage() {
     getCurrentUser()
       .then((currentUser) => {
         setUser(currentUser);
+        // Entrada em /dashboard sem dashboard.read (change alinhar-abas): redireciona para a
+        // primeira aba permitida; sem nenhuma, cai no estado terminal renderizado abaixo.
+        if (!hasPermission(currentUser, 'dashboard.read')) {
+          const dest = firstAllowedRoute(currentUser);
+          if (dest && dest !== '/dashboard') router.replace(dest);
+          return;
+        }
         getDashboardSummary()
           .then((dashboard) => setSummary(dashboard.data))
           .catch((err) => {
@@ -63,19 +71,43 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
+  // Sem dashboard.read: ou está redirecionando para a primeira aba permitida, ou não há
+  // nenhuma tela concedida (estado terminal, sem loop de redirect).
+  if (!hasPermission(user, 'dashboard.read')) {
+    if (firstAllowedRoute(user)) {
+      return (
+        <div className="flex h-[50vh] items-center justify-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
+        </div>
+      );
+    }
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="max-w-md text-center">
+          <h1 className="text-lg font-black uppercase tracking-wide text-white">Acesso ainda não configurado</h1>
+          <p className="mt-2 text-sm text-zinc-400">
+            Sua conta ainda não tem nenhuma tela liberada. Fale com um administrador para configurar seu acesso.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Cada card exige a permissão de tela da entidade e um valor não-nulo (o backend
+  // devolve `null` para quem não tem a permissão — não vaza contagem global).
   const cardConfig = summary
     ? [
-        { label: 'Legendários', value: summary.totals.legendarios, icon: <Users className="h-5 w-5" /> },
-        { label: 'Legendários ativos', value: summary.totals.activeLegendarios, icon: <UserCheck className="h-5 w-5" /> },
-        { label: 'Equipes ativas', value: summary.totals.activeTeams, icon: <Shield className="h-5 w-5" /> },
-        { label: 'TOPs', value: summary.totals.tops, icon: <MapPin className="h-5 w-5" /> },
-        { label: 'Famílias', value: summary.totals.families, icon: <Heart className="h-5 w-5" /> },
-        { label: 'Igrejas', value: summary.totals.churches, icon: <Compass className="h-5 w-5" /> },
-        { label: 'Cidades', value: summary.totals.cities, icon: <Map className="h-5 w-5" /> },
-        { label: 'Expertises', value: summary.totals.expertises, icon: <Wrench className="h-5 w-5" /> },
-        { label: 'Interesse social', value: summary.totals.socialActionInterest, icon: <HeartHandshake className="h-5 w-5" /> },
-        { label: 'Ações planejadas', value: summary.totals.plannedSocialActions, icon: <Calendar className="h-5 w-5" /> },
-      ]
+        { label: 'Legendários', value: summary.totals.legendarios, permission: 'legendarios.read', icon: <Users className="h-5 w-5" /> },
+        { label: 'Legendários ativos', value: summary.totals.activeLegendarios, permission: 'legendarios.read', icon: <UserCheck className="h-5 w-5" /> },
+        { label: 'Equipes ativas', value: summary.totals.activeTeams, permission: 'teams.read', icon: <Shield className="h-5 w-5" /> },
+        { label: 'TOPs', value: summary.totals.tops, permission: 'tops.read', icon: <MapPin className="h-5 w-5" /> },
+        { label: 'Famílias', value: summary.totals.families, permission: 'tops.families.read', icon: <Heart className="h-5 w-5" /> },
+        { label: 'Igrejas', value: summary.totals.churches, permission: 'churches.read', icon: <Compass className="h-5 w-5" /> },
+        { label: 'Cidades', value: summary.totals.cities, permission: 'legendarios.read', icon: <Map className="h-5 w-5" /> },
+        { label: 'Expertises', value: summary.totals.expertises, permission: 'expertises.read', icon: <Wrench className="h-5 w-5" /> },
+        { label: 'Interesse social', value: summary.totals.socialActionInterest, permission: 'legendarios.read', icon: <HeartHandshake className="h-5 w-5" /> },
+        { label: 'Ações planejadas', value: summary.totals.plannedSocialActions, permission: 'social-actions.read', icon: <Calendar className="h-5 w-5" /> },
+      ].filter((card) => card.value !== null && hasPermission(user, card.permission))
     : [];
 
   return (
@@ -153,7 +185,7 @@ export default function DashboardPage() {
             <DashboardCard
               key={card.label}
               label={card.label}
-              value={card.value}
+              value={card.value ?? 0}
               icon={card.icon}
             />
           ))}
@@ -187,7 +219,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {summary.highlightedTop && (
+          {summary.highlightedTop && summary.highlightedTopMetrics && (
             <>
               <div className="grid gap-px bg-zinc-800 grid-cols-2 sm:grid-cols-4">
                 <Mini label="Participantes" value={summary.highlightedTopMetrics.participants} />

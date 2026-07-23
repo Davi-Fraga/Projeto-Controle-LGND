@@ -1,22 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Trash2, ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Trash2, X } from 'lucide-react';
 import { ApiError } from '@/lib/api';
-import { ScreenAccessLevel } from '@central-da-manada/shared';
-import type { ScreenAccessEntry, UserScreenAccessControl } from '@central-da-manada/shared';
-import { AsyncCombobox, type ComboboxOption } from '@/components/ui/AsyncCombobox';
+import { ScopeSelectionMode, ScopeValueSource, ScreenAccessLevel } from '@central-da-manada/shared';
+import type { ScreenAccessEntry, ScreenScopeState, UserScreenAccessControl } from '@central-da-manada/shared';
+import type { ComboboxOption } from '@/components/ui/AsyncCombobox';
 import { getChurches } from '@/features/churches/api';
 import { getTeamsOptionsList, getTopOptions } from '@/features/tops/api';
 import { getCityOrgChartOptions } from '@/features/org-chart/api';
-import {
-  addUserScope,
-  getUserScreenAccess,
-  removeUserScope,
-  setScreenLevel,
-  setScreenToggle,
-  type ScopeTypeValue,
-} from './api';
+import { getUserScreenAccess, setScopeSelection, setScreenLevel, setScreenToggle, type ScopeTypeValue } from './api';
 
 const SCOPE_LABEL: Record<ScopeTypeValue, string> = {
   CITY: 'Cidade',
@@ -25,7 +18,6 @@ const SCOPE_LABEL: Record<ScopeTypeValue, string> = {
   TOP: 'TOP',
 };
 
-// Rótulos legíveis dos toggles de ação (o admin nunca vê a permission crua).
 const TOGGLE_LABEL: Record<string, string> = {
   'organogram.group.reorder': 'Reordenar em subdivisão',
   'organogram.group.move': 'Mover pessoa entre grupos',
@@ -44,26 +36,12 @@ export function AccessControlPanel({ userId }: { userId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [savingScreen, setSavingScreen] = useState<string | null>(null);
 
-  // Mapas value→label para exibir os escopos já configurados (chips) de forma legível.
-  const [labels, setLabels] = useState<Record<string, string>>({});
-
   useEffect(() => {
     getUserScreenAccess(userId)
       .then((res) => setAcl(res.data))
       .catch(() => setError('Não foi possível carregar os acessos deste usuário.'))
       .finally(() => setLoading(false));
   }, [userId]);
-
-  // Carrega rótulos para chips de escopo (equipes/igrejas/TOPs/cidades).
-  useEffect(() => {
-    const map: Record<string, string> = {};
-    Promise.allSettled([
-      getTeamsOptionsList({ limit: 100 }).then((r: any) => r.data?.forEach((o: any) => (map[o.value] = o.label))),
-      getChurches().then((r: any) => r.data?.forEach((c: any) => (map[c.id] = c.name))),
-      getTopOptions({ limit: 100 }).then((r: any) => r.data?.forEach((o: any) => (map[o.value] = o.label))),
-      getCityOrgChartOptions().then((r: any) => r.data?.forEach((o: any) => (map[o.value] = o.label))),
-    ]).then(() => setLabels((prev) => ({ ...prev, ...map })));
-  }, []);
 
   async function changeLevel(screenId: string, level: ScreenAccessLevel) {
     setSavingScreen(screenId);
@@ -91,28 +69,21 @@ export function AccessControlPanel({ userId }: { userId: string }) {
     }
   }
 
-  async function addScope(type: ScopeTypeValue, value: string, label: string) {
+  // Substituição ATÔMICA do escopo de um tipo (um único request). O estado local é
+  // substituído pela resposta normalizada da API (nunca sucesso parcial).
+  async function applyScopeSelection(type: ScopeTypeValue, mode: ScopeSelectionMode, values: string[]) {
     setError(null);
     try {
-      const res = await addUserScope(userId, type, value);
+      const res = await setScopeSelection(userId, type, mode, values);
       setAcl(res.data);
-      setLabels((prev) => ({ ...prev, [value]: label }));
     } catch (err) {
       setError(
-        err instanceof ApiError && err.status === 400
-          ? 'Não foi possível adicionar: a tela precisa estar concedida antes de restringir o escopo, e o valor precisa ser uma entidade existente.'
-          : 'Erro ao adicionar o escopo.',
+        err instanceof ApiError && err.status === 409
+          ? 'Esta dimensão está em "Todos". Troque o modo antes de editar itens.'
+          : err instanceof ApiError && err.status === 400
+            ? 'Não foi possível aplicar: confira a seleção (a tela precisa estar concedida e os itens devem existir).'
+            : 'Erro ao aplicar o escopo.',
       );
-    }
-  }
-
-  async function removeScope(scopeId: string) {
-    setError(null);
-    try {
-      const res = await removeUserScope(userId, scopeId);
-      setAcl(res.data);
-    } catch {
-      setError('Erro ao remover o escopo.');
     }
   }
 
@@ -143,11 +114,9 @@ export function AccessControlPanel({ userId }: { userId: string }) {
           key={screen.id}
           screen={screen}
           saving={savingScreen === screen.id}
-          labels={labels}
           onLevel={(level) => changeLevel(screen.id, level)}
           onToggle={(toggleKey, on) => changeToggle(screen.id, toggleKey, on)}
-          onAddScope={addScope}
-          onRemoveScope={removeScope}
+          onApplyScope={applyScopeSelection}
         />
       ))}
     </div>
@@ -157,32 +126,34 @@ export function AccessControlPanel({ userId }: { userId: string }) {
 function ScreenRow({
   screen,
   saving,
-  labels,
   onLevel,
   onToggle,
-  onAddScope,
-  onRemoveScope,
+  onApplyScope,
 }: {
   screen: ScreenAccessEntry;
   saving: boolean;
-  labels: Record<string, string>;
   onLevel: (level: ScreenAccessLevel) => void;
   onToggle: (toggleKey: string, on: boolean) => void;
-  onAddScope: (type: ScopeTypeValue, value: string, label: string) => void;
-  onRemoveScope: (scopeId: string) => void;
+  onApplyScope: (type: ScopeTypeValue, mode: ScopeSelectionMode, values: string[]) => Promise<void>;
 }) {
   const scopeTypes = screen.scopeTypes as ScopeTypeValue[];
   const hasScope = scopeTypes.length > 0;
   const granted = screen.level !== ScreenAccessLevel.NONE;
   const levels = screen.supportsEdit ? LEVELS : LEVELS.filter((l) => l.value !== ScreenAccessLevel.EDIT);
   const hasToggles = screen.actionToggles.length > 0;
+  const stateByType = new Map((screen.scopeStates ?? []).map((s) => [s.type as ScopeTypeValue, s]));
 
   return (
-    <section className="rounded-xl border border-zinc-800 bg-[#111113] p-4">
+    <section className={`rounded-xl border bg-[#111113] p-4 ${screen.scopeMissing ? 'border-amber-500/60' : 'border-zinc-800'}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <ShieldCheck className={`h-4 w-4 ${granted ? 'text-orange-500' : 'text-zinc-600'}`} />
           <span className="text-sm font-bold text-white">{screen.label}</span>
+          {screen.scopeMissing && (
+            <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-400">
+              Sem escopo
+            </span>
+          )}
         </div>
         <div className="inline-flex overflow-hidden rounded-lg border border-zinc-800">
           {levels.map((l) => (
@@ -222,57 +193,192 @@ function ScreenRow({
       )}
 
       {hasScope && granted && (
-        <div className="mt-3 border-t border-zinc-850 pt-3">
+        <div className="mt-3 space-y-4 border-t border-zinc-850 pt-3">
           <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Escopo (a qual fatia)</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {screen.scopes.length === 0 ? (
-              <span className="text-xs text-zinc-600">Sem restrição — acesso a tudo desta tela.</span>
-            ) : (
-              screen.scopes.map((scope) => (
-                <span key={scope.id} className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-200">
-                  <span className="font-bold uppercase tracking-wide text-orange-400">{SCOPE_LABEL[scope.type as ScopeTypeValue]}</span>
-                  <span>{labels[scope.value] ?? scope.value}</span>
-                  <button onClick={() => onRemoveScope(scope.id)} className="text-zinc-500 hover:text-rose-400" title="Remover escopo">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </span>
-              ))
-            )}
-          </div>
-          <ScopeAdder scopeTypes={scopeTypes} onAdd={onAddScope} />
+          {scopeTypes.map((type) => (
+            <ScopeDimensionEditor
+              key={type}
+              type={type}
+              state={stateByType.get(type)}
+              onApply={onApplyScope}
+            />
+          ))}
         </div>
       )}
     </section>
   );
 }
 
-function ScopeAdder({ scopeTypes, onAdd }: { scopeTypes: ScopeTypeValue[]; onAdd: (type: ScopeTypeValue, value: string, label: string) => void }) {
-  const [type, setType] = useState<ScopeTypeValue>(scopeTypes[0]);
+function ScopeDimensionEditor({
+  type,
+  state,
+  onApply,
+}: {
+  type: ScopeTypeValue;
+  state: ScreenScopeState | undefined;
+  onApply: (type: ScopeTypeValue, mode: ScopeSelectionMode, values: string[]) => Promise<void>;
+}) {
+  const effectiveMode = state?.effectiveMode ?? ScopeSelectionMode.MISSING;
+  const explicitValues = state?.configuredValues ?? [];
+  const effectiveValues = state?.effectiveValues ?? [];
+  const derived = effectiveValues.filter((v) => v.sources.includes(ScopeValueSource.ROLE_DERIVED) && !v.sources.includes(ScopeValueSource.EXPLICIT));
+
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [options, setOptions] = useState<ComboboxOption[]>([]);
+  const [prepared, setPrepared] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
+
+  const labelOf = (value: string) => options.find((o) => o.value === value)?.label ?? value;
+
+  async function beginSelect() {
+    setEditing(true);
+    setSearch('');
+    const opts = await loadScopeOptions(type);
+    setOptions(opts);
+    setPrepared(new Set(explicitValues));
+  }
+
+  async function apply(mode: ScopeSelectionMode, values: string[]) {
+    setBusy(true);
+    try {
+      await onApply(type, mode, values);
+      setEditing(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const filtered = filterOptions(options, search);
 
   return (
-    <div className="mt-3 flex flex-wrap items-end gap-2">
-      {scopeTypes.length > 1 && (
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value as ScopeTypeValue)}
-          className="h-9 rounded-lg border border-zinc-800 bg-zinc-950 px-2 text-xs text-zinc-200"
-        >
-          {scopeTypes.map((t) => <option key={t} value={t}>{SCOPE_LABEL[t]}</option>)}
-        </select>
+    <div className="rounded-lg border border-zinc-800/70 bg-zinc-950/40 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-bold uppercase tracking-wide text-orange-400">{SCOPE_LABEL[type]}</span>
+        <div className="inline-flex overflow-hidden rounded-lg border border-zinc-800 text-[11px] font-bold uppercase tracking-wide">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => apply(ScopeSelectionMode.MISSING, [])}
+            className={`px-2.5 py-1 transition-colors disabled:opacity-50 ${!editing && effectiveMode === ScopeSelectionMode.MISSING ? 'bg-zinc-700 text-white' : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Nenhum
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={beginSelect}
+            className={`px-2.5 py-1 transition-colors disabled:opacity-50 ${editing || effectiveMode === ScopeSelectionMode.SELECTED ? 'bg-orange-600 text-white' : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Selecionados
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => apply(ScopeSelectionMode.ALL, [])}
+            className={`px-2.5 py-1 transition-colors disabled:opacity-50 ${!editing && effectiveMode === ScopeSelectionMode.ALL ? 'bg-orange-600 text-white' : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200'}`}
+          >
+            Todos
+          </button>
+        </div>
+      </div>
+
+      {/* Estado atual (fora de edição) */}
+      {!editing && (
+        <div className="mt-2 space-y-1">
+          {effectiveMode === ScopeSelectionMode.ALL && (
+            <p className="text-xs text-zinc-400">Todos — inclui novos cadastros automaticamente.</p>
+          )}
+          {effectiveMode === ScopeSelectionMode.MISSING && (
+            <p className="text-xs font-semibold text-amber-400">⚠ Sem escopo: este usuário não verá nenhum dado desta tela.</p>
+          )}
+          {effectiveMode === ScopeSelectionMode.SELECTED && (
+            <div className="flex flex-wrap gap-1.5">
+              {effectiveValues.map((v) => (
+                <span key={v.value} className="inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-200">
+                  {v.label ?? v.value}
+                  {v.sources.includes(ScopeValueSource.ROLE_DERIVED) && !v.sources.includes(ScopeValueSource.EXPLICIT) && (
+                    <span className="text-[9px] uppercase tracking-wide text-zinc-500">função</span>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+          {/* Derivados do papel aparecem sempre (read-only), mesmo em MISSING configurado. */}
+          {effectiveMode !== ScopeSelectionMode.SELECTED && derived.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {derived.map((v) => (
+                <span key={v.value} className="inline-flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900/60 px-2 py-0.5 text-xs text-zinc-400" title="Origem: função do usuário (não editável)">
+                  {v.label ?? v.value}
+                  <span className="text-[9px] uppercase tracking-wide text-zinc-500">função</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Todos os tipos usam o MESMO seletor: busca as entidades reais do backend,
-          filtra com tolerância a acento, e só permite escolher itens existentes. */}
-      <div className="w-72">
-        <AsyncCombobox
-          key={type}
-          value=""
-          onChange={(value, label) => { if (value) onAdd(type, value, label); }}
-          fetchOptions={(search) => fetchScopeOptions(type, search)}
-          placeholder={`Buscar ${SCOPE_LABEL[type].toLowerCase()}...`}
-          noneLabel="—"
-        />
-      </div>
+      {/* Edição preparada (multi-seleção) */}
+      {editing && (
+        <div className="mt-2 space-y-2">
+          {prepared.size > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {[...prepared].map((value) => (
+                <span key={value} className="inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-200">
+                  {labelOf(value)}
+                  <button type="button" onClick={() => setPrepared((p) => { const n = new Set(p); n.delete(value); return n; })} className="text-zinc-500 hover:text-rose-400">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={`Buscar ${SCOPE_LABEL[type].toLowerCase()}...`}
+            aria-label={`Buscar ${SCOPE_LABEL[type].toLowerCase()}`}
+            className="input w-full text-sm"
+          />
+          <div className="max-h-40 overflow-y-auto rounded-md border border-zinc-800">
+            {filtered.map((o) => (
+              <label key={o.value} className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-900/60">
+                <input
+                  type="checkbox"
+                  checked={prepared.has(o.value)}
+                  onChange={() => setPrepared((p) => { const n = new Set(p); n.has(o.value) ? n.delete(o.value) : n.add(o.value); return n; })}
+                  className="h-4 w-4 accent-orange-600"
+                />
+                <span>{o.label}</span>
+                {o.sublabel && <span className="text-zinc-600">— {o.sublabel}</span>}
+              </label>
+            ))}
+            {filtered.length === 0 && <p className="px-2.5 py-2 text-xs text-zinc-600">Nenhum resultado.</p>}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={busy || prepared.size === 0}
+              onClick={() => apply(ScopeSelectionMode.SELECTED, [...prepared])}
+              className="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-orange-500 disabled:opacity-50"
+            >
+              Aplicar
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setEditing(false)}
+              className="rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-zinc-400 transition-colors hover:text-zinc-200 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <span className="text-[10px] text-zinc-600">
+              {prepared.size === 0 ? 'Selecione ao menos um item.' : `${prepared.size} selecionado(s)`}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -300,9 +406,7 @@ async function loadScopeOptions(type: ScopeTypeValue): Promise<ComboboxOption[]>
   return opts;
 }
 
-// Filtra a lista real do backend de forma tolerante a acento/caixa (ex.: "cald" -> "Caldas Novas").
-async function fetchScopeOptions(type: ScopeTypeValue, search: string): Promise<ComboboxOption[]> {
-  const all = await loadScopeOptions(type);
+function filterOptions(all: ComboboxOption[], search: string): ComboboxOption[] {
   const q = stripAccents(search);
   if (!q) return all.slice(0, 50);
   return all

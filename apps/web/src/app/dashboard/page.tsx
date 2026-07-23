@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/features/auth/actions';
 import { getDashboardSummary, type DashboardSummary } from '@/features/dashboard/api';
 import type { CurrentUser } from '@/features/auth/types';
 import { hasPermission } from '@/lib/permissions';
+import { firstAllowedRoute } from '@central-da-manada/shared';
 import { DashboardCard } from '@/components/ui/DashboardCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
@@ -36,6 +37,13 @@ export default function DashboardPage() {
     getCurrentUser()
       .then((currentUser) => {
         setUser(currentUser);
+        // Entrada em /dashboard sem dashboard.read (change alinhar-abas): redireciona para a
+        // primeira aba permitida; sem nenhuma, cai no estado terminal renderizado abaixo.
+        if (!hasPermission(currentUser, 'dashboard.read')) {
+          const dest = firstAllowedRoute(currentUser);
+          if (dest && dest !== '/dashboard') router.replace(dest);
+          return;
+        }
         getDashboardSummary()
           .then((dashboard) => setSummary(dashboard.data))
           .catch((err) => {
@@ -62,6 +70,28 @@ export default function DashboardPage() {
   }
 
   if (!user) return null;
+
+  // Sem dashboard.read: ou está redirecionando para a primeira aba permitida, ou não há
+  // nenhuma tela concedida (estado terminal, sem loop de redirect).
+  if (!hasPermission(user, 'dashboard.read')) {
+    if (firstAllowedRoute(user)) {
+      return (
+        <div className="flex h-[50vh] items-center justify-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
+        </div>
+      );
+    }
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="max-w-md text-center">
+          <h1 className="text-lg font-black uppercase tracking-wide text-white">Acesso ainda não configurado</h1>
+          <p className="mt-2 text-sm text-zinc-400">
+            Sua conta ainda não tem nenhuma tela liberada. Fale com um administrador para configurar seu acesso.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Cada card exige a permissão de tela da entidade e um valor não-nulo (o backend
   // devolve `null` para quem não tem a permissão — não vaza contagem global).

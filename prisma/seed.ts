@@ -29,6 +29,9 @@ const permissions = [
   'churches.create',
   'churches.update',
   'churches.delete',
+  // Vista de Líderes Espirituais: permission dedicada e independente de churches.*
+  // (change alinhar-abas-controle-acessos). Admin recebe via loop de all-permissions.
+  'spiritual-leaders.read',
   'professions.read',
   'professions.create',
   'professions.update',

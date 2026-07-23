@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { firstAllowedRoute } from '@central-da-manada/shared';
 import { login } from '@/features/auth/actions';
 
 export default function LoginPage() {
@@ -17,8 +18,10 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      await login(email, password);
-      router.push('/dashboard');
+      const user = await login(email, password);
+      // Destino inicial pela ordem do manifesto (change alinhar-abas): Painel se permitido,
+      // senão a primeira aba concedida; `/dashboard` cobre o estado "sem acesso" terminal.
+      router.push(firstAllowedRoute(user) ?? '/dashboard');
     } catch {
       setError('E-mail ou senha inválidos.');
     } finally {

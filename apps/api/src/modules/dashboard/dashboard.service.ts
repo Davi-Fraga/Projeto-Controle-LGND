@@ -14,18 +14,31 @@ export class DashboardService {
   ) {}
 
   async summary(user: AuthenticatedUser) {
-    // Escopo (change user-access-control, task 10.3): não-admin vê agregados apenas
-    // do seu escopo (geográfico p/ legendários/cidades/social; equipe/TOP/igreja p/
-    // as demais entidades). Admin vê tudo. `mergeScope` acopla o filtro ou não.
+    // Autorização por contador (change access-scope-semantics-hardening): cada agregado
+    // respeita (1) a PERMISSÃO de tela da entidade e (2) o ESCOPO do usuário. Sem a
+    // permissão, o contador vem `null` (omitido no front) — NUNCA a contagem global.
+    // Isso fecha o vazamento do dashboard (ex.: Expertises, que era sempre global). Admin
+    // (irrestrito) vê tudo. O escopo é fail-closed via build*Where.
     const scope = await this.accessPolicy.resolveScope(user);
+    const perms = new Set(user.permissions ?? []);
+    const can = (key: string) => scope.isAdmin || perms.has(key);
+
     const withLeg = (base: any) => (scope.isAdmin ? base : { ...base, AND: [this.accessPolicy.buildLegendaryWhere(scope)] });
     const withTeam = (base: any) => (scope.isAdmin ? base : { ...base, ...this.accessPolicy.buildTeamWhere(scope) });
     const withTop = (base: any) => (scope.isAdmin ? base : { ...base, ...this.accessPolicy.buildTopWhere(scope) });
     const withChurch = (base: any) => (scope.isAdmin ? base : { ...base, ...this.accessPolicy.buildChurchWhere(scope) });
     const withCity = (base: any) => (scope.isAdmin ? base : { ...base, ...this.accessPolicy.buildCityWhere(scope) });
-    const topScopeWhere = scope.isAdmin ? {} : this.accessPolicy.buildTopWhere(scope);
 
-    const highlightedTop = await this.findHighlightedTop(topScopeWhere);
+    const canLeg = can('legendarios.read');
+    const canTeams = can('teams.read');
+    const canTops = can('tops.read');
+    const canFamilies = can('tops.families.read');
+    const canChurches = can('churches.read');
+    const canExpertises = can('expertises.read');
+    const canSocial = can('social-actions.read');
+
+    const topScopeWhere = scope.isAdmin ? {} : this.accessPolicy.buildTopWhere(scope);
+    const highlightedTop = canTops ? await this.findHighlightedTop(topScopeWhere) : null;
     const topId = highlightedTop?.id;
     const [
       totalLegendarios,
@@ -45,22 +58,22 @@ export class DashboardService {
       highlightedPreRegistrations,
       nextTop,
     ] = await Promise.all([
-      this.prisma.legendary.count({ where: withLeg({ deletedAt: null }) }),
-      this.prisma.legendary.count({ where: withLeg({ deletedAt: null, status: LegendaryStatus.ACTIVE }) }),
-      this.prisma.team.count({ where: withTeam({ deletedAt: null, status: 'ACTIVE' }) }),
-      this.prisma.topEvent.count({ where: withTop({ deletedAt: null }) }),
-      this.prisma.topFamily.count({ where: scope.isAdmin ? { deletedAt: null } : { deletedAt: null, topEvent: this.accessPolicy.buildTopWhere(scope) } }),
-      this.prisma.church.count({ where: withChurch({ deletedAt: null }) }),
-      this.prisma.legendary.findMany({ where: withLeg({ deletedAt: null, city: { not: null } }), select: { city: true }, distinct: ['city'] }),
-      this.prisma.expertise.count({ where: { deletedAt: null } }),
-      this.prisma.legendary.count({ where: withLeg({ deletedAt: null, socialActionInterest: true }) }),
-      this.prisma.socialAction.count({ where: withCity({ deletedAt: null, status: 'PLANNED' }) }),
-      this.prisma.topParticipant.count({ where: { topEventId: topId ?? EMPTY_UUID, deletedAt: null, status: { not: 'CANCELLED' } } }),
-      this.prisma.topServant.count({ where: { topEventId: topId ?? EMPTY_UUID, deletedAt: null, status: { not: 'CANCELLED' } } }),
-      this.prisma.topTeam.count({ where: { topEventId: topId ?? EMPTY_UUID, deletedAt: null } }),
-      this.prisma.topFamily.count({ where: { topEventId: topId ?? EMPTY_UUID, deletedAt: null } }),
-      this.prisma.topPreRegistration.count({ where: { topEventId: topId ?? EMPTY_UUID, status: TopPreRegistrationStatus.PENDING, deletedAt: null } }),
-      this.findNextTop(topScopeWhere),
+      canLeg ? this.prisma.legendary.count({ where: withLeg({ deletedAt: null }) }) : Promise.resolve(null),
+      canLeg ? this.prisma.legendary.count({ where: withLeg({ deletedAt: null, status: LegendaryStatus.ACTIVE }) }) : Promise.resolve(null),
+      canTeams ? this.prisma.team.count({ where: withTeam({ deletedAt: null, status: 'ACTIVE' }) }) : Promise.resolve(null),
+      canTops ? this.prisma.topEvent.count({ where: withTop({ deletedAt: null }) }) : Promise.resolve(null),
+      canFamilies ? this.prisma.topFamily.count({ where: scope.isAdmin ? { deletedAt: null } : { deletedAt: null, topEvent: this.accessPolicy.buildTopWhere(scope) } }) : Promise.resolve(null),
+      canChurches ? this.prisma.church.count({ where: withChurch({ deletedAt: null }) }) : Promise.resolve(null),
+      canLeg ? this.prisma.legendary.findMany({ where: withLeg({ deletedAt: null, city: { not: null } }), select: { city: true }, distinct: ['city'] }) : Promise.resolve(null),
+      canExpertises ? this.prisma.expertise.count({ where: { deletedAt: null } }) : Promise.resolve(null),
+      canLeg ? this.prisma.legendary.count({ where: withLeg({ deletedAt: null, socialActionInterest: true }) }) : Promise.resolve(null),
+      canSocial ? this.prisma.socialAction.count({ where: withCity({ deletedAt: null, status: 'PLANNED' }) }) : Promise.resolve(null),
+      canTops ? this.prisma.topParticipant.count({ where: { topEventId: topId ?? EMPTY_UUID, deletedAt: null, status: { not: 'CANCELLED' } } }) : Promise.resolve(0),
+      canTops ? this.prisma.topServant.count({ where: { topEventId: topId ?? EMPTY_UUID, deletedAt: null, status: { not: 'CANCELLED' } } }) : Promise.resolve(0),
+      canTops ? this.prisma.topTeam.count({ where: { topEventId: topId ?? EMPTY_UUID, deletedAt: null } }) : Promise.resolve(0),
+      canTops ? this.prisma.topFamily.count({ where: { topEventId: topId ?? EMPTY_UUID, deletedAt: null } }) : Promise.resolve(0),
+      canTops ? this.prisma.topPreRegistration.count({ where: { topEventId: topId ?? EMPTY_UUID, status: TopPreRegistrationStatus.PENDING, deletedAt: null } }) : Promise.resolve(0),
+      canTops ? this.findNextTop(topScopeWhere) : Promise.resolve(null),
     ]);
 
     return {
@@ -71,21 +84,23 @@ export class DashboardService {
         tops: totalTops,
         families: totalFamilies,
         churches: totalChurches,
-        cities: cities.length,
+        cities: cities === null ? null : cities.length,
         expertises: totalExpertises,
         socialActionInterest,
         plannedSocialActions,
       },
       nextTop,
       highlightedTop,
-      highlightedTopMetrics: {
-        participants: highlightedParticipants,
-        servants: highlightedServants,
-        teams: highlightedTeams,
-        families: highlightedFamilies,
-        preRegistrations: highlightedPreRegistrations,
-        totalEsperado: highlightedParticipants + highlightedPreRegistrations,
-      },
+      highlightedTopMetrics: highlightedTop
+        ? {
+            participants: highlightedParticipants,
+            servants: highlightedServants,
+            teams: highlightedTeams,
+            families: highlightedFamilies,
+            preRegistrations: highlightedPreRegistrations,
+            totalEsperado: highlightedParticipants + highlightedPreRegistrations,
+          }
+        : null,
     };
   }
 

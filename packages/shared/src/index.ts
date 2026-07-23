@@ -179,6 +179,10 @@ export type ScreenAccessEntry = {
   scopes: ScreenScopeEntry[];
   // toggles de ação concedíveis à parte do nível (ex.: organograma: reordenar/mover/estrutural)
   actionToggles: ScreenActionToggle[];
+  // true quando a tela é escopável (scopeTypes não-vazio), está concedida (VIEW/EDIT) e NÃO
+  // tem nenhum escopo: estado inválido — fail-closed faz o usuário "não ver nada". A UI deve
+  // sinalizar e orientar a adicionar um escopo. Telas globais (scopeTypes vazio) nunca marcam.
+  scopeMissing: boolean;
 };
 
 export type UserScreenAccessControl = {

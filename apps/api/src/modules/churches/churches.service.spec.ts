@@ -21,8 +21,9 @@ describe('ChurchesService geocoding integration', () => {
       legendary: { count: jest.fn(), findFirst: jest.fn() },
     };
     audit = { create: jest.fn() };
+    // Default admin (irrestrito): testes de escopo restrito sobrescrevem com mockResolvedValueOnce.
     accessPolicy = {
-      resolveScope: jest.fn(),
+      resolveScope: jest.fn().mockResolvedValue({ isAdmin: true }),
       buildChurchWhere: jest.fn(),
       buildChurchScopeWhere: jest.fn(),
       buildLegendaryWhere: jest.fn(),
@@ -551,7 +552,7 @@ describe('ChurchesService geocoding integration', () => {
     it('findOne retorna a igreja com seus membros legendários', async () => {
       prisma.church.findFirst.mockResolvedValueOnce({ id: 'c1', name: 'Igreja X', legendarios: [{ id: 'l1', fullName: 'Ana' }] });
 
-      const result = await service.findOne('c1');
+      const result = await service.findOne('c1', actor);
 
       expect(result.legendarios).toHaveLength(1);
       expect(prisma.church.findFirst).toHaveBeenCalledWith(
@@ -561,7 +562,7 @@ describe('ChurchesService geocoding integration', () => {
 
     it('findOne lança 404 quando a igreja não existe', async () => {
       prisma.church.findFirst.mockResolvedValueOnce(null);
-      await expect(service.findOne('x')).rejects.toThrow('Church not found.');
+      await expect(service.findOne('x', actor)).rejects.toThrow('Church not found.');
     });
 
     it('remove faz soft-delete quando a igreja está vazia', async () => {
@@ -582,6 +583,41 @@ describe('ChurchesService geocoding integration', () => {
 
       await expect(service.remove('c1', 'actor')).rejects.toThrow('Legendários');
       expect(prisma.church.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('escopo / IDOR (change access-scope-semantics-hardening)', () => {
+    const member = { sub: 'm1', roles: ['SPIRITUAL_LEADER'], permissions: ['churches.read', 'churches.update'] } as any;
+
+    it('findOne fora do escopo retorna 404 e filtra por buildChurchWhere', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false });
+      accessPolicy.buildChurchWhere.mockReturnValueOnce({ id: { in: ['church-allowed'] } });
+      prisma.church.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.findOne('church-forbidden', member)).rejects.toThrow('Church not found.');
+      expect(prisma.church.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: 'church-forbidden', deletedAt: null, AND: [{ id: { in: ['church-allowed'] } }] }),
+        }),
+      );
+    });
+
+    it('findOne sem escopo de igreja (fail-closed) retorna 404', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false });
+      accessPolicy.buildChurchWhere.mockReturnValueOnce({ id: { in: [] } });
+      prisma.church.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.findOne('any', member)).rejects.toThrow('Church not found.');
+    });
+
+    it('update fora do escopo retorna 404 e não altera nada', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false });
+      accessPolicy.buildChurchWhere.mockReturnValueOnce({ id: { in: ['church-allowed'] } });
+      prisma.church.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.update('church-forbidden', { name: 'Hack' } as any, member)).rejects.toThrow('Church not found.');
+      expect(prisma.church.update).not.toHaveBeenCalled();
+      expect(audit.create).not.toHaveBeenCalled();
     });
   });
 });

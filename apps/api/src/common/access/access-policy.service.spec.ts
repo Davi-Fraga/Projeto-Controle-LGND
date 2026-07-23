@@ -339,5 +339,46 @@ describe('AccessPolicyService', () => {
       expect(service.isCityRestricted(scope)).toBe(false);
       expect(() => service.assertCityAllowed(scope, 'qualquer')).not.toThrow();
     });
+
+    // Semântica única fail-closed (change access-scope-semantics-hardening): não-admin SEM
+    // escopo daquele tipo é RESTRITO e o assert NEGA — antes era no-op (fail-open = IDOR).
+    it('non-admin without a scope of the type is restricted and denied (fail-closed)', () => {
+      const scope = {
+        isAdmin: false,
+        churchIds: [],
+        teamIds: [],
+        legendaryIds: [],
+        cityKeys: [],
+        legendaryCities: [],
+        topIds: [],
+      };
+
+      expect(service.isCityRestricted(scope)).toBe(true);
+      expect(service.isTeamRestricted(scope)).toBe(true);
+      expect(service.isChurchRestricted(scope)).toBe(true);
+      expect(service.isTopRestricted(scope)).toBe(true);
+
+      expect(() => service.assertCityAllowed(scope, 'goiania')).toThrow(ForbiddenException);
+      expect(() => service.assertTeamAllowed(scope, 'team-x')).toThrow(ForbiddenException);
+      expect(() => service.assertChurchAllowed(scope, 'church-x')).toThrow(ForbiddenException);
+      expect(() => service.assertTopAllowed(scope, 'top-x')).toThrow(ForbiddenException);
+    });
+
+    it('build*Where are fail-closed for a non-admin without scope (empty in-list)', () => {
+      const scope = {
+        isAdmin: false,
+        churchIds: [],
+        teamIds: [],
+        legendaryIds: [],
+        cityKeys: [],
+        legendaryCities: [],
+        topIds: [],
+      };
+
+      expect(service.buildChurchWhere(scope)).toEqual({ id: { in: [] } });
+      expect(service.buildTeamWhere(scope)).toEqual({ id: { in: [] } });
+      expect(service.buildTopWhere(scope)).toEqual({ id: { in: [] } });
+      expect(service.buildCityWhere(scope)).toEqual({ id: { in: [] } });
+    });
   });
 });

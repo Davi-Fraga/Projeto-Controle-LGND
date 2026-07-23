@@ -49,8 +49,8 @@ export class ChurchesController {
   // Rota parametrizada declarada após as estáticas.
   @Get(':id')
   @Permissions('churches.read')
-  async findOne(@Param('id') id: string) {
-    return { data: await this.churchesService.findOne(id) };
+  async findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.churchesService.findOne(id, user) };
   }
 
   @Post()

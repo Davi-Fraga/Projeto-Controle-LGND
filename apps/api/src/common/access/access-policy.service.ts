@@ -150,21 +150,25 @@ export class AccessPolicyService {
     return scope.legendaryCities.length ? { city: { in: scope.legendaryCities } } : { id: { in: [] } };
   }
 
-  // True quando o usuário está restrito a um conjunto de cidades.
+  // Semântica ÚNICA de escopo (change access-scope-semantics-hardening): TODO não-admin
+  // é "restrito" — inclusive quando NÃO tem escopo daquele tipo. Ausência de escopo NÃO
+  // significa acesso irrestrito; significa "não vê nada" (fail-closed), igual aos build*Where.
+  // Antes, `&& length > 0` deixava o assert vira no-op para quem não tinha escopo do tipo,
+  // liberando IDOR (ex.: ver qualquer TOP por id sem ter escopo de TOP).
   isCityRestricted(scope: AccessScope): boolean {
-    return !scope.isAdmin && scope.cityKeys.length > 0;
+    return !scope.isAdmin;
   }
 
   isTeamRestricted(scope: AccessScope): boolean {
-    return !scope.isAdmin && scope.teamIds.length > 0;
+    return !scope.isAdmin;
   }
 
   isChurchRestricted(scope: AccessScope): boolean {
-    return !scope.isAdmin && scope.churchIds.length > 0;
+    return !scope.isAdmin;
   }
 
   isTopRestricted(scope: AccessScope): boolean {
-    return !scope.isAdmin && scope.topIds.length > 0;
+    return !scope.isAdmin;
   }
 
   // Barreira de IDOR: nega se o usuário é restrito por cidade e a cidade pedida

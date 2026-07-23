@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { SocialActionParticipantStatus } from '@central-da-manada/shared';
 import { addSocialActionParticipant, cancelSocialAction, completeSocialAction, getSocialAction, getSocialActionParticipants, getVolunteerSuggestions, removeSocialActionParticipant, updateSocialActionParticipant } from '@/features/social-actions/api';
-import type { Legendary, SocialAction, SocialActionParticipant } from '@central-da-manada/shared';
+import type { VolunteerSuggestion } from '@/features/social-actions/api';
+import type { SocialAction, SocialActionParticipant } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -17,7 +18,7 @@ export default function SocialActionDetailPage() {
   const { loading: authLoading } = useRequireAuth();
   const [action, setAction] = useState<SocialAction | null>(null);
   const [participants, setParticipants] = useState<SocialActionParticipant[]>([]);
-  const [suggestions, setSuggestions] = useState<Legendary[]>([]);
+  const [suggestions, setSuggestions] = useState<VolunteerSuggestion[]>([]);
   const [newParticipant, setNewParticipant] = useState({ legendaryId: '', role: '', notes: '' });
   const [resultSummary, setResultSummary] = useState('');
   const [suggestionCity, setSuggestionCity] = useState('');

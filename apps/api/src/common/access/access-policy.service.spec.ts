@@ -247,6 +247,23 @@ describe('AccessPolicyService', () => {
       expect(() => service.assertCityAllowed(scope, 'goiania')).toThrow(ForbiddenException);
     });
 
+    it('keeps the CITY builder and assertion aligned for raw entity values', () => {
+      const scope = {
+        isAdmin: false,
+        churchIds: [],
+        teamIds: [],
+        legendaryIds: [],
+        cityKeys: ['goiania'],
+        legendaryCities: ['Goiânia'],
+        topIds: [],
+      };
+
+      expect(service.buildCityWhere(scope)).toEqual({ city: { in: ['Goiânia'] } });
+      expect(() => service.assertCityAllowed(scope, 'Goiânia')).not.toThrow();
+      expect(() => service.assertCityAllowed(scope, 'GOIÂNIA')).not.toThrow();
+      expect(() => service.assertCityAllowed(scope, 'Anápolis')).toThrow(ForbiddenException);
+    });
+
     it('resolves multiple TOP scopes and builds a scoped TOP filter', async () => {
       prisma.church.findMany.mockResolvedValueOnce([]);
       prisma.userScope.findMany.mockResolvedValueOnce([

@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AccessPolicyService } from '../../../common/access/access-policy.service';
 import { AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
 
@@ -13,7 +13,7 @@ export class TopScopeGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<{ user?: AuthenticatedUser; params?: Record<string, string> }>();
     const user = request.user;
-    const topId = request.params?.id;
+    const topId = request.params?.topEventId ?? request.params?.id;
 
     // Rotas sem :id (lista/options/create) não passam por aqui — o filtro de lista
     // é aplicado no service.
@@ -22,7 +22,14 @@ export class TopScopeGuard implements CanActivate {
     }
 
     const scope = await this.accessPolicy.resolveScope(user);
-    this.accessPolicy.assertTopAllowed(scope, topId);
+    try {
+      this.accessPolicy.assertTopAllowed(scope, topId);
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw new NotFoundException('TOP event not found.');
+      }
+      throw error;
+    }
     return true;
   }
 }

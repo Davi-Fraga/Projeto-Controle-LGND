@@ -93,7 +93,10 @@ describe('LegendarioDetalhePage from a team', () => {
 
     render(<LegendarioDetalhePage />);
 
-    expect(await screen.findByRole('link', { name: 'Editar Cadastro' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Editar Cadastro' })).toHaveAttribute(
+      'href',
+      '/dashboard/legendarios/legendary-1/editar?fromTeamId=11111111-1111-4111-8111-111111111111',
+    );
     expect(screen.getByText('Historico canCreate=true')).toBeInTheDocument();
   });
 });

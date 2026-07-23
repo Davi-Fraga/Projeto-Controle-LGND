@@ -41,9 +41,10 @@ const ADD_CHURCH_VALUE = '__add_church__';
 
 type Props = {
   legendario?: Legendary;
+  returnTo?: string;
 };
 
-export function LegendarioForm({ legendario }: Props) {
+export function LegendarioForm({ legendario, returnTo }: Props) {
   const router = useRouter();
   const [payload, setPayload] = useState<LegendarioPayload>(() =>
     legendario
@@ -186,7 +187,7 @@ export function LegendarioForm({ legendario }: Props) {
         ? await updateLegendario(legendario.id, cleanedPayload)
         : await createLegendario(cleanedPayload);
 
-      router.push(`/dashboard/legendarios/${response.data.id}`);
+      router.push(returnTo ?? `/dashboard/legendarios/${response.data.id}`);
     } catch {
       setError('Não foi possível salvar o Legendário. Verifique os dados informados.');
     } finally {
@@ -421,7 +422,7 @@ export function LegendarioForm({ legendario }: Props) {
         </button>
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => returnTo ? router.push(returnTo) : router.back()}
           className="flex h-10 items-center justify-center rounded-lg border border-zinc-800 bg-transparent px-6 text-xs font-bold uppercase tracking-wider text-zinc-400 transition-all hover:bg-zinc-900 hover:text-zinc-200"
         >
           Cancelar

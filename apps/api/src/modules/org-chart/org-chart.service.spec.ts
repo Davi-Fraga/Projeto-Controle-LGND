@@ -16,6 +16,7 @@ describe('OrgChartService', () => {
     accessPolicy = {
       resolveScope: jest.fn().mockResolvedValue({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [], cityKeys: [], legendaryCities: [], topIds: [] }),
       buildLegendaryWhere: jest.fn().mockReturnValue({}),
+      buildTeamWhere: jest.fn().mockReturnValue({ id: { in: [] } }),
       isCityRestricted: jest.fn().mockReturnValue(false),
       assertCityAllowed: jest.fn(),
       assertTeamAllowed: jest.fn(),
@@ -148,7 +149,7 @@ describe('OrgChartService', () => {
         { id: 't2', name: 'Voz', coordinatorLegendaryId: null, coordinator: null },
       ]);
 
-      const root = await service.getCoordinatorsChart();
+      const root = await service.getCoordinatorsChart(user);
 
       expect(root.id).toBe('director');
       expect(root.label).toBe('Coordenação'); // top node uses the DB team name, not a synthesized label
@@ -161,10 +162,23 @@ describe('OrgChartService', () => {
 
     it('uses a neutral root when no coordination team exists', async () => {
       prisma.team.findMany.mockResolvedValueOnce([{ id: 't1', name: 'ADM', coordinatorLegendaryId: 'c1', coordinator: { fullName: 'Coord ADM' } }]);
-      const root = await service.getCoordinatorsChart();
+      const root = await service.getCoordinatorsChart(user);
       expect(root.label).toBe('Coordenação');
       expect(root.leaderId).toBeUndefined();
       expect(root.children).toHaveLength(1);
+    });
+
+    it('escopa por equipe: não-admin sem escopo de equipe recebe estrutura vazia (fail-closed)', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, teamIds: [] });
+      accessPolicy.buildTeamWhere.mockReturnValueOnce({ id: { in: [] } });
+      prisma.team.findMany.mockResolvedValueOnce([]); // filtro fail-closed → nenhuma equipe
+
+      const root = await service.getCoordinatorsChart(user);
+
+      expect(prisma.team.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ id: { in: [] }, deletedAt: null }) }),
+      );
+      expect(root.children).toHaveLength(0);
     });
   });
 
@@ -263,7 +277,7 @@ describe('OrgChartService', () => {
     };
     prisma.legendary.findMany.mockResolvedValue([{ id: 'l1', fullName: 'A', city: 'Goiânia', churchId: 'ch1', church: { name: 'Igreja X' } }]);
     assertShape(await service.getTeamChart('t1', user));
-    assertShape(await service.getCoordinatorsChart());
+    assertShape(await service.getCoordinatorsChart(user));
     assertShape(await service.getCitiesChart('legendaries', 'goiania', user));
     assertShape(await service.getCitiesChart('churches', 'goiania', user));
   });

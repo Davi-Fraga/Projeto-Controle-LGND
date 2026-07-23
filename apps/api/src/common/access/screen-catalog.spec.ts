@@ -29,6 +29,21 @@ describe('screen-catalog', () => {
     expect(grantable.has('tops.participants.add')).toBe(true);
     expect(grantable.has('tops.families.create')).toBe(true); // família dentro do TOP do escopo
   });
+
+  // Higiene do catálogo (change access-scope-semantics-hardening).
+  it('não expõe a tela fantasma "Famílias" (o domínio real é tops.families.*)', () => {
+    expect(getScreen('families')).toBeUndefined();
+    expect(grantable.has('families.read')).toBe(false);
+    expect(grantable.has('families.update')).toBe(false);
+  });
+
+  it('não expõe a tela "Usuários" (administração é role-gated; users.* fica só-admin)', () => {
+    expect(getScreen('users')).toBeUndefined();
+    // users.update gera password-reset — não pode ser concedível por tela.
+    expect(grantable.has('users.update')).toBe(false);
+    expect(grantable.has('users.read')).toBe(false);
+    expect(grantable.has('audit.read')).toBe(false);
+  });
 });
 
 // change organograma-navegacao-escalavel (decisão Q1): o modelo de tela ganha

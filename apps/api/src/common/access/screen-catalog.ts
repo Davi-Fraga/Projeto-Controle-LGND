@@ -98,13 +98,9 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     // Toggles de ação (Q1): concedidos à parte do EDIT — reordenar < mover < estrutural.
     actionToggles: ['organogram.group.reorder', 'organogram.group.move', 'organogram.structure.change'],
   },
-  {
-    id: 'families',
-    label: 'Famílias',
-    view: ['families.read'],
-    edit: ['families.update'],
-    scopeTypes: [],
-  },
+  // REMOVIDO (change access-scope-semantics-hardening): a tela "Famílias" (families.read/
+  // families.update) era FANTASMA — nenhum controller a aplicava. O domínio real de famílias
+  // é `tops.families.*`, sob a tela TOPs. Concedê-la não tinha efeito; não reintroduzir.
   {
     id: 'social-actions',
     label: 'Ações Sociais',
@@ -144,13 +140,12 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     edit: [],
     scopeTypes: [UserScopeType.CITY],
   },
-  {
-    id: 'users',
-    label: 'Usuários',
-    view: ['users.read', 'audit.read'],
-    edit: ['users.update'],
-    scopeTypes: [],
-  },
+  // REMOVIDO (change access-scope-semantics-hardening): a tela "Usuários" era INCOERENTE —
+  // o catálogo anunciava users.*/audit.read, mas a gestão de usuários (/users) e a própria
+  // administração de acessos (/access-control) são guardadas por PAPEL admin (RolesGuard),
+  // ignorando essas permissions. Pior: seu EDIT concedia `users.update`, que gera links de
+  // redefinição de senha (password-reset) — capacidade que DEVE ser só do admin. Tirar a tela
+  // impede delegá-la e mantém users.* como capacidade exclusiva do admin (via base do papel).
 ];
 
 export function getScreen(id: string): ScreenDef | undefined {

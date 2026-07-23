@@ -77,9 +77,14 @@ export class OrgChartService {
   }
 
   // Coordination team (DB name) on top -> one coordinator node per other team that has a coordinator.
-  async getCoordinatorsChart(): Promise<OrgChartNode> {
+  // Escopado por equipe (change access-scope-semantics-hardening): não-admin sem escopo de
+  // equipe não vê a estrutura de coordenadores (fail-closed); com escopo, vê só as suas.
+  async getCoordinatorsChart(user: AuthenticatedUser): Promise<OrgChartNode> {
+    const scope = await this.accessPolicy.resolveScope(user);
+    const where: any = { deletedAt: null, status: TeamStatus.ACTIVE };
+    if (!scope.isAdmin) Object.assign(where, this.accessPolicy.buildTeamWhere(scope));
     const teams = await this.prisma.team.findMany({
-      where: { deletedAt: null, status: TeamStatus.ACTIVE },
+      where,
       include: { coordinator: true },
       orderBy: { name: 'asc' },
     });

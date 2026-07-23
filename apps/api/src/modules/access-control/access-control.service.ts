@@ -63,7 +63,11 @@ export class AccessControlService {
 
       const actionToggles = screenActionToggles(screen).map((key) => ({ key, granted: effective.has(key) }));
 
-      return { id: screen.id, label: screen.label, level, supportsEdit, scopeTypes: screen.scopeTypes, scopes, actionToggles };
+      // Estado inválido (change access-scope-semantics-hardening): tela escopável concedida
+      // sem nenhum escopo → fail-closed faz o usuário "não ver nada". A UI sinaliza/orienta.
+      const scopeMissing = screen.scopeTypes.length > 0 && level !== ScreenAccessLevel.NONE && scopes.length === 0;
+
+      return { id: screen.id, label: screen.label, level, supportsEdit, scopeTypes: screen.scopeTypes, scopes, actionToggles, scopeMissing };
     });
 
     return { userId: user.id, roles: user.roles.map((userRole) => userRole.role.name), screens };

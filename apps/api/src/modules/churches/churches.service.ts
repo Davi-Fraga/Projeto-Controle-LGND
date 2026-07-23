@@ -44,9 +44,17 @@ export class ChurchesService {
     return this.geocoding.geocode(name, city, locationHint);
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user: AuthenticatedUser) {
+    // Barreira de IDOR (change access-scope-semantics-hardening): o detalhe por id
+    // respeita o escopo de igreja (fail-closed) — não-admin sem a igreja no escopo
+    // recebe 404, igual à lista. Sem isto, qualquer `churches.read` abria qualquer igreja.
+    const scope = await this.accessPolicy.resolveScope(user);
+    const where: any = { id, deletedAt: null };
+    if (!scope.isAdmin) {
+      where.AND = [this.accessPolicy.buildChurchWhere(scope)];
+    }
     const church = await this.prisma.church.findFirst({
-      where: { id, deletedAt: null },
+      where,
       include: {
         spiritualLeaderLegendary: {
           select: { id: true, fullName: true, deletedAt: true },
@@ -167,7 +175,14 @@ export class ChurchesService {
   }
 
   async update(id: string, dto: UpdateChurchDto, actor: AuthenticatedUser) {
-    const before = await this.prisma.church.findFirst({ where: { id, deletedAt: null } });
+    // Barreira de IDOR na edição: a igreja-alvo é resolvida DENTRO do escopo antes de
+    // qualquer mutação. Fora do escopo → 404 e nada é alterado.
+    const scope = await this.accessPolicy.resolveScope(actor);
+    const beforeWhere: any = { id, deletedAt: null };
+    if (!scope.isAdmin) {
+      beforeWhere.AND = [this.accessPolicy.buildChurchWhere(scope)];
+    }
+    const before = await this.prisma.church.findFirst({ where: beforeWhere });
     if (!before) throw new NotFoundException('Church not found.');
 
     if (dto.spiritualLeaderUserId) {

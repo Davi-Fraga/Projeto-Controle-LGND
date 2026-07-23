@@ -5,11 +5,16 @@ import { Building2, User, Phone, Users, Mail, MapPin, Search, ShieldCheck } from
 import { formatPhone } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useDebouncedSearch } from '@/hooks/use-debounced-search';
+import { hasPermission } from '@/lib/permissions';
 import { getSpiritualLeaderChurches } from '@/features/spiritual-leaders/api';
 import type { SpiritualLeaderChurch } from '@/features/spiritual-leaders/api';
 
 export default function LideresEspirituaisPage() {
-  const { loading: authLoading } = useRequireAuth();
+  const { loading: authLoading, user } = useRequireAuth();
+  // Links cruzados para Legendários só quando a tela de destino está concedida (change
+  // alinhar-abas). Sem a permission, os dados de líder/igreja continuam visíveis como texto,
+  // apenas sem navegação — e a API de Legendários segue barrando por conta própria.
+  const canSeeLegendarios = hasPermission(user, 'legendarios.read');
   const {
     search,
     setSearch,
@@ -116,7 +121,7 @@ export default function LideresEspirituaisPage() {
               <div className="mt-4 space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Líder Espiritual</p>
 
-                {church.spiritualLeaderLegendary ? (
+                {church.spiritualLeaderLegendary && canSeeLegendarios ? (
                   <Link
                     href={`/dashboard/legendarios/${church.spiritualLeaderLegendary.id}`}
                     className="flex items-center gap-2 text-sm font-semibold text-orange-400 transition-colors hover:text-orange-300"
@@ -124,6 +129,8 @@ export default function LideresEspirituaisPage() {
                     <User className="h-3.5 w-3.5" />
                     <span className="truncate">{church.spiritualLeaderLegendary.fullName}</span>
                   </Link>
+                ) : church.spiritualLeaderLegendary ? (
+                  <InfoRow icon={<User className="h-3.5 w-3.5" />} value={church.spiritualLeaderLegendary.fullName} />
                 ) : church.spiritualLeaderEffectiveName || church.spiritualLeaderName ? (
                   <InfoRow
                     icon={<User className="h-3.5 w-3.5" />}
@@ -146,15 +153,17 @@ export default function LideresEspirituaisPage() {
                 )}
               </div>
 
-              {/* Action */}
-              <div className="mt-4 border-t border-zinc-800/60 pt-3">
-                <Link
-                  href={`/dashboard/legendarios?churchId=${church.id}&churchName=${encodeURIComponent(church.name)}`}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-orange-500 hover:text-orange-400 transition-colors"
-                >
-                  <Users className="h-3.5 w-3.5" /> Ver legendários
-                </Link>
-              </div>
+              {/* Action — só quando a tela de Legendários está concedida. */}
+              {canSeeLegendarios && (
+                <div className="mt-4 border-t border-zinc-800/60 pt-3">
+                  <Link
+                    href={`/dashboard/legendarios?churchId=${church.id}&churchName=${encodeURIComponent(church.name)}`}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-orange-500 hover:text-orange-400 transition-colors"
+                  >
+                    <Users className="h-3.5 w-3.5" /> Ver legendários
+                  </Link>
+                </div>
+              )}
             </div>
           ))}
         </div>

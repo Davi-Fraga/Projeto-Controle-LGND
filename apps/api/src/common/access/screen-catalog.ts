@@ -48,6 +48,16 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     scopeTypes: [UserScopeType.CHURCH],
   },
   {
+    id: 'spiritual-leaders',
+    label: 'Líderes Espirituais',
+    // Vista de Igrejas (líderes) com permission DEDICADA e independente de churches.*
+    // (change alinhar-abas-controle-acessos). VIEW-only; escopo por Igreja. Conceder esta
+    // tela NÃO concede Igrejas e vice-versa; o backfill preserva quem já via via churches.read.
+    view: ['spiritual-leaders.read'],
+    edit: [],
+    scopeTypes: [UserScopeType.CHURCH],
+  },
+  {
     id: 'tops',
     label: 'TOPs',
     view: [

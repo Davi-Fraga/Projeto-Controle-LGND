@@ -33,6 +33,13 @@ export class MapService {
       this.prisma.legendary.count({ where: legendaryWhere }),
     ]);
 
+    // A contagem por igreja carrega o MESMO recorte da listagem: sem isso ela entregava o
+    // total real da igreja a um usuário escopado — o escopo vale para agregados também.
+    const churchCountWhere: any = { deletedAt: null, isFromRotaDoCerrado: true };
+    if (!scope.isAdmin) {
+      churchCountWhere.AND = [this.accessPolicy.buildLegendaryWhere(scope)];
+    }
+
     const churches = churchIds.length
       ? await this.prisma.church.findMany({
           where: { id: { in: churchIds.map((l) => l.churchId!) }, deletedAt: null },
@@ -44,7 +51,7 @@ export class MapService {
             longitude: true,
             _count: {
               select: {
-                legendarios: { where: { deletedAt: null, isFromRotaDoCerrado: true } },
+                legendarios: { where: churchCountWhere },
               },
             },
           },

@@ -181,23 +181,11 @@ export class AccessPolicyService {
   // Semântica ÚNICA de escopo (change access-scope-semantics-hardening): TODO não-admin
   // é "restrito" — inclusive quando NÃO tem escopo daquele tipo. Ausência de escopo NÃO
   // significa acesso irrestrito; significa "não vê nada" (fail-closed), igual aos build*Where.
-  // Antes, `&& length > 0` deixava o assert vira no-op para quem não tinha escopo do tipo,
-  // liberando IDOR (ex.: ver qualquer TOP por id sem ter escopo de TOP).
-  isCityRestricted(scope: AccessScope): boolean {
-    return !scope.isAdmin;
-  }
-
-  isTeamRestricted(scope: AccessScope): boolean {
-    return !scope.isAdmin;
-  }
-
-  isChurchRestricted(scope: AccessScope): boolean {
-    return !scope.isAdmin;
-  }
-
-  isTopRestricted(scope: AccessScope): boolean {
-    return !scope.isAdmin;
-  }
+  //
+  // Os antigos `is*Restricted` (que devolviam apenas `!isAdmin`) foram REMOVIDOS na change
+  // painel-escopo-legivel-e-higiene: não tinham consumidor de produção — só testes de si
+  // mesmos — e eram o resíduo da semântica que os `assert*Allowed` abaixo substituíram.
+  // Não reintroduzir: a checagem correta é o assert tri-estado, não um booleano de "é restrito".
 
   // Barreira de IDOR (tri-estado): admin ou dimensão ALL → libera; SELECTED → só ids do escopo;
   // MISSING (lista vazia, sem ALL) → nega tudo (fail-closed).

@@ -79,9 +79,9 @@ const permissions = [
   'teams.members.add',
   'teams.members.update',
   'teams.members.remove',
-  'families.read',
-  'families.create',
-  'families.update',
+  // `families.*` NÃO existe mais (change painel-escopo-legivel-e-higiene): a tela "Famílias"
+  // era fantasma e saiu do SCREEN_CATALOG no hardening; o domínio real é `tops.families.*`,
+  // sob a tela TOPs. Semeá-las deixava permissions concedíveis por acidente, sem tela.
   'legendarios.history.read',
   'legendarios.history.create',
   'dashboard.read',
@@ -97,7 +97,9 @@ const permissions = [
   'social-actions.create',
   'social-actions.update',
   'social-actions.delete',
-  'social-actions.restore',
+  // `social-actions.restore` e `audit.read` também saem: nenhum endpoint as exige e nenhuma
+  // tela as concede. `audit.read` era do catálogo da tela "Usuários", removida no hardening
+  // (a administração é role-gated por COORDINATION_ADMIN, não por permission).
   'social-actions.participants.read',
   'social-actions.participants.add',
   'social-actions.participants.update',
@@ -105,7 +107,6 @@ const permissions = [
   'reports.read',
   'reports.export',
   'reports.contacts.export',
-  'audit.read',
   // Organograma (change organograma-navegacao-escalavel). Reconciliado com o modelo
   // de acesso por TELA (SCREEN_CATALOG): a tela 'org-chart' mapeia estas permissions.
   //  - VIEW  da tela: organogram.read (entrar/navegar/ver detalhe da pessoa)
@@ -141,6 +142,11 @@ async function main() {
       create: { key: permission, description: permission },
     });
   }
+
+  // ANTES de listar as permissions para o admin: o bloco abaixo concede ao admin TODAS as
+  // permissions existentes no banco (findMany, não a lista deste arquivo). Se as órfãs
+  // saírem depois, o admin ganharia grant de linhas que estão para ser apagadas.
+  await removeOrphanPermissions();
 
   const adminRole = await prisma.role.findUniqueOrThrow({ where: { name: 'COORDINATION_ADMIN' } });
   const allPermissions = await prisma.permission.findMany();
@@ -217,9 +223,6 @@ async function main() {
     'teams.members.add',
     'teams.members.update',
     'teams.members.remove',
-    'families.read',
-    'families.create',
-    'families.update',
     'communications.read',
     'communications.create',
     'communications.update',
@@ -231,7 +234,6 @@ async function main() {
     'social-actions.create',
     'social-actions.update',
     'social-actions.delete',
-    'social-actions.restore',
     'social-actions.participants.read',
     'social-actions.participants.add',
     'social-actions.participants.update',
@@ -432,6 +434,43 @@ async function seedTop1910Teams() {
       await prisma.team.create({ data: { name, status: 'ACTIVE' } });
     }
   }
+}
+
+// Permissions ÓRFÃS (change painel-escopo-legivel-e-higiene): chaves que sobraram no banco
+// sem nenhum endpoint (`@Permissions`) e sem nenhuma tela no SCREEN_CATALOG que as conceda.
+// `families.*` era a tela fantasma "Famílias" (o domínio real é `tops.families.*`, sob TOPs);
+// `audit.read` era da tela "Usuários", hoje role-gated; `social-actions.restore` nunca teve rota.
+// Deixá-las vivas as tornava concedíveis por acidente — um GRANT manual não teria tela, mas
+// ficaria efetivo — e mantinha o catálogo do banco divergindo do catálogo de telas.
+const ORPHAN_PERMISSION_KEYS = [
+  'families.read',
+  'families.create',
+  'families.update',
+  'social-actions.restore',
+  'audit.read',
+];
+
+// Não há `onDelete: Cascade` em RolePermission nem em UserPermissionOverride: apagar uma
+// Permission ainda referenciada viola FK. As dependências saem primeiro, na MESMA transação.
+// Idempotente: não encontrar nada é sucesso (execuções seguintes não fazem nada).
+async function removeOrphanPermissions() {
+  const orphans = await prisma.permission.findMany({
+    where: { key: { in: ORPHAN_PERMISSION_KEYS } },
+    select: { id: true, key: true },
+  });
+  if (orphans.length === 0) return;
+
+  const permissionId = { in: orphans.map((permission) => permission.id) };
+  const [overrides, roleGrants, removed] = await prisma.$transaction([
+    prisma.userPermissionOverride.deleteMany({ where: { permissionId } }),
+    prisma.rolePermission.deleteMany({ where: { permissionId } }),
+    prisma.permission.deleteMany({ where: { id: permissionId } }),
+  ]);
+
+  console.log(
+    `[seed] permissions órfãs removidas: ${removed.count} (${orphans.map((p) => p.key).join(', ')}) ` +
+      `— ${roleGrants.count} grant(s) de papel e ${overrides.count} override(s) de usuário limpos`,
+  );
 }
 
 async function assignPermissions(roleName: string, permissionKeys: string[]) {

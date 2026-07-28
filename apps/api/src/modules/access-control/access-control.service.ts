@@ -21,6 +21,9 @@ import { AddUserScopeDto } from './dto/access-control.dto';
 
 const MAX_SELECTED = 500;
 
+// Rótulo humano de um valor de escopo, resolvido a partir da entidade real.
+type ScopeLabel = { label: string; sublabel?: string | null };
+
 const userAccessInclude = {
   roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
   permissionOverrides: { include: { permission: true } },
@@ -52,9 +55,25 @@ export class AccessControlService {
       this.accessPolicy.resolveScopeByUserId(userId),
     ]);
     const policyByType = new Map(policies.map((policy) => [policy.type as UserScopeType, policy.mode as ScopeSelectionMode]));
+
+    // Valores a rotular por dimensão: explícitos ∪ efetivos (o derivado do papel também
+    // aparece na tela). Em ALL as duas listas são vazias → nenhuma consulta de rótulo.
+    const valuesByType = new Map<UserScopeType, Set<string>>();
+    for (const type of Object.values(UserScopeType)) {
+      const values = new Set<string>(
+        user.scopes.filter((userScope) => userScope.type === type).map((userScope) => userScope.value),
+      );
+      for (const id of this.effectiveDimension(type, scope).ids) values.add(id);
+      valuesByType.set(type, values);
+    }
+    const labelsByType = await this.resolveScopeLabels(valuesByType);
+
     const baseStateByType = new Map<UserScopeType, Omit<ScreenScopeState, 'satisfying'>>();
     for (const type of Object.values(UserScopeType)) {
-      baseStateByType.set(type, this.buildScopeBaseState(type, user.scopes, policyByType.get(type), scope));
+      baseStateByType.set(
+        type,
+        this.buildScopeBaseState(type, user.scopes, policyByType.get(type), scope, labelsByType.get(type) ?? new Map()),
+      );
     }
 
     const screens = SCREEN_CATALOG.map((screen) => {
@@ -68,8 +87,14 @@ export class AccessControlService {
           : ScreenAccessLevel.VIEW;
 
       const scopes: ScreenScopeEntry[] = user.scopes
-        .filter((scope) => screen.scopeTypes.includes(scope.type as UserScopeType))
-        .map((scope) => ({ id: scope.id, type: scope.type as UserScopeType, value: scope.value }));
+        .filter((userScope) => screen.scopeTypes.includes(userScope.type as UserScopeType))
+        .map((userScope) => ({
+          id: userScope.id,
+          type: userScope.type as UserScopeType,
+          value: userScope.value,
+          // Rotulado igual às demais listas: nenhum valor de escopo sai daqui sem rótulo.
+          label: labelsByType.get(userScope.type as UserScopeType)?.get(userScope.value)?.label ?? null,
+        }));
 
       const actionToggles = screenActionToggles(screen).map((key) => ({ key, granted: effective.has(key) }));
 
@@ -117,6 +142,7 @@ export class AccessControlService {
     allScopes: { type: string; value: string }[],
     policyMode: ScopeSelectionMode | undefined,
     scope: AccessScope,
+    labels: Map<string, ScopeLabel>,
   ): Omit<ScreenScopeState, 'satisfying'> {
     const explicitValues = allScopes.filter((s) => s.type === type).map((s) => s.value);
     const configuredMode =
@@ -128,10 +154,87 @@ export class AccessControlService {
     const { all, ids } = this.effectiveDimension(type, scope);
     const effectiveMode = all ? ScopeSelectionMode.ALL : ids.length ? ScopeSelectionMode.SELECTED : ScopeSelectionMode.MISSING;
     const explicitSet = new Set(explicitValues);
+    // Rótulo humano em AMBAS as listas (change painel-escopo-legivel-e-higiene): a
+    // configurada é o ponto de partida da edição, então também precisa dele.
+    const entry = (value: string, sources: ScopeValueSource[]) => this.toScopeValueEntry(value, sources, labels);
     const effectiveValues = all
       ? []
-      : ids.map((value) => ({ value, sources: [explicitSet.has(value) ? ScopeValueSource.EXPLICIT : ScopeValueSource.ROLE_DERIVED] }));
-    return { type, configuredMode, configuredValues: explicitValues, effectiveMode, effectiveValues };
+      : ids.map((value) => entry(value, [explicitSet.has(value) ? ScopeValueSource.EXPLICIT : ScopeValueSource.ROLE_DERIVED]));
+    const configuredValues = explicitValues.map((value) => entry(value, [ScopeValueSource.EXPLICIT]));
+    return { type, configuredMode, configuredValues, effectiveMode, effectiveValues };
+  }
+
+  // Valor sem rótulo resolvido = entidade inexistente/soft-deleted. Marca `missing` em vez
+  // de degradar para o identificador cru — um escopo apontando para entidade morta é
+  // informação que o admin precisa ver.
+  private toScopeValueEntry(value: string, sources: ScopeValueSource[], labels: Map<string, ScopeLabel>) {
+    const resolved = labels.get(value);
+    if (!resolved) return { value, label: null, missing: true, sources };
+    return { value, label: resolved.label, sublabel: resolved.sublabel ?? null, sources };
+  }
+
+  // Rótulos de TODAS as dimensões, em paralelo e só para as que têm valores: em ALL/MISSING
+  // não há valor a rotular, então não há consulta (é o caso mais comum do painel).
+  private async resolveScopeLabels(valuesByType: Map<UserScopeType, Set<string>>) {
+    const byType = new Map<UserScopeType, Map<string, ScopeLabel>>();
+    await Promise.all(
+      [...valuesByType.entries()]
+        .filter(([, values]) => values.size > 0)
+        .map(async ([type, values]) => {
+          byType.set(type, await this.labelsForScopeType(type, [...values]));
+        }),
+    );
+    return byType;
+  }
+
+  // Os rótulos seguem o MESMO formato dos seletores da tela (options de equipe/TOP/igreja),
+  // senão o chip e a opção do mesmo item apareceriam escritos diferente.
+  private async labelsForScopeType(type: UserScopeType, values: string[]): Promise<Map<string, ScopeLabel>> {
+    const labels = new Map<string, ScopeLabel>();
+
+    if (type === UserScopeType.CHURCH) {
+      const churches = await this.prisma.church.findMany({
+        where: { id: { in: values }, deletedAt: null },
+        select: { id: true, name: true, city: true },
+      });
+      for (const church of churches) labels.set(church.id, { label: church.name, sublabel: church.city });
+      return labels;
+    }
+
+    if (type === UserScopeType.TEAM) {
+      const teams = await this.prisma.team.findMany({
+        where: { id: { in: values }, deletedAt: null },
+        select: { id: true, name: true },
+      });
+      for (const team of teams) labels.set(team.id, { label: team.name });
+      return labels;
+    }
+
+    if (type === UserScopeType.TOP) {
+      const tops = await this.prisma.topEvent.findMany({
+        where: { id: { in: values }, deletedAt: null },
+        select: { id: true, name: true, number: true, city: true },
+      });
+      for (const top of tops) labels.set(top.id, { label: `TOP #${top.number} - ${top.name}`, sublabel: top.city });
+      return labels;
+    }
+
+    // CITY guarda a KEY normalizada (`goiania`), não o nome. O rótulo é a grafia REAL de
+    // `Legendary.city` — a mesma correspondência que o AccessPolicyService usa para montar
+    // o filtro — para o admin ver exatamente o que aparece nas telas de dados.
+    const wanted = new Set(values);
+    const rows = await this.prisma.legendary.findMany({
+      where: { deletedAt: null, city: { not: null } },
+      select: { city: true },
+      distinct: ['city'],
+    });
+    for (const row of rows) {
+      const city = row.city?.trim();
+      if (!city) continue;
+      const key = normalizeCityKey(city);
+      if (wanted.has(key) && !labels.has(key)) labels.set(key, { label: city });
+    }
+    return labels;
   }
 
   // Define o nível de acesso de UMA tela, traduzindo para o conjunto de overrides

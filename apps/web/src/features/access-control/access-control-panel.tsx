@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ShieldCheck, Trash2, X } from 'lucide-react';
 import { ApiError } from '@/lib/api';
 import { ScopeSelectionMode, ScopeValueSource, ScreenAccessLevel } from '@central-da-manada/shared';
-import type { ScreenAccessEntry, ScreenScopeState, UserScreenAccessControl } from '@central-da-manada/shared';
+import type { ScopeValueEntry, ScreenAccessEntry, ScreenScopeState, UserScreenAccessControl } from '@central-da-manada/shared';
 import type { ComboboxOption } from '@/components/ui/AsyncCombobox';
 import { getChurches } from '@/features/churches/api';
 import { getTeamsOptionsList, getTopOptions } from '@/features/tops/api';
@@ -113,6 +113,7 @@ export function AccessControlPanel({ userId }: { userId: string }) {
         <ScreenRow
           key={screen.id}
           screen={screen}
+          allScreens={acl.screens}
           saving={savingScreen === screen.id}
           onLevel={(level) => changeLevel(screen.id, level)}
           onToggle={(toggleKey, on) => changeToggle(screen.id, toggleKey, on)}
@@ -125,12 +126,14 @@ export function AccessControlPanel({ userId }: { userId: string }) {
 
 function ScreenRow({
   screen,
+  allScreens,
   saving,
   onLevel,
   onToggle,
   onApplyScope,
 }: {
   screen: ScreenAccessEntry;
+  allScreens: ScreenAccessEntry[];
   saving: boolean;
   onLevel: (level: ScreenAccessLevel) => void;
   onToggle: (toggleKey: string, on: boolean) => void;
@@ -200,6 +203,9 @@ function ScreenRow({
               key={type}
               type={type}
               state={stateByType.get(type)}
+              // O escopo é ÚNICO por dimensão (chave userId+type no banco), não por tela.
+              // Estas são as outras telas concedidas que a mesma edição afeta.
+              alsoAffects={otherGrantedScreensUsing(allScreens, screen.id, type)}
               onApply={onApplyScope}
             />
           ))}
@@ -212,14 +218,18 @@ function ScreenRow({
 function ScopeDimensionEditor({
   type,
   state,
+  alsoAffects,
   onApply,
 }: {
   type: ScopeTypeValue;
   state: ScreenScopeState | undefined;
+  alsoAffects: string[];
   onApply: (type: ScopeTypeValue, mode: ScopeSelectionMode, values: string[]) => Promise<void>;
 }) {
-  const effectiveMode = state?.effectiveMode ?? ScopeSelectionMode.MISSING;
-  const explicitValues = state?.configuredValues ?? [];
+  // O controle de modo reflete o CONFIGURADO — é o que a ação do admin altera. O efetivo
+  // (composto com os vínculos derivados da função) é informação, não estado do controle.
+  const configuredMode = state?.configuredMode ?? ScopeSelectionMode.MISSING;
+  const configuredValues = state?.configuredValues ?? [];
   const effectiveValues = state?.effectiveValues ?? [];
   const derived = effectiveValues.filter((v) => v.sources.includes(ScopeValueSource.ROLE_DERIVED) && !v.sources.includes(ScopeValueSource.EXPLICIT));
 
@@ -229,14 +239,18 @@ function ScopeDimensionEditor({
   const [prepared, setPrepared] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
 
-  const labelOf = (value: string) => options.find((o) => o.value === value)?.label ?? value;
+  // Rótulo dos itens em preparação: o backend já rotulou os configurados, então a edição
+  // nunca depende das options terem carregado para mostrar nome em vez de identificador.
+  const configuredLabels = new Map(configuredValues.map((v) => [v.value, v.label ?? null]));
+  const labelOf = (value: string) =>
+    options.find((o) => o.value === value)?.label ?? configuredLabels.get(value) ?? SCOPE_FALLBACK_LABEL;
 
   async function beginSelect() {
     setEditing(true);
     setSearch('');
+    setPrepared(new Set(configuredValues.map((v) => v.value)));
     const opts = await loadScopeOptions(type);
     setOptions(opts);
-    setPrepared(new Set(explicitValues));
   }
 
   async function apply(mode: ScopeSelectionMode, values: string[]) {
@@ -260,7 +274,7 @@ function ScopeDimensionEditor({
             type="button"
             disabled={busy}
             onClick={() => apply(ScopeSelectionMode.MISSING, [])}
-            className={`px-2.5 py-1 transition-colors disabled:opacity-50 ${!editing && effectiveMode === ScopeSelectionMode.MISSING ? 'bg-zinc-700 text-white' : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200'}`}
+            className={`px-2.5 py-1 transition-colors disabled:opacity-50 ${!editing && configuredMode === ScopeSelectionMode.MISSING ? 'bg-zinc-700 text-white' : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200'}`}
           >
             Nenhum
           </button>
@@ -268,7 +282,7 @@ function ScopeDimensionEditor({
             type="button"
             disabled={busy}
             onClick={beginSelect}
-            className={`px-2.5 py-1 transition-colors disabled:opacity-50 ${editing || effectiveMode === ScopeSelectionMode.SELECTED ? 'bg-orange-600 text-white' : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200'}`}
+            className={`px-2.5 py-1 transition-colors disabled:opacity-50 ${editing || configuredMode === ScopeSelectionMode.SELECTED ? 'bg-orange-600 text-white' : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200'}`}
           >
             Selecionados
           </button>
@@ -276,43 +290,47 @@ function ScopeDimensionEditor({
             type="button"
             disabled={busy}
             onClick={() => apply(ScopeSelectionMode.ALL, [])}
-            className={`px-2.5 py-1 transition-colors disabled:opacity-50 ${!editing && effectiveMode === ScopeSelectionMode.ALL ? 'bg-orange-600 text-white' : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200'}`}
+            className={`px-2.5 py-1 transition-colors disabled:opacity-50 ${!editing && configuredMode === ScopeSelectionMode.ALL ? 'bg-orange-600 text-white' : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200'}`}
           >
             Todos
           </button>
         </div>
       </div>
 
+      {/* Alcance da edição: o escopo é global por dimensão, não por tela. */}
+      {alsoAffects.length > 0 && (
+        <p className="mt-2 text-[11px] text-zinc-500">
+          Este escopo de <strong className="text-zinc-400">{SCOPE_LABEL[type].toLowerCase()}</strong> é único por usuário:
+          alterá-lo aqui também vale para {formatScreenList(alsoAffects)}.
+        </p>
+      )}
+
       {/* Estado atual (fora de edição) */}
       {!editing && (
         <div className="mt-2 space-y-1">
-          {effectiveMode === ScopeSelectionMode.ALL && (
+          {configuredMode === ScopeSelectionMode.ALL && (
             <p className="text-xs text-zinc-400">Todos — inclui novos cadastros automaticamente.</p>
           )}
-          {effectiveMode === ScopeSelectionMode.MISSING && (
+          {configuredMode === ScopeSelectionMode.MISSING && derived.length === 0 && (
             <p className="text-xs font-semibold text-amber-400">⚠ Sem escopo: este usuário não verá nenhum dado desta tela.</p>
           )}
-          {effectiveMode === ScopeSelectionMode.SELECTED && (
+          {configuredMode === ScopeSelectionMode.SELECTED && (
             <div className="flex flex-wrap gap-1.5">
-              {effectiveValues.map((v) => (
-                <span key={v.value} className="inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-200">
-                  {v.label ?? v.value}
-                  {v.sources.includes(ScopeValueSource.ROLE_DERIVED) && !v.sources.includes(ScopeValueSource.EXPLICIT) && (
-                    <span className="text-[9px] uppercase tracking-wide text-zinc-500">função</span>
-                  )}
-                </span>
+              {configuredValues.map((v) => (
+                <ScopeValueChip key={v.value} entry={v} />
               ))}
             </div>
           )}
-          {/* Derivados do papel aparecem sempre (read-only), mesmo em MISSING configurado. */}
-          {effectiveMode !== ScopeSelectionMode.SELECTED && derived.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {derived.map((v) => (
-                <span key={v.value} className="inline-flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900/60 px-2 py-0.5 text-xs text-zinc-400" title="Origem: função do usuário (não editável)">
-                  {v.label ?? v.value}
-                  <span className="text-[9px] uppercase tracking-wide text-zinc-500">função</span>
-                </span>
-              ))}
+          {/* Derivados da função aparecem à parte, read-only — não são editáveis aqui e não
+              devem fazer o controle indicar um modo que o admin não escolheu. */}
+          {derived.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-[10px] uppercase tracking-wider text-zinc-600">Vindos da função do usuário (não editáveis)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {derived.map((v) => (
+                  <ScopeValueChip key={v.value} entry={v} derived />
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -374,13 +392,78 @@ function ScopeDimensionEditor({
               Cancelar
             </button>
             <span className="text-[10px] text-zinc-600">
-              {prepared.size === 0 ? 'Selecione ao menos um item.' : `${prepared.size} selecionado(s)`}
+              {prepared.size === 0
+                ? 'Marque ao menos um item para aplicar — ou use "Nenhum"/"Todos".'
+                : `${prepared.size} selecionado(s)`}
             </span>
           </div>
+          {/* Sem isto, entrar em "Selecionados" numa dimensão com vínculos da função parece
+              um estado travado: o admin não vê por que "Aplicar" está desabilitado se já
+              existem itens listados fora da edição. */}
+          {derived.length > 0 && (
+            <p className="text-[10px] text-zinc-600">
+              Os itens vindos da função do usuário continuam valendo e não entram nesta seleção.
+            </p>
+          )}
         </div>
       )}
     </div>
   );
+}
+
+// Último recurso quando nem o backend nem as options trouxeram rótulo. NUNCA cair no
+// identificador: o admin não consegue conferir escopo lendo UUID — foi o que deixou um
+// usuário em modo "Todos" passar por "escopo configurado" até virar chamado de produção.
+const SCOPE_FALLBACK_LABEL = 'Item sem nome';
+
+// Chip de um valor de escopo. `missing` = a entidade não existe mais; sinaliza em vez de
+// exibir o identificador cru.
+function ScopeValueChip({ entry, derived = false }: { entry: ScopeValueEntry; derived?: boolean }) {
+  if (entry.missing) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-400"
+        title="O item deste escopo não existe mais (excluído). Remova-o ou selecione outro."
+      >
+        Item removido
+        <span className="text-[9px] uppercase tracking-wide text-amber-500/70">indisponível</span>
+      </span>
+    );
+  }
+
+  const className = derived
+    ? 'inline-flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900/60 px-2 py-0.5 text-xs text-zinc-400'
+    : 'inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-200';
+
+  return (
+    <span className={className} title={derived ? 'Origem: função do usuário (não editável)' : undefined}>
+      {entry.label || SCOPE_FALLBACK_LABEL}
+      {entry.sublabel && <span className="text-zinc-500">— {entry.sublabel}</span>}
+      {derived && <span className="text-[9px] uppercase tracking-wide text-zinc-500">função</span>}
+    </span>
+  );
+}
+
+// Telas CONCEDIDAS (≠ NONE), fora da atual, que usam a mesma dimensão de escopo. Derivado
+// da própria resposta — o escopo é global por dimensão, então a edição alcança todas elas.
+function otherGrantedScreensUsing(
+  screens: ScreenAccessEntry[],
+  currentScreenId: string,
+  type: ScopeTypeValue,
+): string[] {
+  return screens
+    .filter(
+      (screen) =>
+        screen.id !== currentScreenId &&
+        screen.level !== ScreenAccessLevel.NONE &&
+        (screen.scopeTypes as ScopeTypeValue[]).includes(type),
+    )
+    .map((screen) => screen.label);
+}
+
+function formatScreenList(labels: string[]): string {
+  if (labels.length === 1) return labels[0];
+  return `${labels.slice(0, -1).join(', ')} e ${labels[labels.length - 1]}`;
 }
 
 // Cache por tipo das opções reais (listas pequenas) — evita refetch a cada tecla.

@@ -54,7 +54,12 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     label: 'Igrejas',
     view: ['churches.read'],
     edit: ['churches.update'],
-    scopeTypes: [UserScopeType.CHURCH],
+    // CITY é declarada porque a listagem SEMPRE a aceitou: `buildChurchScopeWhere` é
+    // cidade ∪ igreja. Antes o catálogo declarava só CHURCH, então quem tinha apenas
+    // escopo de cidade via as igrejas mas aparecia como "Sem escopo" no painel — o sinal
+    // que o admin usa para conferir estava errado. Declaração ALINHADA ao enforcement;
+    // não amplia acesso algum (o endpoint já se comportava assim).
+    scopeTypes: [UserScopeType.CHURCH, UserScopeType.CITY],
   },
   {
     id: 'spiritual-leaders',
@@ -157,7 +162,10 @@ export const SCREEN_CATALOG: ScreenDef[] = [
     label: 'Mapa',
     view: ['map.read'],
     edit: [],
-    scopeTypes: [UserScopeType.CITY],
+    // Mesmo alinhamento de Igrejas: o mapa filtra por `buildLegendaryWhere`, que é
+    // cidade ∪ igreja. Declarar só CITY marcava "Sem escopo" para quem tem igreja e
+    // enxerga o mapa normalmente.
+    scopeTypes: [UserScopeType.CITY, UserScopeType.CHURCH],
   },
   // REMOVIDO (change access-scope-semantics-hardening): a tela "Usuários" era INCOERENTE —
   // o catálogo anunciava users.*/audit.read, mas a gestão de usuários (/users) e a própria

@@ -1,0 +1,16 @@
+{
+  // `prisma/` (seed, scripts de import) NÃO era coberto por nenhum type-check: o
+  // `pnpm -r lint` só alcança api/web/shared. Um erro de tipo aqui só aparecia ao rodar
+  // o seed contra o banco — tarde. Ligado ao `pnpm lint` da raiz.
+  "compilerOptions": {
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

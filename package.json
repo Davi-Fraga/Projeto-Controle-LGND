@@ -9,7 +9,7 @@
     "dev:api": "pnpm --filter @central-da-manada/api dev",
     "dev:web": "pnpm --filter @central-da-manada/web dev",
     "build": "pnpm -r build",
-    "lint": "pnpm -r lint",
+    "lint": "pnpm -r lint && tsc -p prisma/tsconfig.json",
     "test": "pnpm -r test",
     "db:generate": "pnpm prisma generate",
     "db:migrate": "pnpm prisma migrate deploy",
@@ -19,8 +19,10 @@
     "db:studio": "pnpm prisma studio"
   },
   "devDependencies": {
+    "@central-da-manada/shared": "workspace:*",
     "@prisma/client": "^5.22.0",
     "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.8.6",
     "bcryptjs": "^2.4.3",
     "prettier": "^3.3.3",
     "prisma": "^5.22.0",

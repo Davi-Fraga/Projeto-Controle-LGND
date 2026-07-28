@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { ScopeSelectionMode, ScreenAccessLevel, UserScopeType } from '@central-da-manada/shared';
+import { EffectiveScreenAccessState, ScopeSelectionMode, ScreenAccessLevel, UserScopeType } from '@central-da-manada/shared';
 import { AccessControlService } from './access-control.service';
-import { getScreen, permissionsForLevel } from '../../common/access/screen-catalog';
+import { getScreen, permissionsForLevel, SCREEN_CATALOG, satisfyingScopeTypes } from '../../common/access/screen-catalog';
 
 // Conjunto VIEW efetivo de uma tela concedida (= nível ≥ VIEW).
 const viewOf = (screenId: string) => permissionsForLevel(getScreen(screenId)!, 'VIEW');
@@ -28,6 +28,7 @@ describe('AccessControlService (por tela)', () => {
   let audit: any;
   let effective: any;
   let accessPolicy: any;
+  let effectiveScreenAccess: any;
   let service: AccessControlService;
 
   beforeEach(() => {
@@ -49,7 +50,23 @@ describe('AccessControlService (por tela)', () => {
     audit = { create: jest.fn() };
     effective = { resolveKeys: jest.fn().mockResolvedValue([]) };
     accessPolicy = { resolveScopeByUserId: jest.fn().mockResolvedValue(emptyScope()) };
-    service = new AccessControlService(prisma, audit, effective, accessPolicy);
+    effectiveScreenAccess = {
+      fromPermissionsAndScope: jest.fn((permissions: Iterable<string>, scope: any) => {
+        const set = new Set(permissions);
+        return SCREEN_CATALOG.map((screen) => {
+          const hasView = screen.view.every((key) => set.has(key));
+          const satisfiers = satisfyingScopeTypes(screen);
+          const hasScope = scope.isAdmin || satisfiers.some((type) =>
+            type === UserScopeType.CITY ? scope.allCities || scope.cityKeys.length > 0 :
+            type === UserScopeType.TEAM ? scope.allTeams || scope.teamIds.length > 0 :
+            type === UserScopeType.CHURCH ? scope.allChurches || scope.churchIds.length > 0 :
+            scope.allTops || scope.topIds.length > 0,
+          );
+          return { screenId: screen.id, state: !hasView ? EffectiveScreenAccessState.MISSING_PERMISSION : screen.scopeTypes.length && !hasScope ? EffectiveScreenAccessState.MISSING_SCOPE : EffectiveScreenAccessState.AVAILABLE };
+        });
+      }),
+    };
+    service = new AccessControlService(prisma, audit, effective, accessPolicy, effectiveScreenAccess);
   });
 
   describe('getUserScreenAccess — telas, não permissions', () => {

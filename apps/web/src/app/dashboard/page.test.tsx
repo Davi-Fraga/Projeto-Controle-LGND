@@ -12,7 +12,23 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: any) => <a href={String(href)} {...props}>{children}</a>,
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: mocks.replace }) }));
-vi.mock('@/features/auth/actions', () => ({ getCurrentUser: () => mocks.getCurrentUser() }));
+vi.mock('@/features/auth/actions', () => ({
+  getCurrentUser: async () => {
+    const current = await mocks.getCurrentUser();
+    if (!current || current.screenAccess) return current;
+    const byPermission: Record<string, string> = {
+      'dashboard.read': 'dashboard',
+      'spiritual-leaders.read': 'spiritual-leaders',
+    };
+    return {
+      ...current,
+      screenAccess: (current.permissions ?? [])
+        .map((permission: string) => byPermission[permission])
+        .filter(Boolean)
+        .map((screenId: string) => ({ screenId, level: 'VIEW', state: 'AVAILABLE', usable: true })),
+    };
+  },
+}));
 vi.mock('@/features/dashboard/api', () => ({ getDashboardSummary: () => mocks.getDashboardSummary() }));
 vi.mock('@/lib/permissions', () => ({
   hasPermission: (user: any, key: string) => (user?.permissions ?? []).includes(key),
@@ -39,6 +55,14 @@ function summary(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function user(name: string, permissions: string[], screenIds: string[] = []) {
+  return {
+    name,
+    permissions,
+    screenAccess: screenIds.map((screenId) => ({ screenId, level: 'VIEW' as const, state: 'AVAILABLE' as const, usable: true })),
+  };
+}
+
 describe('DashboardPage (gating de cards por permissão)', () => {
   beforeEach(() => {
     mocks.getCurrentUser.mockReset();
@@ -47,7 +71,7 @@ describe('DashboardPage (gating de cards por permissão)', () => {
   });
 
   it('mostra só os cards permitidos e esconde os de entidades sem permissão (valor null)', async () => {
-    mocks.getCurrentUser.mockResolvedValue({ name: 'Membro', permissions: ['dashboard.read', 'legendarios.read'] });
+    mocks.getCurrentUser.mockResolvedValue(user('Membro', ['dashboard.read', 'legendarios.read'], ['dashboard', 'legendarios']));
     mocks.getDashboardSummary.mockResolvedValue({ data: summary() });
 
     render(<DashboardPage />);
@@ -61,7 +85,7 @@ describe('DashboardPage (gating de cards por permissão)', () => {
   });
 
   it('mostra o card TOPs quando o usuário tem tops.read e o valor não é nulo', async () => {
-    mocks.getCurrentUser.mockResolvedValue({ name: 'Coord', permissions: ['dashboard.read', 'tops.read'] });
+    mocks.getCurrentUser.mockResolvedValue(user('Coord', ['dashboard.read', 'tops.read'], ['dashboard', 'tops']));
     mocks.getDashboardSummary.mockResolvedValue({ data: summary({ tops: 4 }) });
 
     render(<DashboardPage />);

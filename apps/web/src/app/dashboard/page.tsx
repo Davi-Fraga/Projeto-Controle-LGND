@@ -39,7 +39,7 @@ export default function DashboardPage() {
         setUser(currentUser);
         // Entrada em /dashboard sem dashboard.read (change alinhar-abas): redireciona para a
         // primeira aba permitida; sem nenhuma, cai no estado terminal renderizado abaixo.
-        if (!hasPermission(currentUser, 'dashboard.read')) {
+        if (!currentUser.screenAccess?.find((entry) => entry.screenId === 'dashboard')?.usable) {
           const dest = firstAllowedRoute(currentUser);
           if (dest && dest !== '/dashboard') router.replace(dest);
           return;
@@ -73,7 +73,7 @@ export default function DashboardPage() {
 
   // Sem dashboard.read: ou está redirecionando para a primeira aba permitida, ou não há
   // nenhuma tela concedida (estado terminal, sem loop de redirect).
-  if (!hasPermission(user, 'dashboard.read')) {
+  if (!user.screenAccess?.find((entry) => entry.screenId === 'dashboard')?.usable) {
     if (firstAllowedRoute(user)) {
       return (
         <div className="flex h-[50vh] items-center justify-center">
@@ -107,7 +107,7 @@ export default function DashboardPage() {
         { label: 'Expertises', value: summary.totals.expertises, permission: 'expertises.read', icon: <Wrench className="h-5 w-5" /> },
         { label: 'Interesse social', value: summary.totals.socialActionInterest, permission: 'legendarios.read', icon: <HeartHandshake className="h-5 w-5" /> },
         { label: 'Ações planejadas', value: summary.totals.plannedSocialActions, permission: 'social-actions.read', icon: <Calendar className="h-5 w-5" /> },
-      ].filter((card) => card.value !== null && hasPermission(user, card.permission))
+      ].filter((card) => card.value !== null && user.permissions.includes(card.permission))
     : [];
 
   return (

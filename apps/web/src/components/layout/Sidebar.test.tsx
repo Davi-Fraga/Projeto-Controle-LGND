@@ -10,7 +10,16 @@ vi.mock('next/link', () => ({
 vi.mock('next/navigation', () => ({ usePathname: () => '/dashboard' }));
 vi.mock('@/features/auth/actions', () => ({ getCurrentUser: () => mocks.getCurrentUser() }));
 
-const user = (permissions: string[], roles: string[] = ['MEMBER']) => ({ id: 'u1', name: 'X', permissions, roles });
+const user = (permissions: string[], roles: string[] = ['MEMBER']) => ({
+  id: 'u1',
+  name: 'X',
+  permissions,
+  roles,
+  screenAccess: [
+    'dashboard', 'legendarios', 'teams', 'spiritual-leaders', 'map', 'tops',
+    'org-chart', 'social-actions', 'communications', 'reports', 'churches',
+  ].map((screenId) => ({ screenId, level: 'VIEW' as const, state: 'AVAILABLE' as const, usable: true })),
+});
 
 describe('Sidebar (navegação permission-driven via manifesto)', () => {
   beforeEach(() => mocks.getCurrentUser.mockReset());

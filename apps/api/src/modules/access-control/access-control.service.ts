@@ -14,6 +14,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { AccessPolicyService, type AccessScope } from '../../common/access/access-policy.service';
 import { AuditService } from '../audit/audit.service';
 import { EffectivePermissionsService } from '../../common/access/effective-permissions.service';
+import { EffectiveScreenAccessService } from '../../common/access/effective-screen-access.service';
 import { roleContributesBase } from '../../common/access/access.constants';
 import { SCREEN_CATALOG, getScreen, permissionsForLevel, satisfyingScopeTypes, screenActionToggles } from '../../common/access/screen-catalog';
 import { normalizeCityKey } from '../../common/org-chart/org-chart.util';
@@ -37,6 +38,7 @@ export class AccessControlService {
     private readonly audit: AuditService,
     private readonly effectivePermissions: EffectivePermissionsService,
     private readonly accessPolicy: AccessPolicyService,
+    private readonly effectiveScreenAccess: EffectiveScreenAccessService,
   ) {}
 
   // Estado de acesso de um usuário POR TELA (o admin nunca vê permissions cruas).
@@ -107,10 +109,9 @@ export class AccessControlService {
       // Estado inválido (refinado na change access-scope-bulk-selection): tela concedida, com
       // dimensão SATISFATÓRIA, mas NENHUMA satisfatória tem escopo EFETIVO (SELECTED com valores,
       // ALL, ou derivado do papel). Escopo apenas suplementar (ex.: TEAM em Legendários) NÃO conta.
-      const scopeMissing =
-        level !== ScreenAccessLevel.NONE &&
-        satisfying.length > 0 &&
-        !satisfying.some((type) => this.hasEffectiveScope(type, scope));
+      const effectiveScreen = this.effectiveScreenAccess.fromPermissionsAndScope(effective, scope)
+        .find((entry) => entry.screenId === screen.id)!;
+      const scopeMissing = effectiveScreen.state === 'MISSING_SCOPE';
 
       return { id: screen.id, label: screen.label, level, supportsEdit, scopeTypes: screen.scopeTypes, scopes, actionToggles, scopeMissing, scopeStates };
     });

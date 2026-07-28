@@ -152,6 +152,21 @@ export enum ScreenAccessLevel {
   EDIT = 'EDIT',
 }
 
+// Estado de navegação calculado no backend. É somente UX: guards e policies da API
+// continuam sendo a autoridade para cada requisição.
+export enum EffectiveScreenAccessState {
+  AVAILABLE = 'AVAILABLE',
+  MISSING_PERMISSION = 'MISSING_PERMISSION',
+  MISSING_SCOPE = 'MISSING_SCOPE',
+}
+
+export type EffectiveScreenAccess = {
+  screenId: string;
+  level: ScreenAccessLevel;
+  state: EffectiveScreenAccessState;
+  usable: boolean;
+};
+
 // Um escopo do usuário, agrupado sob a tela cujos scopeTypes o contêm.
 export type ScreenScopeEntry = {
   id: string;

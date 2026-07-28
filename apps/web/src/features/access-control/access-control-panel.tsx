@@ -154,7 +154,7 @@ function ScreenRow({
           <span className="text-sm font-bold text-white">{screen.label}</span>
           {screen.scopeMissing && (
             <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-400">
-              Sem escopo
+              Acesso ainda não efetivo
             </span>
           )}
         </div>
@@ -198,6 +198,7 @@ function ScreenRow({
       {hasScope && granted && (
         <div className="mt-3 space-y-4 border-t border-zinc-850 pt-3">
           <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Escopo (a qual fatia)</p>
+          {screen.scopeMissing && <p className="text-xs text-amber-400">A aba ficará escondida até existir uma dimensão de escopo satisfatória. Nenhuma permission ou acesso total será concedido automaticamente.</p>}
           {scopeTypes.map((type) => (
             <ScopeDimensionEditor
               key={type}

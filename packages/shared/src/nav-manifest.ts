@@ -50,9 +50,14 @@ export function isPrimaryNavVisible(user: NavUser, item: PrimaryNavItem): boolea
     return (user.roles ?? []).includes(rule.role);
   }
   const perms = user.permissions ?? [];
-  return rule.mode === 'allOf'
+  const permitted = rule.mode === 'allOf'
     ? rule.keys.every((key) => perms.includes(key))
     : rule.keys.some((key) => perms.includes(key));
+  if (!permitted) return false;
+  const access = (user as NavUser & { screenAccess?: Array<{ screenId: string; usable: boolean }> }).screenAccess;
+  // Ausência do contrato novo é fail-closed para telas protegidas; a exceção admin acima
+  // continua explícita e não depende do catálogo concedível.
+  return !!access?.find((entry) => entry.screenId === item.screenId)?.usable;
 }
 
 export function visiblePrimaryNav(user: NavUser): PrimaryNavItem[] {

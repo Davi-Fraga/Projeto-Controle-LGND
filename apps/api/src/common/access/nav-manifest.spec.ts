@@ -45,7 +45,18 @@ describe('nav-manifest ↔ SCREEN_CATALOG (paridade)', () => {
 });
 
 describe('nav-manifest — visibilidade e destino inicial', () => {
-  const u = (permissions: string[], roles: string[] = ['MEMBER']) => ({ permissions, roles });
+  const u = (permissions: string[], roles: string[] = ['MEMBER'], unavailable: string[] = []) => ({
+    permissions,
+    roles,
+    screenAccess: permissions
+      .filter((permission) => permission.endsWith('.read'))
+      .map((permission) => ({
+        screenId: permission.replace('.read', ''),
+        level: 'VIEW' as const,
+        state: unavailable.includes(permission.replace('.read', '')) ? 'MISSING_SCOPE' as const : 'AVAILABLE' as const,
+        usable: !unavailable.includes(permission.replace('.read', '')),
+      })),
+  });
 
   it('Ações Sociais aparece com social-actions.read e TOPs não (gate correto, não tops.read)', () => {
     const ids = visiblePrimaryNav(u(['social-actions.read'])).map((i) => i.screenId);
@@ -76,6 +87,10 @@ describe('nav-manifest — visibilidade e destino inicial', () => {
 
   it('Painel some sem dashboard.read', () => {
     expect(visiblePrimaryNav(u(['legendarios.read'])).map((i) => i.screenId)).not.toContain('dashboard');
+  });
+
+  it('esconde a aba quando o contrato informa MISSING_SCOPE', () => {
+    expect(visiblePrimaryNav(u(['teams.read'], ['MEMBER'], ['teams'])).map((i) => i.screenId)).not.toContain('teams');
   });
 
   it('sem usuário nada protegido aparece', () => {

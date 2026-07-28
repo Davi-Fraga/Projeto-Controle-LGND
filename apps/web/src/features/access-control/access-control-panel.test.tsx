@@ -46,7 +46,7 @@ describe('AccessControlPanel — escopo tri-estado (bulk-selection)', () => {
   it('MISSING: badge e aviso "sem escopo"; tela global não sinaliza', async () => {
     mocks.getUserScreenAccess.mockResolvedValue(acl([churchesScreen(churchState()), dashboardScreen]));
     render(<AccessControlPanel userId="u1" />);
-    expect(await screen.findByText('Sem escopo')).toBeInTheDocument();
+    expect(await screen.findByText('Acesso ainda não efetivo')).toBeInTheDocument();
     expect(screen.getByText(/não verá nenhum dado desta tela/i)).toBeInTheDocument();
   });
 

@@ -1,16 +1,20 @@
 'use client';
 
 import { ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { AppHeader } from './AppHeader';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { EffectiveScreenAccessState, PRIMARY_NAV, firstAllowedRoute } from '@central-da-manada/shared';
 
 interface AppLayoutProps {
   children: ReactNode;
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { loading } = useRequireAuth();
+  const { user, loading } = useRequireAuth();
+  const pathname = usePathname();
+  const router = useRouter();
 
   if (loading) {
     return (
@@ -23,6 +27,24 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
       </div>
     );
+  }
+
+  const item = PRIMARY_NAV.find((entry) => pathname === entry.href || (entry.href !== '/dashboard' && pathname?.startsWith(`${entry.href}/`)));
+  if (item?.rule.kind === 'permissions') {
+    const access = user?.screenAccess?.find((entry) => entry.screenId === item.screenId);
+    if (!access?.usable) {
+      const destination = firstAllowedRoute(user);
+      const missingScope = access?.state === EffectiveScreenAccessState.MISSING_SCOPE;
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-[#0E0E10] px-6 text-center text-zinc-100">
+          <div className="max-w-md">
+            <h1 className="text-lg font-black uppercase tracking-wide">{missingScope ? 'Acesso ainda não efetivo' : 'Você não possui acesso'}</h1>
+            <p className="mt-2 text-sm text-zinc-400">{missingScope ? 'Seu acesso foi concedido, mas ainda falta configurar um escopo válido.' : 'Sua conta não possui a permissão necessária para esta tela.'}</p>
+            {destination && destination !== item.href && <button onClick={() => router.replace(destination)} className="mt-5 rounded-lg bg-orange-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white">Ir para uma tela disponível</button>}
+          </div>
+        </div>
+      );
+    }
   }
 
   return (

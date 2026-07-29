@@ -127,3 +127,55 @@ describe('screen-catalog — satisfying/supplemental', () => {
     }
   });
 });
+
+// Invariante DECLARAÇÃO × ENFORCEMENT.
+//
+// O catálogo não é decorativo: `scopeMissing` (o aviso "Sem escopo" do painel) e a
+// elegibilidade de escopo (`assertScopeAllowed`) saem daqui. Quando ele diverge do
+// builder que o service realmente usa, o admin recebe um sinal FALSO — foi o caso de
+// Igrejas (declarava só CHURCH, filtrava por cidade ∪ igreja) e do Mapa.
+//
+// Este teste é a trava: mudar o builder de uma tela sem mexer no catálogo quebra aqui.
+describe('screen-catalog — declaração × enforcement', () => {
+  // Dimensões que cada build*Where do AccessPolicyService de fato considera.
+  const BUILDER_DIMENSIONS: Record<string, UserScopeType[]> = {
+    buildCityWhere: [UserScopeType.CITY],
+    buildTeamWhere: [UserScopeType.TEAM],
+    buildTopWhere: [UserScopeType.TOP],
+    buildChurchWhere: [UserScopeType.CHURCH],
+    buildChurchScopeWhere: [UserScopeType.CHURCH, UserScopeType.CITY],
+    buildLegendaryWhere: [UserScopeType.CITY, UserScopeType.CHURCH],
+  };
+
+  // Builder que filtra a LISTAGEM principal de cada tela escopável.
+  // `org-chart` fica fora de propósito: tem abas com builders distintos
+  // (equipes via buildTeamWhere, cidades via buildLegendaryWhere + assertCityAllowed).
+  const SCREEN_ENFORCEMENT: Record<string, keyof typeof BUILDER_DIMENSIONS> = {
+    legendarios: 'buildLegendaryWhere',
+    teams: 'buildTeamWhere',
+    churches: 'buildChurchScopeWhere',
+    'spiritual-leaders': 'buildChurchWhere',
+    tops: 'buildTopWhere',
+    'social-actions': 'buildCityWhere',
+    reports: 'buildCityWhere',
+    map: 'buildLegendaryWhere',
+  };
+
+  const sorted = (types: UserScopeType[]) => [...types].sort();
+
+  it.each(Object.entries(SCREEN_ENFORCEMENT))(
+    'tela "%s": dimensões satisfatórias == dimensões de %s',
+    (screenId, builder) => {
+      const screen = getScreen(screenId)!;
+      expect(screen).toBeDefined();
+      expect(sorted(satisfyingScopeTypes(screen))).toEqual(sorted(BUILDER_DIMENSIONS[builder]));
+    },
+  );
+
+  it('toda tela escopável do catálogo está coberta (exceto org-chart, multi-aba)', () => {
+    const uncovered = SCREEN_CATALOG.filter(
+      (screen) => screen.scopeTypes.length > 0 && screen.id !== 'org-chart' && !SCREEN_ENFORCEMENT[screen.id],
+    ).map((screen) => screen.id);
+    expect(uncovered).toEqual([]);
+  });
+});

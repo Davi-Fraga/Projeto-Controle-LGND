@@ -170,6 +170,32 @@ describe('AccessPolicyService', () => {
         legendaryCities: [],
       })).toEqual({ id: { in: [] } });
     });
+
+    // Regressão do incidente de produção: com CHURCH=ALL o `resolveScope` esvazia
+    // `churchIds` de propósito (o modo ALL domina a dimensão). Sem tratar a flag, o
+    // builder caía no fail-closed e a aba Igrejas zerava — enquanto Líderes Espirituais,
+    // que usa `buildChurchWhere` (já ciente de `allChurches`), listava normalmente.
+    it('CHURCH=ALL é irrestrito (a lista vazia é consequência do modo, não ausência de escopo)', () => {
+      expect(service.buildChurchScopeWhere({
+        ...baseScope,
+        isAdmin: false,
+        churchIds: [],
+        legendaryCities: [],
+        allChurches: true,
+      })).toEqual({});
+    });
+
+    // Mesma armadilha na outra dimensão: esta listagem também é satisfeita por CIDADE,
+    // e CITY=ALL igualmente esvazia `legendaryCities`.
+    it('CITY=ALL é irrestrito (a listagem de igrejas também é satisfeita por cidade)', () => {
+      expect(service.buildChurchScopeWhere({
+        ...baseScope,
+        isAdmin: false,
+        churchIds: [],
+        legendaryCities: [],
+        allCities: true,
+      })).toEqual({});
+    });
   });
 
   it('legendário só com escopo de equipe não vê legendários (equipe vale em Equipes/Organograma)', () => {

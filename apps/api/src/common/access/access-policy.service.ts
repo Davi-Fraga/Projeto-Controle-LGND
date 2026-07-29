@@ -148,8 +148,12 @@ export class AccessPolicyService {
   // Filtro da listagem administrativa de igrejas: cidade ∪ igrejas explícitas.
   // `buildChurchWhere` permanece restrito a churchIds para não alterar outros
   // consumidores que dependem dessa semântica mais estreita.
+  //
+  // Modo ALL de QUALQUER das duas dimensões libera a listagem inteira. Isso não é
+  // detalhe: `resolveScope` esvazia a lista da dimensão em ALL (o modo domina), então
+  // ler só as listas confundiria "irrestrito" com "sem escopo" e zeraria a tela.
   buildChurchScopeWhere(scope: AccessScope) {
-    if (scope.isAdmin) return {};
+    if (scope.isAdmin || scope.allChurches || scope.allCities) return {};
 
     const OR: any[] = [];
     if (scope.legendaryCities.length) {

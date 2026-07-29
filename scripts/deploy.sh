@@ -28,6 +28,25 @@ compose() {
 echo ">> Atualizando código (git pull)..."
 git pull --ff-only
 
+echo ">> Marcando imagens atuais para rollback..."
+# O compose não define `image:` para api/web, então cada build substitui o mesmo nome e a
+# imagem anterior fica dangling — que é justamente o que o `docker image prune -f` do final
+# apaga. Marcar ANTES do build dá um ponto de retorno em segundos (sem rebuild), e a tag
+# protege a imagem do prune. O rótulo é o commit que está sendo implantado: `pre-<commit>`
+# significa "estado imediatamente ANTES de <commit>".
+ROLLBACK_TAG="pre-$(git rev-parse --short HEAD)"
+for svc in api web; do
+  img="central-da-manada-$svc"
+  if ! docker image inspect "$img:latest" >/dev/null 2>&1; then
+    echo "   $img:latest não existe (primeiro deploy?) — nada a marcar"
+  elif docker image inspect "$img:$ROLLBACK_TAG" >/dev/null 2>&1; then
+    echo "   $img:$ROLLBACK_TAG já existe — mantido (não sobrescreve o ponto de retorno)"
+  else
+    docker tag "$img:latest" "$img:$ROLLBACK_TAG"
+    echo "   $img:latest -> $img:$ROLLBACK_TAG"
+  fi
+done
+
 echo ">> Buildando imagens..."
 compose build
 
@@ -52,7 +71,11 @@ echo ">> Subindo aplicação (api, web, caddy)..."
 compose up -d
 
 echo ">> Limpando imagens órfãs..."
+# Só remove imagens SEM tag. As `pre-<commit>` sobrevivem de propósito — são o rollback.
+# NÃO limpa build cache: isso acumula (chegou a 17 GB em 29/07/2026). Periodicamente, à mão:
+#   docker builder prune -f --filter until=72h
 docker image prune -f
 
 echo ">> Deploy concluído."
+echo "   Rollback rápido disponível em: central-da-manada-{api,web}:$ROLLBACK_TAG"
 compose ps

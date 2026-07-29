@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { ScopeSelectionMode, ScreenAccessLevel, UserScopeType } from '@central-da-manada/shared';
+import { EffectiveScreenAccessState, ScopeSelectionMode, ScreenAccessLevel, UserScopeType } from '@central-da-manada/shared';
 import { AccessControlService } from './access-control.service';
-import { getScreen, permissionsForLevel } from '../../common/access/screen-catalog';
+import { getScreen, permissionsForLevel, SCREEN_CATALOG, satisfyingScopeTypes } from '../../common/access/screen-catalog';
 
 // Conjunto VIEW efetivo de uma tela concedida (= nível ≥ VIEW).
 const viewOf = (screenId: string) => permissionsForLevel(getScreen(screenId)!, 'VIEW');
@@ -28,6 +28,7 @@ describe('AccessControlService (por tela)', () => {
   let audit: any;
   let effective: any;
   let accessPolicy: any;
+  let effectiveScreenAccess: any;
   let service: AccessControlService;
 
   beforeEach(() => {
@@ -37,16 +38,35 @@ describe('AccessControlService (por tela)', () => {
       userPermissionOverride: { upsert: jest.fn(), deleteMany: jest.fn() },
       userScope: { upsert: jest.fn(), findFirst: jest.fn(), delete: jest.fn(), deleteMany: jest.fn(), createMany: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       userScopePolicy: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn(), deleteMany: jest.fn() },
-      team: { findFirst: jest.fn() },
-      church: { findFirst: jest.fn() },
-      topEvent: { findFirst: jest.fn() },
+      // `findMany` por dimensão alimenta a resolução de RÓTULO dos valores de escopo
+      // (change painel-escopo-legivel-e-higiene). Default vazio = nada resolvido, que é
+      // exatamente o caminho "entidade não existe mais" (missing).
+      team: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
+      church: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
+      topEvent: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
       legendary: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(async (cb: any) => cb(prisma)),
     };
     audit = { create: jest.fn() };
     effective = { resolveKeys: jest.fn().mockResolvedValue([]) };
     accessPolicy = { resolveScopeByUserId: jest.fn().mockResolvedValue(emptyScope()) };
-    service = new AccessControlService(prisma, audit, effective, accessPolicy);
+    effectiveScreenAccess = {
+      fromPermissionsAndScope: jest.fn((permissions: Iterable<string>, scope: any) => {
+        const set = new Set(permissions);
+        return SCREEN_CATALOG.map((screen) => {
+          const hasView = screen.view.every((key) => set.has(key));
+          const satisfiers = satisfyingScopeTypes(screen);
+          const hasScope = scope.isAdmin || satisfiers.some((type) =>
+            type === UserScopeType.CITY ? scope.allCities || scope.cityKeys.length > 0 :
+            type === UserScopeType.TEAM ? scope.allTeams || scope.teamIds.length > 0 :
+            type === UserScopeType.CHURCH ? scope.allChurches || scope.churchIds.length > 0 :
+            scope.allTops || scope.topIds.length > 0,
+          );
+          return { screenId: screen.id, state: !hasView ? EffectiveScreenAccessState.MISSING_PERMISSION : screen.scopeTypes.length && !hasScope ? EffectiveScreenAccessState.MISSING_SCOPE : EffectiveScreenAccessState.AVAILABLE };
+        });
+      }),
+    };
+    service = new AccessControlService(prisma, audit, effective, accessPolicy, effectiveScreenAccess);
   });
 
   describe('getUserScreenAccess — telas, não permissions', () => {
@@ -70,6 +90,7 @@ describe('AccessControlService (por tela)', () => {
       );
       // Efetivo: só TEAM tem escopo (satisfatório p/ Equipes; suplementar p/ Legendários).
       accessPolicy.resolveScopeByUserId.mockResolvedValue({ ...emptyScope(), teamIds: ['team-seg'] });
+      prisma.team.findMany.mockResolvedValue([{ id: 'team-seg', name: 'Segurança' }]);
 
       const acl = await service.getUserScreenAccess('u1');
       const byId = Object.fromEntries(acl.screens.map((s) => [s.id, s]));
@@ -78,7 +99,8 @@ describe('AccessControlService (por tela)', () => {
       expect(byId['teams'].level).toBe(ScreenAccessLevel.VIEW);
       expect(byId['churches'].level).toBe(ScreenAccessLevel.EDIT);
       expect(byId['legendarios'].level).toBe(ScreenAccessLevel.NONE);
-      expect(byId['teams'].scopes).toEqual([{ id: 's1', type: 'TEAM', value: 'team-seg' }]);
+      // `scopes` também sai rotulado (change painel-escopo-legivel-e-higiene).
+      expect(byId['teams'].scopes).toEqual([{ id: 's1', type: 'TEAM', value: 'team-seg', label: 'Segurança' }]);
       expect(byId['churches'].scopes).toEqual([]);
       // scopeMissing: churches é escopável, concedida (EDIT) e sem escopo → estado inválido.
       expect(byId['churches'].scopeMissing).toBe(true);
@@ -327,6 +349,92 @@ describe('AccessControlService (por tela)', () => {
       prisma.userScope.findFirst.mockResolvedValue({ id: 's1', type: 'TOP', value: 'top-1' });
       prisma.userScopePolicy.findUnique.mockResolvedValue({ mode: ScopeSelectionMode.ALL });
       await expect(service.removeScope('u1', 's1')).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  // change painel-escopo-legivel-e-higiene: o admin não consegue conferir um escopo que
+  // aparece como UUID. O backend passa a devolver rótulo humano em TODA lista de valores.
+  describe('rótulo humano dos valores de escopo', () => {
+    // Concede as telas que suportam cada dimensão, para os escopos serem elegíveis.
+    const grantAll = () =>
+      [...viewOf('churches'), ...viewOf('teams'), ...viewOf('tops'), ...viewOf('legendarios')].map((key) => ({
+        key,
+        effect: 'GRANT' as const,
+      }));
+
+    const stateOf = (acl: any, screenId: string, type: UserScopeType) =>
+      acl.screens.find((s: any) => s.id === screenId).scopeStates.find((s: any) => s.type === type);
+
+    it('rotula igreja, equipe e TOP no formato dos seletores da tela', async () => {
+      prisma.user.findFirst.mockResolvedValue(
+        buildUser([], grantAll(), [
+          { id: 's1', type: 'CHURCH', value: 'church-1' },
+          { id: 's2', type: 'TEAM', value: 'team-1' },
+          { id: 's3', type: 'TOP', value: 'top-1' },
+        ]),
+      );
+      accessPolicy.resolveScopeByUserId.mockResolvedValue({
+        ...emptyScope(),
+        churchIds: ['church-1'],
+        teamIds: ['team-1'],
+        topIds: ['top-1'],
+      });
+      prisma.church.findMany.mockResolvedValue([{ id: 'church-1', name: 'Igreja Batista Central', city: 'Goiânia' }]);
+      prisma.team.findMany.mockResolvedValue([{ id: 'team-1', name: 'Segurança' }]);
+      prisma.topEvent.findMany.mockResolvedValue([{ id: 'top-1', name: 'Rota do Cerrado', number: 12, city: 'Anápolis' }]);
+
+      const acl = await service.getUserScreenAccess('u1');
+
+      const church = stateOf(acl, 'churches', UserScopeType.CHURCH);
+      expect(church.effectiveValues[0]).toMatchObject({ label: 'Igreja Batista Central', sublabel: 'Goiânia' });
+      // A lista CONFIGURADA também vem rotulada: é dela que a edição parte.
+      expect(church.configuredValues[0]).toMatchObject({ value: 'church-1', label: 'Igreja Batista Central' });
+
+      expect(stateOf(acl, 'teams', UserScopeType.TEAM).effectiveValues[0].label).toBe('Segurança');
+      // Mesmo formato do options de TOP (hífen), para chip e opção não divergirem.
+      expect(stateOf(acl, 'tops', UserScopeType.TOP).effectiveValues[0].label).toBe('TOP #12 - Rota do Cerrado');
+    });
+
+    it('rotula cidade com a grafia REAL do legendário, não com a key normalizada', async () => {
+      prisma.user.findFirst.mockResolvedValue(
+        buildUser([], grantAll(), [{ id: 's1', type: 'CITY', value: 'goiania' }]),
+      );
+      accessPolicy.resolveScopeByUserId.mockResolvedValue({ ...emptyScope(), cityKeys: ['goiania'] });
+      prisma.legendary.findMany.mockResolvedValue([{ city: 'Goiânia' }, { city: 'Anápolis' }]);
+
+      const acl = await service.getUserScreenAccess('u1');
+      const city = stateOf(acl, 'legendarios', UserScopeType.CITY);
+
+      expect(city.effectiveValues[0]).toMatchObject({ value: 'goiania', label: 'Goiânia' });
+      expect(city.effectiveValues[0].label).not.toBe('goiania');
+    });
+
+    it('marca missing quando o valor aponta para entidade que não existe mais', async () => {
+      prisma.user.findFirst.mockResolvedValue(
+        buildUser([], grantAll(), [{ id: 's1', type: 'CHURCH', value: 'church-apagada' }]),
+      );
+      accessPolicy.resolveScopeByUserId.mockResolvedValue({ ...emptyScope(), churchIds: ['church-apagada'] });
+      prisma.church.findMany.mockResolvedValue([]); // soft-deleted / inexistente
+
+      const acl = await service.getUserScreenAccess('u1');
+      const church = stateOf(acl, 'churches', UserScopeType.CHURCH);
+
+      expect(church.effectiveValues[0]).toMatchObject({ value: 'church-apagada', label: null, missing: true });
+    });
+
+    it('em ALL e MISSING não consulta rótulo (não há valor a rotular)', async () => {
+      prisma.user.findFirst.mockResolvedValue(buildUser([], grantAll(), []));
+      prisma.userScopePolicy.findMany.mockResolvedValue([{ type: 'CHURCH', mode: ScopeSelectionMode.ALL }]);
+      accessPolicy.resolveScopeByUserId.mockResolvedValue({ ...emptyScope(), allChurches: true });
+
+      const acl = await service.getUserScreenAccess('u1');
+
+      expect(prisma.church.findMany).not.toHaveBeenCalled();
+      expect(prisma.team.findMany).not.toHaveBeenCalled();
+      expect(prisma.topEvent.findMany).not.toHaveBeenCalled();
+      const church = stateOf(acl, 'churches', UserScopeType.CHURCH);
+      expect(church.effectiveMode).toBe(ScopeSelectionMode.ALL);
+      expect(church.effectiveValues).toEqual([]);
     });
   });
 });

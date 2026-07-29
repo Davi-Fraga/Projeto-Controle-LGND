@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { UserWithAccess } from '../../common/types/safe-user';
 import { roleContributesBase } from '../../common/access/access.constants';
 import { PrismaService } from '../../database/prisma.service';
+import { EffectiveScreenAccessService } from '../../common/access/effective-screen-access.service';
 
 const userInclude = {
   roles: {
@@ -34,6 +35,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly effectiveScreenAccess: EffectiveScreenAccessService,
   ) {}
 
   async login(email: string, password: string) {
@@ -54,7 +56,7 @@ export class AuthService {
     return {
       accessToken: await this.createAccessToken(user),
       refreshToken: await this.createRefreshToken(user.id),
-      user: this.toSafeUser(user),
+      user: await this.toSafeUser(user),
     };
   }
 
@@ -86,7 +88,7 @@ export class AuthService {
     return {
       accessToken: await this.createAccessToken(token.user),
       refreshToken: await this.createRefreshToken(token.userId),
-      user: this.toSafeUser(token.user),
+      user: await this.toSafeUser(token.user),
     };
   }
 
@@ -132,7 +134,7 @@ export class AuthService {
   }
 
   private async createAccessToken(user: UserWithAccess) {
-    const safeUser = this.toSafeUser(user);
+    const safeUser = await this.toSafeUser(user);
 
     return this.jwt.signAsync({
       sub: user.id,
@@ -159,7 +161,7 @@ export class AuthService {
     return token;
   }
 
-  private toSafeUser(user: UserWithAccess) {
+  private async toSafeUser(user: UserWithAccess) {
     const roles = user.roles.map((item) => item.role.name);
     // Efetivas coerentes com o PermissionsGuard (para os menus refletirem):
     // base do papel só conta para o Administrador; demais funções não concedem.
@@ -174,6 +176,7 @@ export class AuthService {
     }
     const permissions = Array.from(effective);
 
+    const screenAccess = await this.effectiveScreenAccess.forUser({ id: user.id, roles, permissions });
     return {
       id: user.id,
       name: user.name,
@@ -183,6 +186,7 @@ export class AuthService {
       lastLoginAt: user.lastLoginAt,
       roles,
       permissions,
+      screenAccess,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

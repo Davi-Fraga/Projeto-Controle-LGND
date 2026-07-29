@@ -152,6 +152,21 @@ export enum ScreenAccessLevel {
   EDIT = 'EDIT',
 }
 
+// Estado de navegação calculado no backend. É somente UX: guards e policies da API
+// continuam sendo a autoridade para cada requisição.
+export enum EffectiveScreenAccessState {
+  AVAILABLE = 'AVAILABLE',
+  MISSING_PERMISSION = 'MISSING_PERMISSION',
+  MISSING_SCOPE = 'MISSING_SCOPE',
+}
+
+export type EffectiveScreenAccess = {
+  screenId: string;
+  level: ScreenAccessLevel;
+  state: EffectiveScreenAccessState;
+  usable: boolean;
+};
+
 // Um escopo do usuário, agrupado sob a tela cujos scopeTypes o contêm.
 export type ScreenScopeEntry = {
   id: string;
@@ -173,9 +188,17 @@ export enum ScopeValueSource {
   ROLE_DERIVED = 'ROLE_DERIVED',
 }
 
+// Um valor de escopo com seu RÓTULO humano (change painel-escopo-legivel-e-higiene).
+// O backend SEMPRE preenche `label` — a tela administrativa nunca deve exibir o `value`
+// (UUID/key normalizada) ao operador. `sublabel` desambigua (ex.: igreja → cidade).
 export type ScopeValueEntry = {
   value: string;
+  // null APENAS quando `missing` é true: a entidade não existe mais.
   label?: string | null;
+  sublabel?: string | null;
+  // true = o valor aponta para entidade inexistente/soft-deleted. A UI sinaliza a
+  // condição em vez de degradar para o identificador cru.
+  missing?: boolean;
   sources: ScopeValueSource[];
 };
 
@@ -185,7 +208,9 @@ export type ScreenScopeState = {
   // true = esta dimensão SATISFAZ o escopo principal da tela (vs suplementar).
   satisfying: boolean;
   configuredMode: ScopeSelectionMode; // configuração explícita: MISSING | SELECTED | ALL
-  configuredValues: string[]; // ids explícitos (vazio em MISSING/ALL)
+  // Valores explícitos, JÁ ROTULADOS (vazio em MISSING/ALL): a edição parte daqui, então
+  // precisa carregar rótulo — não basta o id (change painel-escopo-legivel-e-higiene).
+  configuredValues: ScopeValueEntry[];
   effectiveMode: ScopeSelectionMode; // após compor com vínculos derivados do papel
   effectiveValues: ScopeValueEntry[]; // união dedup explícito+derivado (preenchida em SELECTED)
 };

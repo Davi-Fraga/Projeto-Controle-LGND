@@ -309,7 +309,6 @@ describe('AccessPolicyService', () => {
         topIds: [],
       };
 
-      expect(service.isCityRestricted(scope)).toBe(true);
       expect(() => service.assertCityAllowed(scope, 'piracanjuba')).not.toThrow();
       expect(() => service.assertCityAllowed(scope, 'goiania')).toThrow(ForbiddenException);
     });
@@ -347,7 +346,6 @@ describe('AccessPolicyService', () => {
 
       expect(scope.topIds).toEqual(['top-1', 'top-2']);
       expect(service.buildTopWhere(scope)).toEqual({ id: { in: ['top-1', 'top-2'] } });
-      expect(service.isTopRestricted(scope)).toBe(true);
       expect(() => service.assertTopAllowed(scope, 'top-1')).not.toThrow();
       expect(() => service.assertTopAllowed(scope, 'top-9')).toThrow(ForbiddenException);
     });
@@ -364,7 +362,6 @@ describe('AccessPolicyService', () => {
       });
 
       expect(scope.teamIds).toEqual(['team-seg']);
-      expect(service.isTeamRestricted(scope)).toBe(true);
       expect(() => service.assertTeamAllowed(scope, 'team-seg')).not.toThrow();
       expect(() => service.assertTeamAllowed(scope, 'team-x')).toThrow(ForbiddenException);
     });
@@ -380,7 +377,6 @@ describe('AccessPolicyService', () => {
         topIds: [],
       };
 
-      expect(service.isCityRestricted(scope)).toBe(false);
       expect(() => service.assertCityAllowed(scope, 'qualquer')).not.toThrow();
     });
 
@@ -396,11 +392,6 @@ describe('AccessPolicyService', () => {
         legendaryCities: [],
         topIds: [],
       };
-
-      expect(service.isCityRestricted(scope)).toBe(true);
-      expect(service.isTeamRestricted(scope)).toBe(true);
-      expect(service.isChurchRestricted(scope)).toBe(true);
-      expect(service.isTopRestricted(scope)).toBe(true);
 
       expect(() => service.assertCityAllowed(scope, 'goiania')).toThrow(ForbiddenException);
       expect(() => service.assertTeamAllowed(scope, 'team-x')).toThrow(ForbiddenException);

@@ -17,7 +17,6 @@ describe('OrgChartService', () => {
       resolveScope: jest.fn().mockResolvedValue({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [], cityKeys: [], legendaryCities: [], topIds: [] }),
       buildLegendaryWhere: jest.fn().mockReturnValue({}),
       buildTeamWhere: jest.fn().mockReturnValue({ id: { in: [] } }),
-      isCityRestricted: jest.fn().mockReturnValue(false),
       assertCityAllowed: jest.fn(),
       assertTeamAllowed: jest.fn(),
     };

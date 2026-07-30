@@ -10,10 +10,9 @@ import {
   createLegendario,
   getChurches,
   getExpertises,
-  getProfessions,
   updateLegendario,
 } from './api';
-import type { Church, Expertise, LegendarioPayload, Legendary, Profession } from './types';
+import type { Church, Expertise, LegendarioPayload, Legendary } from './types';
 
 const emptyPayload: LegendarioPayload = {
   fullName: '',
@@ -24,7 +23,7 @@ const emptyPayload: LegendarioPayload = {
   churchId: '',
   servesInChurch: false,
   churchRole: '',
-  professionId: '',
+  professionText: '',
   status: LegendaryStatus.UNKNOWN,
   socialActionInterest: false,
   notes: '',
@@ -57,7 +56,8 @@ export function LegendarioForm({ legendario, returnTo }: Props) {
           churchId: legendario.churchId ?? '',
           servesInChurch: legendario.servesInChurch,
           churchRole: legendario.churchRole ?? '',
-          professionId: legendario.professionId ?? '',
+          // Nome catalogado quando vinculado; texto livre preservado como fallback.
+          professionText: legendario.profession?.name ?? legendario.professionText ?? '',
           status: legendario.status,
           socialActionInterest: legendario.socialActionInterest,
           notes: legendario.notes ?? '',
@@ -72,8 +72,13 @@ export function LegendarioForm({ legendario, returnTo }: Props) {
       : emptyPayload,
   );
   const [churches, setChurches] = useState<Church[]>([]);
-  const [professions, setProfessions] = useState<Profession[]>([]);
   const [expertises, setExpertises] = useState<Expertise[]>([]);
+  /**
+   * A profissão só vai no payload quando o usuário edita o campo. Sem isso, uma alteração
+   * não relacionada (ex.: trocar o telefone) reenviaria o texto e poderia derrubar um
+   * vínculo legado cuja `Profession` foi desativada depois — o texto não casaria mais.
+   */
+  const [professionTouched, setProfessionTouched] = useState(false);
   const [topOptions, setTopOptions] = useState<OptionItem[]>([]);
   const [firstTopFamilyOptions, setFirstTopFamilyOptions] = useState<OptionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -82,10 +87,10 @@ export function LegendarioForm({ legendario, returnTo }: Props) {
   const [churchForm, setChurchForm] = useState({ name: '', city: '', notes: '' });
 
   useEffect(() => {
-    Promise.all([getChurches(), getProfessions(), getExpertises(), getTopOptions()])
-      .then(([churchResponse, professionResponse, expertiseResponse, topResponse]) => {
+    // Profissão é texto livre resolvido no backend: esta tela não carrega mais o catálogo.
+    Promise.all([getChurches(), getExpertises(), getTopOptions()])
+      .then(([churchResponse, expertiseResponse, topResponse]) => {
         setChurches(churchResponse.data);
-        setProfessions(professionResponse.data);
         setExpertises(expertiseResponse.data);
         setTopOptions(topResponse.data);
       })
@@ -173,7 +178,9 @@ export function LegendarioForm({ legendario, returnTo }: Props) {
         city: payload.city || undefined,
         churchId: payload.churchId || undefined,
         churchRole: payload.churchRole || undefined,
-        professionId: payload.professionId || undefined,
+        // Só vai quando editado (omitido = preserva a profissão atual). String vazia é
+        // significativa e NÃO pode virar `undefined`: é o pedido explícito de limpar.
+        professionText: professionTouched ? (payload.professionText ?? '') : undefined,
         notes: payload.notes || undefined,
         needsReview: payload.needsReview,
         firstTopIsExternal: payload.firstTopIsExternal,
@@ -251,12 +258,15 @@ export function LegendarioForm({ legendario, returnTo }: Props) {
           </select>
         </Field>
         <Field label="Profissão">
-          <select className="input" value={payload.professionId} onChange={(event) => updateField('professionId', event.target.value)}>
-            <option value="">Não informada</option>
-            {professions.map((profession) => (
-              <option key={profession.id} value={profession.id}>{profession.name}</option>
-            ))}
-          </select>
+          <input
+            className="input"
+            value={payload.professionText ?? ''}
+            placeholder="Não informada"
+            onChange={(event) => {
+              setProfessionTouched(true);
+              updateField('professionText', event.target.value);
+            }}
+          />
         </Field>
         <Field label="Função na igreja">
           <input className="input" value={payload.churchRole} onChange={(event) => updateField('churchRole', event.target.value)} />

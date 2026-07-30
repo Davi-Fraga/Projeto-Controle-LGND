@@ -356,6 +356,13 @@ model Legendary {
   churchRole            String?
   professionId          String?              @db.Uuid
   profession            Profession?          @relation(fields: [professionId], references: [id])
+  // Profissão em texto livre (change profissao-livre-vinculo-catalogo): preserva o valor
+  // informado quando NÃO há correspondência única com uma `Profession` ativa (não encontrada
+  // ou ambígua após `normalizeName`). Mutuamente exclusivo com `professionId` em toda
+  // gravação resolvida; texto livre força `needsReview = true`. Apresentação e exportação
+  // usam `profession?.name ?? professionText`. Filtro/relatório catalogado continua por
+  // `professionId`. O runtime NUNCA cria `Profession` a partir deste texto.
+  professionText        String?
   status                LegendaryStatus      @default(UNKNOWN)
   socialActionInterest  Boolean              @default(false)
   notes                 String?

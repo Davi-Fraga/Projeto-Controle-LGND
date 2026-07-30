@@ -7,5 +7,8 @@ import { ProfessionsService } from './professions.service';
   imports: [AuditModule],
   controllers: [ProfessionsController],
   providers: [ProfessionsService],
+  // `ProfessionsService.resolveByName` é o caminho único de resolução de profissão por
+  // nome, consumido por Legendários e pelo sync do Forms.
+  exports: [ProfessionsService],
 })
 export class ProfessionsModule {}

@@ -107,7 +107,8 @@ export default function LegendarioDetalhePage() {
             ['Igreja', legendario.church?.name || '-'],
             ['Serve na Igreja', legendario.servesInChurch ? 'Sim' : 'Não'],
             ['Função', legendario.churchRole || '-'],
-            ['Profissão', legendario.profession?.name || '-'],
+            // Nome catalogado quando vinculado; texto livre preservado como fallback.
+            ['Profissão', legendario.profession?.name || legendario.professionText || '-'],
           ]}
         />
         <Info

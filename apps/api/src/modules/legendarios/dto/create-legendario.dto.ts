@@ -44,9 +44,23 @@ export class CreateLegendarioDto {
   @IsString()
   churchRole?: string;
 
+  /**
+   * Entrada compatível para clientes antigos que enviam apenas o ID catalogado.
+   * Não pode vir junto de `professionText` (payload ambíguo → 400).
+   */
   @IsOptional()
   @IsUUID()
   professionId?: string;
+
+  /**
+   * Profissão em texto livre (change profissao-livre-vinculo-catalogo). A presença
+   * desta propriedade é autoritativa, INCLUSIVE como string vazia (= limpar
+   * profissão). O service resolve contra o catálogo ativo: match único vira
+   * `professionId`; sem match ou ambíguo preserva o texto e força `needsReview`.
+   */
+  @IsOptional()
+  @IsString()
+  professionText?: string;
 
   @IsEnum(LegendaryStatus)
   status: LegendaryStatus;

@@ -226,7 +226,8 @@ function flatten(row: any): Record<string, string | number | undefined> {
     count: row.count ?? row._count?.legendarios ?? row._count?.memberships ?? row._count?.recipients ?? row._count?._all,
     cidade: row.city ?? row.legendary?.city,
     igreja: row.church?.name,
-    profissao: row.profession?.name,
+    // Nome catalogado quando vinculado; texto livre preservado como fallback.
+    profissao: row.profession?.name ?? row.professionText,
     equipe: row.team?.name,
     legendario: row.legendary?.fullName,
     contexto: row.contexto,

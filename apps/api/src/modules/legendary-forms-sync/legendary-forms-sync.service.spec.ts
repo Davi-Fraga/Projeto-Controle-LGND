@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { LegendaryFormsSyncService } from './legendary-forms-sync.service';
+import { ProfessionsService } from '../professions/professions.service';
 import { FormsSyncWebhookDto } from './dto/forms-sync-webhook.dto';
 
 /** Payload canônico válido e completo — base para variações nos cenários. */
@@ -41,12 +42,17 @@ describe('LegendaryFormsSyncService', () => {
       team: { findMany: jest.fn().mockResolvedValue([{ id: 'tm-midia', name: 'Mídia' }]) },
       church: { findMany: jest.fn().mockResolvedValue([{ id: 'ch-x', name: 'Igreja X' }]) },
       churchAlias: { findUnique: jest.fn().mockResolvedValue(null) },
-      profession: { findMany: jest.fn().mockResolvedValue([{ id: 'pr-ped', name: 'Pedreiro' }]) },
+      profession: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'pr-ped', name: 'Pedreiro' }]),
+        // Provam que o resolvedor NUNCA cria profissão a partir do Forms.
+        create: jest.fn(),
+        upsert: jest.fn(),
+      },
       teamMembership: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn() },
       legendaryHistory: { create: jest.fn() },
     };
     audit = { create: jest.fn() };
-    service = new LegendaryFormsSyncService(prisma, audit);
+    service = new LegendaryFormsSyncService(prisma, audit, new ProfessionsService(prisma, audit));
   });
 
   // 7.8 (parte) — âncoras de identidade
@@ -74,6 +80,54 @@ describe('LegendaryFormsSyncService', () => {
     expect(data.lastFormsSyncAt).toBeInstanceOf(Date);
     expect(data.needsReview).toBe(false); // tudo casou, sem issues
     expect(res.issues).toEqual([]);
+  });
+
+  /**
+   * Profissão em texto livre (change profissao-livre-vinculo-catalogo). O sync usa o MESMO
+   * resolvedor do cadastro manual e agora persiste no perfil o texto que não casou — antes
+   * ele ficava só nos metadados da inconsistência.
+   */
+  describe('profissão do Forms', () => {
+    it('match único grava o vínculo e não deixa texto residual', async () => {
+      await service.ingest(validPayload({ profession: '  pedreiro  ' }));
+
+      const data = prisma.legendary.create.mock.calls[0][0].data;
+      expect(data.professionId).toBe('pr-ped');
+      expect(data.professionText).toBeNull();
+      expect(data.needsReview).toBe(false);
+    });
+
+    it('sem match persiste o texto no perfil, registra a issue e marca needsReview', async () => {
+      const res = await service.ingest(validPayload({ profession: 'Domador de Leões' }));
+
+      const data = prisma.legendary.create.mock.calls[0][0].data;
+      expect(data.professionId).toBeNull();
+      expect(data.professionText).toBe('Domador de Leões');
+      expect(data.needsReview).toBe(true);
+      expect(res.issues).toContain('Profissão não encontrada: Domador de Leões');
+    });
+
+    it('colisão normalizada no catálogo é ambígua: preserva texto, não escolhe id', async () => {
+      prisma.profession.findMany.mockResolvedValueOnce([
+        { id: 'pr-a', name: 'Pedreiro' },
+        { id: 'pr-b', name: 'pedreiro' },
+      ]);
+
+      const res = await service.ingest(validPayload({ profession: 'Pedreiro' }));
+
+      const data = prisma.legendary.create.mock.calls[0][0].data;
+      expect(data.professionId).toBeNull();
+      expect(data.professionText).toBe('Pedreiro');
+      expect(data.needsReview).toBe(true);
+      expect(res.issues).toContain('Profissão ambígua no catálogo: Pedreiro');
+    });
+
+    it('nunca cria profissão a partir do Forms', async () => {
+      await service.ingest(validPayload({ profession: 'Domador de Leões' }));
+
+      expect(prisma.profession.create).not.toHaveBeenCalled();
+      expect(prisma.profession.upsert).not.toHaveBeenCalled();
+    });
   });
 
   // 7.2 — mesmo número + nome tolerante atualiza (não duplica)

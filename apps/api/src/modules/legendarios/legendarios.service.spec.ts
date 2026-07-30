@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { LegendaryStatus } from '@central-da-manada/shared';
 import { LegendariosService } from './legendarios.service';
+import { ProfessionsService } from '../professions/professions.service';
 
 const adminUser = { sub: 'admin-id', email: 'admin@example.com', roles: ['COORDINATION_ADMIN'], permissions: [] };
 const restrictedUser = { sub: 'user-id', email: 'user@example.com', roles: ['SPIRITUAL_LEADER'], permissions: [] };
@@ -25,7 +26,9 @@ describe('LegendariosService', () => {
       },
       teamMembership: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
       church: { findFirst: jest.fn() },
-      profession: { findFirst: jest.fn() },
+      // `findFirst` = validação do `professionId` cru (compatibilidade); `findMany` = catálogo
+      // ativo lido por `ProfessionsService.resolveByName` (profissão em texto livre).
+      profession: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
       expertise: { count: jest.fn() },
       legendaryHistory: { findMany: jest.fn(), create: jest.fn() },
     };
@@ -36,7 +39,8 @@ describe('LegendariosService', () => {
       buildLegendaryDetailWhere: jest.fn(),
       buildTeamMembershipWhere: jest.fn(),
     };
-    service = new LegendariosService(prisma, audit, accessPolicy);
+    // Resolvedor REAL sobre o prisma mockado: mantém a regra de match/ambiguidade sob teste.
+    service = new LegendariosService(prisma, audit, accessPolicy, new ProfessionsService(prisma, audit));
   });
 
   it('lists legendarios with pagination (admin sees all)', async () => {
@@ -305,6 +309,144 @@ describe('LegendariosService', () => {
     );
     expect(result.phone).toBe('61999999999');
     expect(audit.create).toHaveBeenCalledWith(expect.objectContaining({ action: 'create' }), expect.anything());
+  });
+
+  /**
+   * Profissão em texto livre (change profissao-livre-vinculo-catalogo). Precedência do
+   * design D3 — `professionText` é autoritativo, inclusive vazio; ausência não altera nada.
+   */
+  describe('profissão em texto livre', () => {
+    const baseCreate = {
+      fullName: 'Joao Silva',
+      isFromRotaDoCerrado: true,
+      servesInChurch: false,
+      status: LegendaryStatus.ACTIVE,
+      socialActionInterest: false,
+      expertiseIds: [],
+    };
+
+    /** Extrai o `data` passado ao `prisma.legendary.create`. */
+    function createdData() {
+      return prisma.legendary.create.mock.calls[0][0].data;
+    }
+
+    /** Prepara o update de `id=1` e devolve o mock de `legendary.update` da transação. */
+    function stubUpdate() {
+      prisma.legendary.findFirst.mockResolvedValueOnce({ id: '1', fullName: 'Antes', expertises: [] });
+      prisma.legendary.findUnique.mockResolvedValueOnce(null);
+      const update = jest.fn().mockResolvedValue({ id: '1', fullName: 'Antes', expertises: [] });
+      prisma.$transaction.mockImplementationOnce(async (callback: any) =>
+        callback({ legendaryExpertise: { deleteMany: jest.fn() }, legendary: { update } }),
+      );
+      return update;
+    }
+
+    beforeEach(() => {
+      prisma.legendary.findUnique.mockResolvedValue(null);
+      prisma.legendary.create.mockResolvedValue({ id: '1', fullName: 'Joao Silva', expertises: [] });
+    });
+
+    it('match único grava o vínculo e não deixa texto residual', async () => {
+      prisma.profession.findMany.mockResolvedValueOnce([{ id: 'prof-1', name: 'Médico' }]);
+
+      await service.create({ ...baseCreate, professionText: 'medico' });
+
+      expect(createdData()).toMatchObject({ professionId: 'prof-1', professionText: null });
+      expect(createdData().needsReview).not.toBe(true);
+    });
+
+    it('sem match preserva o texto aparado e força needsReview', async () => {
+      prisma.profession.findMany.mockResolvedValueOnce([{ id: 'prof-1', name: 'Médico' }]);
+
+      await service.create({ ...baseCreate, professionText: '  Domador de Leões  ' });
+
+      expect(createdData()).toMatchObject({
+        professionId: null,
+        professionText: 'Domador de Leões',
+        needsReview: true,
+      });
+    });
+
+    it('match ambíguo não escolhe id: preserva o texto e força needsReview', async () => {
+      prisma.profession.findMany.mockResolvedValueOnce([
+        { id: 'prof-1', name: 'Médico' },
+        { id: 'prof-2', name: 'medico' },
+      ]);
+
+      await service.create({ ...baseCreate, professionText: 'MÉDICO' });
+
+      expect(createdData()).toMatchObject({
+        professionId: null,
+        professionText: 'MÉDICO',
+        needsReview: true,
+      });
+    });
+
+    it('needsReview:false explícito não vence uma profissão desconhecida', async () => {
+      prisma.profession.findMany.mockResolvedValueOnce([]);
+
+      await service.create({ ...baseCreate, needsReview: false, professionText: 'Astronauta' });
+
+      expect(createdData().needsReview).toBe(true);
+    });
+
+    it('texto vazio limpa vínculo e texto sem forçar revisão', async () => {
+      const update = stubUpdate();
+
+      await service.update('1', { professionText: '' });
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ professionId: null, professionText: null }),
+        }),
+      );
+      expect(update.mock.calls[0][0].data.needsReview).toBeUndefined();
+      // limpar não consulta o catálogo
+      expect(prisma.profession.findMany).not.toHaveBeenCalled();
+    });
+
+    it('PATCH sem profissão preserva o vínculo legado (nem professionId nem professionText no data)', async () => {
+      const update = stubUpdate();
+
+      await service.update('1', { fullName: 'Depois' });
+
+      const data = update.mock.calls[0][0].data;
+      expect(data).not.toHaveProperty('professionId');
+      expect(data).not.toHaveProperty('professionText');
+      expect(prisma.profession.findMany).not.toHaveBeenCalled();
+    });
+
+    it('rejeita payload que envia texto e ID simultaneamente', async () => {
+      prisma.profession.findFirst.mockResolvedValueOnce({ id: 'prof-1', name: 'Médico' });
+
+      await expect(
+        service.create({ ...baseCreate, professionId: 'prof-1', professionText: 'Médico' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.legendary.create).not.toHaveBeenCalled();
+    });
+
+    it('professionId isolado continua compatível (cliente antigo) e limpa texto residual', async () => {
+      prisma.profession.findFirst.mockResolvedValueOnce({ id: 'prof-1', name: 'Médico' });
+
+      await service.create({ ...baseCreate, professionId: 'prof-1' });
+
+      // Exclusividade mútua: definir pelo ID não pode deixar texto livre pendurado.
+      expect(createdData()).toMatchObject({ professionId: 'prof-1', professionText: null });
+      expect(prisma.profession.findMany).not.toHaveBeenCalled();
+    });
+
+    it('cliente antigo com professionId limpa o texto livre já gravado', async () => {
+      prisma.profession.findFirst.mockResolvedValueOnce({ id: 'prof-1', name: 'Médico' });
+      const update = stubUpdate();
+
+      await service.update('1', { professionId: 'prof-1' });
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ professionId: 'prof-1', professionText: null }),
+        }),
+      );
+    });
   });
 
   it('blocks duplicated LGND number', async () => {

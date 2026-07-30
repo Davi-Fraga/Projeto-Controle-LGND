@@ -317,6 +317,10 @@ export type Legendary = {
   churchRole?: string | null;
   professionId?: string | null;
   profession?: Profession | null;
+  // Profissão em texto livre quando não houve correspondência única no catálogo
+  // (change profissao-livre-vinculo-catalogo). Apresentação/exportação usam
+  // `profession?.name ?? professionText`; filtro/relatório seguem por `professionId`.
+  professionText?: string | null;
   status: LegendaryStatus;
   socialActionInterest: boolean;
   notes?: string | null;

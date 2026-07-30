@@ -7,6 +7,7 @@ import { getPagination, toPaginatedResponse } from '../../common/pagination/pagi
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { ProfessionsService } from '../professions/professions.service';
 import { CreateLegendarioDto } from './dto/create-legendario.dto';
 import { LegendarioQueryDto } from './dto/legendario-query.dto';
 import { CreateLegendaryHistoryNoteDto, LegendaryHistoryQueryDto } from './dto/legendary-history.dto';
@@ -37,6 +38,7 @@ export class LegendariosService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly accessPolicy: AccessPolicyService,
+    private readonly professions: ProfessionsService,
   ) {}
 
   async findAll(query: LegendarioQueryDto, user: AuthenticatedUser) {
@@ -140,10 +142,13 @@ export class LegendariosService {
   async create(dto: CreateLegendarioDto, actorUserId?: string, db: Prisma.TransactionClient = this.prisma) {
     await this.validateRelations(dto);
     await this.ensureLgndIsAvailable(dto.lgndNumber);
+    const professionPatch = await this.resolveProfessionPatch(dto);
 
     const legendario = await db.legendary.create({
       data: {
         ...this.toData(dto),
+        // Depois de `toData`: profissão sem match no catálogo força `needsReview`.
+        ...professionPatch,
         expertises: {
           create: (dto.expertiseIds ?? []).map((expertiseId) => ({ expertiseId })),
         },
@@ -201,6 +206,7 @@ export class LegendariosService {
 
     await this.validateRelations(dto);
     await this.ensureLgndIsAvailable(dto.lgndNumber, id);
+    const professionPatch = await this.resolveProfessionPatch(dto);
 
     const after = await this.prisma.$transaction(async (tx: any) => {
       if (dto.expertiseIds) {
@@ -211,6 +217,8 @@ export class LegendariosService {
         where: { id },
         data: {
           ...this.toData(dto, { fullName: before.fullName, city: before.city, lgndNumber: before.lgndNumber }),
+          // Depois de `toData`: profissão sem match no catálogo força `needsReview`.
+          ...professionPatch,
           expertises: dto.expertiseIds
             ? {
                 create: dto.expertiseIds.map((expertiseId) => ({ expertiseId })),
@@ -391,6 +399,43 @@ export class LegendariosService {
           throw new BadRequestException('A família deve pertencer ao TOP selecionado.');
         }
       }
+    }
+  }
+
+  /**
+   * Resolve a entrada de profissão em texto livre (change profissao-livre-vinculo-catalogo).
+   *
+   * A presença da propriedade `professionText` é autoritativa, inclusive vazia. Ausência
+   * (típica de PATCH) retorna `{}` — a profissão atual NÃO é alterada e o `professionId`
+   * cru continua tratado por `toData`, preservando clientes antigos e vínculos legados
+   * (mesmo quando a profissão vinculada foi desativada depois).
+   *
+   * Precedência (design D3): vazio → limpa ambos · match único → grava `professionId` e
+   * limpa o texto · sem match/ambíguo → limpa `professionId`, grava o texto aparado e
+   * força `needsReview = true`.
+   *
+   * `needsReview` é um marcador GLOBAL (igreja, equipe, identidade…): profissão só o
+   * LIGA, nunca o desliga — desligar é do fluxo de revisão/reconciliação.
+   */
+  private async resolveProfessionPatch(dto: Partial<CreateLegendarioDto>): Promise<Record<string, unknown>> {
+    if (!('professionText' in dto)) {
+      // Cliente legado definindo a profissão pelo ID: o vínculo passa a ser a verdade,
+      // então qualquer texto livre residual é limpo — os campos são mutuamente exclusivos.
+      return 'professionId' in dto ? { professionText: null } : {};
+    }
+    if (dto.professionId) {
+      throw new BadRequestException('Informe a profissão por texto ou por ID, não ambos.');
+    }
+
+    const resolution = await this.professions.resolveByName(dto.professionText ?? null);
+    switch (resolution.outcome) {
+      case 'empty':
+        return { professionId: null, professionText: null };
+      case 'matched':
+        return { professionId: resolution.professionId, professionText: null };
+      case 'notFound':
+      case 'ambiguous':
+        return { professionId: null, professionText: resolution.text, needsReview: true };
     }
   }
 

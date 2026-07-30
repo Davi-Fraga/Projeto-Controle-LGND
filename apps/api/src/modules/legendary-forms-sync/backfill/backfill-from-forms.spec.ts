@@ -1,4 +1,5 @@
 import { LegendaryFormsSyncService } from '../legendary-forms-sync.service';
+import { ProfessionsService } from '../../professions/professions.service';
 import { COLUMN_MAP, rowToPayload } from './forms-row-mapper';
 
 /**
@@ -52,7 +53,7 @@ describe('backfill-from-forms (serviço real)', () => {
       legendaryHistory: { create: jest.fn() },
     };
     audit = { create: jest.fn() };
-    service = new LegendaryFormsSyncService(prisma, audit);
+    service = new LegendaryFormsSyncService(prisma, audit, new ProfessionsService(prisma, audit));
   });
 
   it('cria um novo legendário a partir da linha da planilha', async () => {

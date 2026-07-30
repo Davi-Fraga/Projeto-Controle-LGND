@@ -11,6 +11,7 @@ import {
 } from '@central-da-manada/shared';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { ProfessionsService } from '../professions/professions.service';
 import { FormsSyncWebhookDto } from './dto/forms-sync-webhook.dto';
 
 export type FormsSyncResult = {
@@ -37,6 +38,7 @@ export class LegendaryFormsSyncService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly professions: ProfessionsService,
   ) {}
 
   /**
@@ -73,7 +75,8 @@ export class LegendaryFormsSyncService {
     }
 
     // ---- Resolução de vínculos + issues de validação (não bloqueiam) ----
-    const { churchId, professionId, teamId, birthDate, issues } = await this.resolveReferencesAndIssues(payload);
+    const { churchId, professionId, professionText, teamId, birthDate, issues } =
+      await this.resolveReferencesAndIssues(payload);
     const needsReview = issues.length > 0 || Boolean(existing?.needsReview);
     const city = canonCity(payload.city ?? null);
 
@@ -85,6 +88,9 @@ export class LegendaryFormsSyncService {
       searchText: normalizeName([fullName, city, lgndNumber].filter(Boolean).join(' ')),
       churchId: churchId ?? null,
       professionId: professionId ?? null,
+      // Mutuamente exclusivos: match único grava o vínculo; sem match/ambíguo preserva
+      // o texto informado no perfil (a issue correspondente já força `needsReview`).
+      professionText: professionText ?? null,
       email: payload.email?.trim() || null,
       birthDate,
       district: payload.district?.trim() || null,
@@ -152,6 +158,11 @@ export class LegendaryFormsSyncService {
   private async resolveReferencesAndIssues(payload: FormsSyncWebhookDto): Promise<{
     churchId?: string;
     professionId?: string;
+    /**
+     * Profissão informada que NÃO casou de forma única com o catálogo ativo. Passa a ser
+     * persistida no legendário (antes ficava só nos metadados da inconsistência).
+     */
+    professionText?: string;
     teamId?: string;
     teamUnmatched?: string;
     birthDate: Date | null;
@@ -159,11 +170,16 @@ export class LegendaryFormsSyncService {
   }> {
     const issues: string[] = [];
     const churchId = await this.resolveChurchByName(payload.churchName ?? null);
-    const professionId = await this.resolveProfessionByName(payload.profession ?? null);
+    // Caminho ÚNICO de resolução de profissão, compartilhado com o cadastro manual.
+    const profession = await this.professions.resolveByName(payload.profession ?? null);
+    const professionId = profession.outcome === 'matched' ? profession.professionId : undefined;
+    const professionText =
+      profession.outcome === 'notFound' || profession.outcome === 'ambiguous' ? profession.text : undefined;
     const { teamId, unmatched: teamUnmatched } = await this.resolveTeamByName(payload.team ?? null);
 
     if (payload.churchName?.trim() && !churchId) issues.push(`Igreja não encontrada: ${payload.churchName.trim()}`);
-    if (payload.profession?.trim() && !professionId) issues.push(`Profissão não encontrada: ${payload.profession.trim()}`);
+    if (profession.outcome === 'notFound') issues.push(`Profissão não encontrada: ${profession.text}`);
+    if (profession.outcome === 'ambiguous') issues.push(`Profissão ambígua no catálogo: ${profession.text}`);
     if (teamUnmatched) issues.push(`Equipe não encontrada: ${teamUnmatched}`);
     if (payload.isSpiritualLeader) issues.push('Declarou-se líder espiritual — revisar liderança.');
 
@@ -187,7 +203,7 @@ export class LegendaryFormsSyncService {
       if (!value?.trim()) issues.push(`Campo obrigatório ausente: ${label}`);
     }
 
-    return { churchId, professionId, teamId, teamUnmatched, birthDate, issues };
+    return { churchId, professionId, professionText, teamId, teamUnmatched, birthDate, issues };
   }
 
   /**
@@ -208,16 +224,17 @@ export class LegendaryFormsSyncService {
     if (!lgndNumber) return { result: 'not_found' };
     const existing = await client.legendary.findUnique({
       where: { lgndNumber },
-      select: { id: true, churchId: true, professionId: true, needsReview: true },
+      select: { id: true, churchId: true, professionId: true, professionText: true, needsReview: true },
     });
     if (!existing) return { result: 'not_found' };
 
-    const { churchId, professionId, teamId, issues } = await this.resolveReferencesAndIssues(payload);
+    const { churchId, professionId, professionText, teamId, issues } = await this.resolveReferencesAndIssues(payload);
     const needsReview = issues.length > 0;
 
     const fieldsChanged =
       (churchId ?? null) !== existing.churchId ||
       (professionId ?? null) !== existing.professionId ||
+      (professionText ?? null) !== existing.professionText ||
       needsReview !== existing.needsReview;
 
     if (!fieldsChanged && !teamId) {
@@ -228,7 +245,12 @@ export class LegendaryFormsSyncService {
       if (fieldsChanged) {
         await tx.legendary.update({
           where: { id: existing.id },
-          data: { churchId: churchId ?? null, professionId: professionId ?? null, needsReview },
+          data: {
+            churchId: churchId ?? null,
+            professionId: professionId ?? null,
+            professionText: professionText ?? null,
+            needsReview,
+          },
         });
       }
       if (teamId) await this.ensureMembership(tx, teamId, existing.id);
@@ -335,12 +357,4 @@ export class LegendaryFormsSyncService {
     return undefined;
   }
 
-  /** Resolve Profession por nome normalizado. NÃO cria profissão a partir do Forms. */
-  private async resolveProfessionByName(name: string | null): Promise<string | undefined> {
-    const raw = name?.trim();
-    if (!raw) return undefined;
-    const target = normalizeName(raw);
-    const professions = await this.prisma.profession.findMany({ where: { deletedAt: null }, select: { id: true, name: true } });
-    return professions.find((p) => normalizeName(p.name) === target)?.id;
-  }
 }

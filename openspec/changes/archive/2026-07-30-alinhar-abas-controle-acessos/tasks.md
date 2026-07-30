@@ -63,4 +63,4 @@
 ## 9. Entrega
 
 - [x] 9.1 Revisar o diff final: sem expansão de escopo, sem arquivos locais de IA, sem segredos.
-- [ ] 9.2 Git (commit/push/PR empilhado) — somente com aval explícito do Davi na mesma interação.
+- [x] 9.2 Git (commit/push/PR empilhado) — somente com aval explícito do Davi na mesma interação. Entregue: PR #34 (`77083d1`, consolida hardening + navegação por permissions) e `6aeaa79` (navegar por acesso efetivo), ambos no `main`.

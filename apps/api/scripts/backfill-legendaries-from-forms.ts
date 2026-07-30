@@ -41,6 +41,7 @@ import { PrismaClient } from '@prisma/client';
 import * as XLSX from 'xlsx';
 import { AuditService } from '../src/modules/audit/audit.service';
 import { LegendaryFormsSyncService } from '../src/modules/legendary-forms-sync/legendary-forms-sync.service';
+import { ProfessionsService } from '../src/modules/professions/professions.service';
 import { rowToPayload, validateHeaders } from '../src/modules/legendary-forms-sync/backfill/forms-row-mapper';
 
 const DATETIME_HEADER = 'Carimbo de data/hora';
@@ -156,7 +157,12 @@ async function main() {
   console.log(`Modo: ${modeLabel}\n`);
 
   const prisma = new PrismaClient();
-  const service = new LegendaryFormsSyncService(prisma as any, new AuditService(prisma as any));
+  const audit = new AuditService(prisma as any);
+  const service = new LegendaryFormsSyncService(
+    prisma as any,
+    audit,
+    new ProfessionsService(prisma as any, audit),
+  );
 
   const summary = { created: 0, updated: 0, conflict: 0, needsReview: 0, duplicate: 0, stale: 0, validationError: 0 };
   const reconcileSummary = { reconciled: 0, unchanged: 0, notFound: 0 };

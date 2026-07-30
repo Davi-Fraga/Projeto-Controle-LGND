@@ -1,0 +1,30 @@
+-- Change: profissao-livre-vinculo-catalogo (Decisão 1 do design).
+--
+-- Aditiva e idempotente: cria `Legendary.professionText` como TEXT anulável para
+-- preservar a profissão informada quando NÃO há correspondência única com uma
+-- `Profession` ativa. Nenhum dado existente é lido, atualizado ou recalculado.
+--
+-- Invariantes desta migration:
+--   * `professionId` e a FK `Legendary_professionId_fkey` permanecem intactos;
+--   * a contagem de legendários e o conjunto/contagem de `professionId` não mudam;
+--   * nenhuma `Profession` é criada, alterada ou removida;
+--   * rerun seguro (IF NOT EXISTS) — reaplicar não altera nada.
+--
+-- Compatibilidade de rollout: a coluna entra ANTES da API/web que a lê e grava.
+-- Rollback = reverter API/web; a coluna pode permanecer sem afetar a versão
+-- anterior, que simplesmente a ignora. Só remover em migration posterior, depois
+-- de exportar os textos livres já gravados.
+--
+-- Validação pós-migration (esperado: contagens idênticas ao preview, professionText 0):
+--   SELECT count(*) AS total,
+--          count("professionId") AS com_vinculo,
+--          count(DISTINCT "professionId") AS profissoes_distintas,
+--          count("professionText") AS com_texto_livre
+--     FROM "Legendary" WHERE "deletedAt" IS NULL;
+--   -- vínculos órfãos (esperado: 0 linhas)
+--   SELECT l.id FROM "Legendary" l
+--     LEFT JOIN "Profession" p ON p.id = l."professionId"
+--    WHERE l."professionId" IS NOT NULL AND p.id IS NULL;
+
+-- AlterTable
+ALTER TABLE "Legendary" ADD COLUMN IF NOT EXISTS "professionText" TEXT;

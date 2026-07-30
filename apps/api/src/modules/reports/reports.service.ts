@@ -77,7 +77,8 @@ export class ReportsService {
     if (!scope.isAdmin) {
       where.AND = [this.accessPolicy.buildCityWhere(scope)];
     }
-    return this.prisma.legendary.findMany({ where, select: { id: true, fullName: true, city: true, profession: true }, orderBy: { fullName: 'asc' } });
+    // `professionText` acompanha `profession` para a apresentação usar o fallback.
+    return this.prisma.legendary.findMany({ where, select: { id: true, fullName: true, city: true, profession: true, professionText: true }, orderBy: { fullName: 'asc' } });
   }
 
   async topParticipants(topId: string, user: AuthenticatedUser) {
@@ -149,7 +150,8 @@ export class ReportsService {
     const scope = await this.accessPolicy.resolveScope(user);
     const where = this.legendaryWhereForScope(scope);
     const rows = (await this.prisma.legendary.findMany({ where, include: { church: true, profession: true }, orderBy: { fullName: 'asc' } }))
-      .map((item: any) => ({ nome: item.fullName, lgnd: item.lgndNumber ?? '', cidade: item.city ?? '', igreja: item.church?.name ?? '', profissao: item.profession?.name ?? '', status: item.status, interesseSocial: item.socialActionInterest ? 'sim' : 'nao' }));
+      // `profissao`: nome catalogado quando vinculado; texto livre preservado como fallback.
+      .map((item: any) => ({ nome: item.fullName, lgnd: item.lgndNumber ?? '', cidade: item.city ?? '', igreja: item.church?.name ?? '', profissao: item.profession?.name ?? item.professionText ?? '', status: item.status, interesseSocial: item.socialActionInterest ? 'sim' : 'nao' }));
     await this.audit.create({ actorUserId, entityType: 'Report', action: 'export_legendarios_csv' });
     return this.toCsv(rows);
   }

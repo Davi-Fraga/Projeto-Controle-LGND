@@ -34,7 +34,13 @@ export type LegendarioPayload = {
   churchId?: string;
   servesInChurch: boolean;
   churchRole?: string;
-  professionId?: string;
+  /**
+   * Profissão em texto livre (change profissao-livre-vinculo-catalogo). O backend resolve
+   * contra o catálogo ativo. Enviado SOMENTE quando o campo é editado — a omissão preserva
+   * o vínculo atual, inclusive um legado apontando para profissão já desativada.
+   * A web não envia mais `professionId` (que segue aceito pela API por compatibilidade).
+   */
+  professionText?: string;
   status: string;
   socialActionInterest: boolean;
   notes?: string;

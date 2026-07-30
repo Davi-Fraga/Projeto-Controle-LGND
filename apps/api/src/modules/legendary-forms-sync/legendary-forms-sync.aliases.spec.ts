@@ -1,4 +1,5 @@
 import { LegendaryFormsSyncService } from './legendary-forms-sync.service';
+import { ProfessionsService } from '../professions/professions.service';
 import { FormsSyncWebhookDto } from './dto/forms-sync-webhook.dto';
 
 /**
@@ -43,7 +44,7 @@ function makePrisma(aliasRow: any) {
 describe('LegendaryFormsSyncService — resolução de igreja por alias', () => {
   it('casa a variante por ALIAS e vincula ao churchId canônico', async () => {
     const prisma = makePrisma({ churchId: 'ch-pib', church: { deletedAt: null } });
-    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any);
+    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any, new ProfessionsService(prisma, { create: jest.fn() } as any));
 
     await service.ingest(payload());
 
@@ -57,7 +58,7 @@ describe('LegendaryFormsSyncService — resolução de igreja por alias', () => 
 
   it('alias inexistente → churchId nulo e needsReview (comportamento atual)', async () => {
     const prisma = makePrisma(null);
-    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any);
+    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any, new ProfessionsService(prisma, { create: jest.fn() } as any));
 
     const res = await service.ingest(payload({ churchName: 'Igreja Desconhecida' }));
 
@@ -69,7 +70,7 @@ describe('LegendaryFormsSyncService — resolução de igreja por alias', () => 
 
   it('precedência: nome canônico casa sem consultar alias', async () => {
     const prisma = makePrisma(null);
-    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any);
+    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any, new ProfessionsService(prisma, { create: jest.fn() } as any));
 
     await service.ingest(payload({ churchName: 'Primeira Igreja Batista (PIB) — Caldas Novas' }));
 
@@ -80,7 +81,7 @@ describe('LegendaryFormsSyncService — resolução de igreja por alias', () => 
 
   it('alias de igreja soft-deleted NÃO resolve', async () => {
     const prisma = makePrisma({ churchId: 'ch-pib', church: { deletedAt: new Date('2026-01-01') } });
-    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any);
+    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any, new ProfessionsService(prisma, { create: jest.fn() } as any));
 
     const res = await service.ingest(payload());
 
@@ -130,10 +131,10 @@ describe('LegendaryFormsSyncService — reconcileReferences (retroativo)', () =>
 
   it('vincula churchId por alias e limpa needsReview quando não há outras issues', async () => {
     const prisma = makeReconcilePrisma(
-      { id: 'leg-1', churchId: null, professionId: null, needsReview: true },
+      { id: 'leg-1', churchId: null, professionId: null, professionText: null, needsReview: true },
       { churchId: 'ch-pib', church: { deletedAt: null } },
     );
-    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any);
+    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any, new ProfessionsService(prisma, { create: jest.fn() } as any));
 
     const res = await service.reconcileReferences(fullPayload());
 
@@ -145,10 +146,10 @@ describe('LegendaryFormsSyncService — reconcileReferences (retroativo)', () =>
 
   it('é idempotente: nada muda quando já está casado', async () => {
     const prisma = makeReconcilePrisma(
-      { id: 'leg-1', churchId: 'ch-pib', professionId: 'pr-ped', needsReview: false },
+      { id: 'leg-1', churchId: 'ch-pib', professionId: 'pr-ped', professionText: null, needsReview: false },
       { churchId: 'ch-pib', church: { deletedAt: null } },
     );
-    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any);
+    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any, new ProfessionsService(prisma, { create: jest.fn() } as any));
 
     const res = await service.reconcileReferences(fullPayload());
 
@@ -156,9 +157,57 @@ describe('LegendaryFormsSyncService — reconcileReferences (retroativo)', () =>
     expect(prisma.legendary.update).not.toHaveBeenCalled();
   });
 
+  /** Profissão em texto livre na reconciliação (change profissao-livre-vinculo-catalogo). */
+  it('grava professionText quando a profissão não casa e mantém a idempotência', async () => {
+    const prisma = makeReconcilePrisma(
+      { id: 'leg-1', churchId: 'ch-pib', professionId: null, professionText: null, needsReview: false },
+      { churchId: 'ch-pib', church: { deletedAt: null } },
+    );
+    prisma.profession.findMany.mockResolvedValue([]); // catálogo sem "Pedreiro"
+    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any, new ProfessionsService(prisma, { create: jest.fn() } as any));
+
+    const res = await service.reconcileReferences(fullPayload());
+
+    expect(res.result).toBe('reconciled');
+    const data = prisma.legendary.update.mock.calls[0][0].data;
+    expect(data.professionId).toBeNull();
+    expect(data.professionText).toBe('Pedreiro');
+    expect(data.needsReview).toBe(true);
+  });
+
+  it('é idempotente com texto livre já gravado', async () => {
+    const prisma = makeReconcilePrisma(
+      { id: 'leg-1', churchId: 'ch-pib', professionId: null, professionText: 'Pedreiro', needsReview: true },
+      { churchId: 'ch-pib', church: { deletedAt: null } },
+    );
+    prisma.profession.findMany.mockResolvedValue([]);
+    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any, new ProfessionsService(prisma, { create: jest.fn() } as any));
+
+    const res = await service.reconcileReferences(fullPayload());
+
+    expect(res.result).toBe('unchanged');
+    expect(prisma.legendary.update).not.toHaveBeenCalled();
+  });
+
+  it('promove texto livre a vínculo quando a profissão entra no catálogo', async () => {
+    const prisma = makeReconcilePrisma(
+      { id: 'leg-1', churchId: 'ch-pib', professionId: null, professionText: 'Pedreiro', needsReview: true },
+      { churchId: 'ch-pib', church: { deletedAt: null } },
+    );
+    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any, new ProfessionsService(prisma, { create: jest.fn() } as any));
+
+    const res = await service.reconcileReferences(fullPayload());
+
+    expect(res.result).toBe('reconciled');
+    const data = prisma.legendary.update.mock.calls[0][0].data;
+    expect(data.professionId).toBe('pr-ped');
+    expect(data.professionText).toBeNull();
+    expect(data.needsReview).toBe(false);
+  });
+
   it('no-op quando o legendário não existe', async () => {
     const prisma = makeReconcilePrisma(null, null);
-    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any);
+    const service = new LegendaryFormsSyncService(prisma, { create: jest.fn() } as any, new ProfessionsService(prisma, { create: jest.fn() } as any));
 
     const res = await service.reconcileReferences(fullPayload({ lgndNumber: '99999' }));
 

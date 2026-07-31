@@ -1,10 +1,14 @@
 ## 1. Inventário e matriz de permissions
 
-- [ ] 1.1 Inventariar botões, links e `ActionMenu` nas listas e detalhes dos módulos afetados
-- [ ] 1.2 Mapear cada controle visual à permission exata do controller correspondente
-- [ ] 1.3 Inventariar todos os seletores de User, Legendary e Team usados em operações contextuais
-- [ ] 1.4 Classificar cada seletor entre endpoint compatível, endpoint contextual necessário ou tipo de entidade diferente
-- [ ] 1.5 Confirmar e documentar os consumidores do endpoint existente de opções de participantes de TOP
+> Resultado completo em **`inventario.md`** (mesma pasta). Decisão de rumo aprovada pelo Davi em
+> 31/07/2026: endpoints contextuais (A) onde a busca **expõe pessoas**; `@AnyPermissions` no
+> endpoint existente (B) onde o campo escolhe um dirigente dentro de um recurso já administrado.
+
+- [x] 1.1 Inventariar botões, links e `ActionMenu` nas listas e detalhes dos módulos afetados — 32 páginas varridas. **Achado central:** nas 6 listas o botão "criar" é gated, mas os itens do `ActionMenu` (Ver/Editar/Inativar/Excluir) são array literal **sem filtro nenhum**. 4 telas de detalhe (`acoes-sociais/[id]`, `comunicacao/[id]`, `tops/[id]/pre-inscricoes`, `relatorios`) não têm **nenhuma** checagem. `equipes/[id]` e `tops/[id]` já são o padrão correto a generalizar.
+- [x] 1.2 Mapear cada controle visual à permission exata do controller correspondente — matriz em `inventario.md` §5. **Dois achados que mudariam o resultado se ignorados:** (a) existe um segundo decorator, `@AnyPermissions` (OR), em `GET`/`PATCH /legendarios/:id` — gate por permission única **esconderia ação legítima** de quem tem `organogram.person.edit`; (b) `legendarios.update` não é declarada por nenhum `@Permissions` isolado. **Bug já localizado:** `equipes/[id]` usa `legendarios.update` sozinho, mais restrito que a própria API.
+- [x] 1.3 Inventariar todos os seletores de User, Legendary e Team usados em operações contextuais — `LegendarioCombobox` (→ `/legendarios/options`, exige `legendarios.read`) tem **13 consumidores**; é a origem do 403 em ação autorizada.
+- [x] 1.4 Classificar cada seletor entre endpoint compatível, endpoint contextual necessário ou tipo de entidade diferente — classificação completa em `inventario.md` §6. **Dos 6 endpoints propostos no design, 4 sobrevivem**; Equipes-candidatas-em-TOP vira caso B e líder de Igreja vira caso C. ⚠️ **Open question do design resolvida:** `church-form` tem **os dois** campos — `spiritualLeaderUserId` (User) e `spiritualLeaderLegendaryId` (Legendary); não são o mesmo seletor.
+- [x] 1.5 Confirmar e documentar os consumidores do endpoint existente de opções de participantes de TOP — **um único consumidor** (`top-families-section.tsx`), já correto: `TopScopeGuard` como escopo autoritativo, `tops.participants.read`, projeção enxuta. **Não mexer.**
 
 ## 2. Primitiva de autorização visual
 

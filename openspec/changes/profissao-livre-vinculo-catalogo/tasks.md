@@ -45,5 +45,27 @@
   - **Segurança:** tudo dentro de UMA transação externa encerrada por rollback intencional (o `$transaction` interno do service é redirecionado para ela por Proxy, mesmo padrão do backfill dry-run). Verificado após o rollback que 0 registros de teste sobreviveram.
   - ⚠️ **Achado do próprio smoke:** na primeira execução o cenário 5 falhou porque `apps/api/dist` estava desatualizado (o build fora feito ANTES do fix da 6.4). Após `pnpm --filter api build`, 7/7. Lição: o smoke valida o artefato compilado, então o build precisa ser posterior ao último fix — documentado no cabeçalho do script.
   - **Repetível por qualquer um** (não foi um one-off): `apps/api/scripts/profissao-livre-check.ts` (preview/post-check, somente leitura) e `apps/api/scripts/profissao-livre-smoke.ts` (smoke transacional), no mesmo padrão dos scripts já existentes em `apps/api/scripts/`. Uso documentado no cabeçalho de cada um.
-- [ ] 6.3 Registrar evidências de backup verificado, migration aplicada e integridade dos vínculos antes do deploy de produção — **BLOQUEADA POR PRÉ-REQUISITO:** o código desta change ainda não está no git (sem commit/PR/merge). Só vai a produção o que está no `main`. Além disso, todo comando na VPS — inclusive leitura — exige apresentação prévia e aval explícito na mesma interação (REGRAS OBRIGATÓRIAS DE PRODUÇÃO). Sequência necessária: aval de git → commit/PR → merge no `main` → aval de deploy → backup verificado → `migrate deploy` → post-check.
+- [x] 6.3 Registrar evidências de backup verificado, migration aplicada e integridade dos vínculos antes do deploy de produção — **DEPLOY EXECUTADO E VALIDADO em 31/07/2026 ~12:01–12:06 UTC.** PR #40 mesclado (`685144c0`); produção saiu de `6a1c2f6` → `685144c0`.
+
+  **Diagnóstico pré-deploy:** produção em `main`/`6a1c2f6`, 5 containers Up, health `ok/up/up`. Consulta a `_prisma_migrations` confirmou que **`20260722120000_top_family_notes_merge_and_servant_indexes` JÁ ESTAVA APLICADA** — o risco levantado (migration que muta dados) não se materializou; a única pendente era a desta change, aditiva. Nenhuma das 6 últimas migrations estava não-finalizada. `scripts/deploy.sh` e `docker/Caddyfile` fora do diff (33 arquivos), o que neutralizou as duas armadilhas de 29/07 (script que se automodifica no próprio `git pull`; pull recusado por arquivo modificado na VPS).
+
+  **Backup verificado:** `/home/deploy/backups/central-da-manada/backup_20260731-115432.sql`, `-rw-------`, dono `deploy`, **1.508.283 bytes**. As três validações (`test -f`, `test -s`, `stat`) imprimiram — o `< /dev/null` impediu a falha silenciosa do `exec -T` comendo o stdin. Conteúdo não foi lido (dados pessoais).
+
+  **Migration aplicada:** `Applying migration 20260730120000_add_legendary_profession_text` → `All migrations have been successfully applied`. Exatamente uma, a desta change. Tags `central-da-manada-{api,web}:pre-685144c` criadas ANTES do build; `docker image prune -f` → `Total reclaimed space: 0B` (o ponto de retorno sobreviveu). `EXIT_CODE=0`.
+
+  **Integridade dos vínculos — comparação prod-antes × prod-depois (mesma expressão SQL):**
+
+  | | antes | depois |
+  |---|---|---|
+  | total de legendários ativos | 249 | 249 |
+  | com `professionId` | 65 | 65 |
+  | profissões distintas | 5 | 5 |
+  | fingerprint md5 de `(id, professionId)` | `5327d74e29d5fd6ac7b7c5fdcf1deda7` | `5327d74e29d5fd6ac7b7c5fdcf1deda7` |
+  | vínculos órfãos | — | 0 |
+
+  Coluna criada como especificado: `text`, `is_nullable = YES`, `professionText` com 0 valores. **Nenhum vínculo existente foi alterado.**
+
+  **Pós-deploy:** commit implantado confirmado (`685144c0`), health `{"status":"ok","database":"up","redis":"up"}`, site `/login` HTTP 200, 5 containers Up, sem erros nos logs da API. Seed `SEED_MODE=access` sem remoções (a change não toca permissions) — diferente de 29/07, que limpou 5 órfãs.
+
+  **Rollback disponível:** imagens `pre-685144c` (binário) + `backup_20260731-115432.sql` (dado). A coluna pode permanecer em qualquer rollback — a versão anterior da app a ignora; dropá-la perderia textos livres já gravados.
 - [x] 6.4 Validar todos os cenários das specs da change e somente então marcar a implementação pronta para archive — **18 cenários percorridos um a um contra o código.** 17 conformes; **1 GAP REAL ENCONTRADO E CORRIGIDO:** o cenário “Legacy client submits catalog ID … **and clears any stale profession fallback text**” não era cumprido — `professionId` isolado gravava o vínculo mas deixava `professionText` pendurado, quebrando a exclusividade mútua dos campos. O teste existente ainda codificava o comportamento errado (`not.toHaveProperty('professionText')`). Corrigido em `resolveProfessionPatch` (ID presente sem texto → `professionText: null`) + 2 testes (create e update). Restam operacionais, fora do controle do código: “Pre-deploy and post-deploy checks are compared” (depende de 6.2/6.3).

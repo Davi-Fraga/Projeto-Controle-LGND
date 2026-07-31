@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
   getExpertises: vi.fn(),
   getLegendarios: vi.fn(),
   getProfessions: vi.fn(),
+  // Permissions efetivas do usuário sob teste + captura dos itens do ActionMenu, para
+  // verificar a autorização visual das ações da lista.
+  permissions: [] as string[],
+  actionLabels: [] as string[],
 }));
 
 vi.mock('next/navigation', () => ({
@@ -25,7 +29,7 @@ vi.mock('next/link', () => ({
 vi.mock('@/hooks/use-require-auth', () => ({
   useRequireAuth: () => ({
     loading: false,
-    user: { id: 'user-1', roles: [], permissions: [] },
+    user: { id: 'user-1', roles: [], permissions: mocks.permissions },
   }),
 }));
 
@@ -46,7 +50,10 @@ vi.mock('@/components/ui/ConfirmDialog', () => ({
 }));
 
 vi.mock('@/components/ui/ActionMenu', () => ({
-  ActionMenu: () => null,
+  ActionMenu: ({ items }: { items: Array<{ label: string }> }) => {
+    mocks.actionLabels = items.map((item) => item.label);
+    return null;
+  },
 }));
 
 vi.mock('@/features/teams/team-filter', () => ({
@@ -135,5 +142,57 @@ describe('LegendariosPage church deep-link', () => {
     await waitFor(() => {
       expect(mocks.getLegendarios.mock.calls.at(-1)?.[0].churchId).toBeUndefined();
     });
+  });
+});
+
+/**
+ * Autorização visual das ações da lista (change acoes-web-e-seletores-contextuais).
+ * Antes, "Editar" e "Inativar" eram um array literal sem filtro: quem tinha apenas
+ * `legendarios.read` via as duas.
+ */
+describe('LegendariosPage — ações por permission', () => {
+  beforeEach(() => {
+    mocks.search = '';
+    mocks.actionLabels = [];
+    mocks.getLegendarios.mockReset().mockResolvedValue({
+      data: [{ id: 'l1', fullName: 'João', status: 'ACTIVE', expertises: [] }],
+      meta: { page: 1, perPage: 10, total: 1, totalPages: 1 },
+    });
+    mocks.getChurches.mockReset().mockResolvedValue({ data: [] });
+    mocks.getProfessions.mockReset().mockResolvedValue({ data: [] });
+    mocks.getExpertises.mockReset().mockResolvedValue({ data: [] });
+  });
+
+  async function renderWith(...permissions: string[]) {
+    mocks.permissions = permissions;
+    render(<LegendariosPage />);
+    await waitFor(() => expect(mocks.getLegendarios).toHaveBeenCalled());
+    await waitFor(() => expect(mocks.actionLabels.length).toBeGreaterThan(0));
+  }
+
+  it('somente leitura oferece apenas Ver', async () => {
+    await renderWith('legendarios.read');
+
+    expect(mocks.actionLabels).toEqual(['Ver']);
+  });
+
+  it('legendarios.delete acrescenta Inativar, mas não Editar', async () => {
+    await renderWith('legendarios.read', 'legendarios.delete');
+
+    expect(mocks.actionLabels).toEqual(['Ver', 'Inativar']);
+  });
+
+  // Regressão do inventário: PATCH /legendarios/:id é
+  // @AnyPermissions('legendarios.update', 'organogram.person.edit').
+  it('organogram.person.edit sozinho já habilita Editar', async () => {
+    await renderWith('legendarios.read', 'organogram.person.edit');
+
+    expect(mocks.actionLabels).toContain('Editar');
+  });
+
+  it('legendarios.update também habilita Editar', async () => {
+    await renderWith('legendarios.read', 'legendarios.update');
+
+    expect(mocks.actionLabels).toContain('Editar');
   });
 });

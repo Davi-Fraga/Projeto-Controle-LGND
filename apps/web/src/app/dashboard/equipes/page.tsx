@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { TeamStatus } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/hooks/use-can';
 import { useDebounce } from '@/hooks/use-debounce';
 import { deactivateTeam, getTeams } from '@/features/teams/api';
 import type { Team } from '@/features/teams/types';
@@ -16,6 +17,9 @@ import { formatTeamName } from '@/lib/teams';
 
 export default function TeamsPage() {
   const { user, loading: authLoading } = useRequireAuth();
+  const canDo = useCan(user);
+  const canEdit = canDo('teams.update');
+  const canRemove = canDo('teams.delete');
   const [teams, setTeams] = useState<Team[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -175,8 +179,8 @@ export default function TeamsPage() {
                         <ActionMenu
                           items={[
                             { label: 'Ver', href: `/dashboard/equipes/${team.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
-                            { label: 'Editar', href: `/dashboard/equipes/${team.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> },
-                            { label: 'Inativar', onClick: () => setDeactivatingId(team.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true },
+                            ...(canEdit ? [{ label: 'Editar', href: `/dashboard/equipes/${team.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
+                            ...(canRemove ? [{ label: 'Inativar', onClick: () => setDeactivatingId(team.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true }] : []),
                           ]}
                         />
                       </div>

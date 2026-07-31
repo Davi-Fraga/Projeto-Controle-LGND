@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { TopEventStatus } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/hooks/use-can';
 import { useDebounce } from '@/hooks/use-debounce';
 import { deactivateTop, getTops } from '@/features/tops/api';
 import type { TopEvent } from '@/features/tops/types';
@@ -15,6 +16,9 @@ import { Search, MapPin, Eye, Edit2, ShieldAlert, Calendar } from 'lucide-react'
 
 export default function TopsPage() {
   const { user, loading: authLoading } = useRequireAuth();
+  const canDo = useCan(user);
+  const canEdit = canDo('tops.update');
+  const canRemove = canDo('tops.delete');
   const [tops, setTops] = useState<TopEvent[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -204,8 +208,8 @@ export default function TopsPage() {
                         <ActionMenu
                           items={[
                             { label: 'Ver', href: `/dashboard/tops/${top.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
-                            { label: 'Editar', href: `/dashboard/tops/${top.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> },
-                            { label: 'Inativar', onClick: () => setDeactivatingId(top.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true },
+                            ...(canEdit ? [{ label: 'Editar', href: `/dashboard/tops/${top.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
+                            ...(canRemove ? [{ label: 'Inativar', onClick: () => setDeactivatingId(top.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true }] : []),
                           ]}
                         />
                       </div>

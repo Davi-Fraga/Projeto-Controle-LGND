@@ -34,11 +34,11 @@
 
 ## 4. Ações nas telas
 
-- [ ] 4.1 Aplicar permissions granulares às ações de Legendários
-- [ ] 4.2 Aplicar permissions granulares às ações de Equipes e membros
-- [ ] 4.3 Aplicar permissions granulares às ações de Igrejas
-- [ ] 4.4 Aplicar permissions granulares às ações principais de TOP
-- [ ] 4.5 Aplicar permissions granulares a participantes, servos, equipes, famílias e pré-inscrições de TOP
+- [x] 4.1 Aplicar permissions granulares às ações de Legendários — itens do `ActionMenu` deixaram de ser array literal. "Ver" segue sem gate (estar na lista já exige `legendarios.read`); "Editar" usa **`anyOf('legendarios.update', 'organogram.person.edit')`**, espelhando o `@AnyPermissions` da rota; "Inativar" → `legendarios.delete`.
+- [x] 4.2 Aplicar permissions granulares às ações de Equipes e membros — lista: "Editar" → `teams.update`, "Inativar" → `teams.delete`. O detalhe (`equipes/[id]`) já era o padrão de referência e teve o gate estrito corrigido (ver §4.6-4.8).
+- [x] 4.3 Aplicar permissions granulares às ações de Igrejas — "Editar" → `churches.update`, "Excluir" → `churches.delete`.
+- [x] 4.4 Aplicar permissions granulares às ações principais de TOP — "Editar" → `tops.update`, "Inativar" → `tops.delete`. Sub-recursos do detalhe já estavam corretos (§4.5).
+- [x] 4.5 Aplicar permissions granulares a participantes, servos, equipes, famílias e pré-inscrições de TOP — participantes/servos/equipes/famílias já estavam corretos em `tops/[id]` (era o padrão de referência que o design mandava generalizar). **Pré-inscrições não tinham nenhuma checagem** e foram cobertas neste lote: Aprovar → `tops.preregistrations.approve`, Rejeitar → `tops.preregistrations.reject` — permissions **distintas**, então quem tria pode rejeitar sem poder efetivar a inscrição.
 - [x] 4.6 Aplicar permissions granulares a Ações Sociais e participantes — `acoes-sociais/[id]` **não tinha nenhuma checagem**. Editar/Cancelar e o card de Conclusão → `social-actions.update`; bloco de vincular participante e o card de Sugestões de Voluntários → `social-actions.participants.add` (a lista de sugestões só serve para escolher quem adicionar); Concluir participante → `.participants.update`; Remover → `.participants.remove`.
 - [x] 4.7 Aplicar permissions granulares a Comunicação e destinatários — `comunicacao/[id]` **não tinha nenhuma checagem**. "Enviar Mensagem" → **`communications.send`**, que é permission PRÓPRIA no backend, distinta de `communications.update` (esta cobre editar rascunho e cancelar envio). Botões de marcar destinatário como lido/confirmado → `communications.recipients.update`.
 - [x] 4.8 Aplicar permissions granulares aos controles de exportação de Relatórios — `relatorios` **não tinha nenhuma checagem**. ⚠️ Havia uma colisão de nome: `canExport` significava "este relatório tem CSV", não "o usuário pode exportar". Renomeado para `reportHasCsv` e composto com `canDo('reports.export')` — antes o botão aparecia para quem só tinha `reports.read`.

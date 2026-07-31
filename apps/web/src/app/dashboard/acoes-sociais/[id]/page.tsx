@@ -8,6 +8,7 @@ import { addSocialActionParticipant, cancelSocialAction, completeSocialAction, g
 import type { VolunteerSuggestion } from '@/features/social-actions/api';
 import type { SocialAction, SocialActionParticipant } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useCan } from '@/hooks/use-can';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
@@ -15,7 +16,14 @@ import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
 export default function SocialActionDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { loading: authLoading } = useRequireAuth();
+  const { user, loading: authLoading } = useRequireAuth();
+  const canDo = useCan(user);
+  // Espelham as permissions das rotas: PATCH :id/complete e :id/cancel exigem
+  // `social-actions.update`; o vínculo de participante tem permission própria.
+  const canUpdate = canDo('social-actions.update');
+  const canAddParticipant = canDo('social-actions.participants.add');
+  const canUpdateParticipant = canDo('social-actions.participants.update');
+  const canRemoveParticipant = canDo('social-actions.participants.remove');
   const [action, setAction] = useState<SocialAction | null>(null);
   const [participants, setParticipants] = useState<SocialActionParticipant[]>([]);
   const [suggestions, setSuggestions] = useState<VolunteerSuggestion[]>([]);
@@ -100,18 +108,22 @@ export default function SocialActionDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href={`/dashboard/acoes-sociais/${action.id}/editar`}
-            className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/60 px-5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
-          >
-            Editar
-          </Link>
-          <button
-            onClick={cancel}
-            className="inline-flex h-10 items-center justify-center rounded-lg border border-rose-900/30 bg-rose-950/20 px-5 text-xs font-bold uppercase tracking-wider text-rose-400 transition-all hover:bg-rose-950/50 hover:text-rose-300"
-          >
-            Cancelar Ação
-          </button>
+          {canUpdate && (
+            <Link
+              href={`/dashboard/acoes-sociais/${action.id}/editar`}
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/60 px-5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
+            >
+              Editar
+            </Link>
+          )}
+          {canUpdate && (
+            <button
+              onClick={cancel}
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-rose-900/30 bg-rose-950/20 px-5 text-xs font-bold uppercase tracking-wider text-rose-400 transition-all hover:bg-rose-950/50 hover:text-rose-300"
+            >
+              Cancelar Ação
+            </button>
+          )}
         </div>
       </div>
 
@@ -144,6 +156,7 @@ export default function SocialActionDetailPage() {
             <p className="text-xs text-zinc-500 mt-1">Gerencie a presença e participação dos homens da manada.</p>
           </div>
 
+          {canAddParticipant && (
           <div className="grid gap-3 md:grid-cols-4 bg-zinc-900/20 border border-zinc-800/40 rounded-xl p-4">
             <LegendarioCombobox
               value={newParticipant.legendaryId}
@@ -170,6 +183,7 @@ export default function SocialActionDetailPage() {
               Adicionar
             </button>
           </div>
+          )}
 
           <div className="w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#0B0B0C]">
             <div className="overflow-x-auto">
@@ -205,18 +219,22 @@ export default function SocialActionDetailPage() {
                         </td>
                         <td className="px-5 py-3.5">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              className="flex h-7 items-center rounded bg-zinc-800 px-3 text-[10px] font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-700"
-                              onClick={() => updateParticipant(participant, participant.attended, SocialActionParticipantStatus.COMPLETED)}
-                            >
-                              Concluir
-                            </button>
-                            <button
-                              className="flex h-7 items-center rounded border border-rose-900/30 bg-rose-950/20 px-3 text-[10px] font-bold uppercase tracking-wider text-rose-400 hover:bg-rose-950/50 hover:text-rose-300"
-                              onClick={() => removeParticipant(participant.id)}
-                            >
-                              Remover
-                            </button>
+                            {canUpdateParticipant && (
+                              <button
+                                className="flex h-7 items-center rounded bg-zinc-800 px-3 text-[10px] font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-700"
+                                onClick={() => updateParticipant(participant, participant.attended, SocialActionParticipantStatus.COMPLETED)}
+                              >
+                                Concluir
+                              </button>
+                            )}
+                            {canRemoveParticipant && (
+                              <button
+                                className="flex h-7 items-center rounded border border-rose-900/30 bg-rose-950/20 px-3 text-[10px] font-bold uppercase tracking-wider text-rose-400 hover:bg-rose-950/50 hover:text-rose-300"
+                                onClick={() => removeParticipant(participant.id)}
+                              >
+                                Remover
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -236,7 +254,8 @@ export default function SocialActionDetailPage() {
 
         {/* Right: Results / Volunteer Suggestions */}
         <section className="space-y-6">
-          {/* Conclusão Card */}
+          {/* Conclusão Card — PATCH :id/complete exige `social-actions.update`. */}
+          {canUpdate && (
           <div className="rounded-xl border border-zinc-800 bg-[#111113] p-5 shadow-lg space-y-4">
             <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-300">Conclusão do Projeto</h2>
             <textarea
@@ -252,8 +271,11 @@ export default function SocialActionDetailPage() {
               Concluir Ação
             </button>
           </div>
+          )}
 
-          {/* Sugestões Card */}
+          {/* Sugestões Card — serve só para escolher quem adicionar; sem a permission de
+              adicionar participante, a lista não tem para onde levar. */}
+          {canAddParticipant && (
           <div className="rounded-xl border border-zinc-800 bg-[#111113] p-5 shadow-lg space-y-4">
             <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-300">Sugestões de Voluntários</h2>
             <div className="flex gap-2">
@@ -286,6 +308,7 @@ export default function SocialActionDetailPage() {
               )}
             </div>
           </div>
+          )}
         </section>
       </div>
     </div>

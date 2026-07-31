@@ -39,9 +39,18 @@
 - [ ] 4.3 Aplicar permissions granulares às ações de Igrejas
 - [ ] 4.4 Aplicar permissions granulares às ações principais de TOP
 - [ ] 4.5 Aplicar permissions granulares a participantes, servos, equipes, famílias e pré-inscrições de TOP
-- [ ] 4.6 Aplicar permissions granulares a Ações Sociais e participantes
-- [ ] 4.7 Aplicar permissions granulares a Comunicação e destinatários
-- [ ] 4.8 Aplicar permissions granulares aos controles de exportação de Relatórios
+- [x] 4.6 Aplicar permissions granulares a Ações Sociais e participantes — `acoes-sociais/[id]` **não tinha nenhuma checagem**. Editar/Cancelar e o card de Conclusão → `social-actions.update`; bloco de vincular participante e o card de Sugestões de Voluntários → `social-actions.participants.add` (a lista de sugestões só serve para escolher quem adicionar); Concluir participante → `.participants.update`; Remover → `.participants.remove`.
+- [x] 4.7 Aplicar permissions granulares a Comunicação e destinatários — `comunicacao/[id]` **não tinha nenhuma checagem**. "Enviar Mensagem" → **`communications.send`**, que é permission PRÓPRIA no backend, distinta de `communications.update` (esta cobre editar rascunho e cancelar envio). Botões de marcar destinatário como lido/confirmado → `communications.recipients.update`.
+- [x] 4.8 Aplicar permissions granulares aos controles de exportação de Relatórios — `relatorios` **não tinha nenhuma checagem**. ⚠️ Havia uma colisão de nome: `canExport` significava "este relatório tem CSV", não "o usuário pode exportar". Renomeado para `reportHasCsv` e composto com `canDo('reports.export')` — antes o botão aparecia para quem só tinha `reports.read`.
+
+> **Fora da numeração, no mesmo lote:** `tops/[id]/pre-inscricoes` também não tinha checagem —
+> Aprovar → `tops.preregistrations.approve` e Rejeitar → `tops.preregistrations.reject`, que são
+> **permissions distintas**: quem tria pode rejeitar sem poder efetivar a inscrição.
+>
+> **Bug do inventário corrigido:** `equipes/[id]` gateava `updateLegendary` por
+> `legendarios.update` sozinho, enquanto a rota é
+> `@AnyPermissions('legendarios.update', 'organogram.person.edit')` — gate **mais restrito que a
+> própria API**, escondendo a ação de quem edita pelo Organograma. Agora usa `anyOf`.
 - [ ] 4.9 Condicionar links cruzados à permission da tela de destino
 
 ## 5. Formulários e comboboxes

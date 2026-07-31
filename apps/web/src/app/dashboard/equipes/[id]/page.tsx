@@ -9,7 +9,7 @@ import type { Team } from '@/features/teams/types';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatTeamName } from '@/lib/teams';
-import { hasPermission } from '@/lib/permissions';
+import { can } from '@/lib/permissions';
 
 export default function TeamDetailPage() {
   const params = useParams<{ id: string }>();
@@ -64,10 +64,13 @@ export default function TeamDetailPage() {
         <TeamMembersTable
           teamId={team.id}
           capabilities={{
-            addMembership: hasPermission(user, 'teams.members.add'),
-            updateMembership: hasPermission(user, 'teams.members.update'),
-            removeMembership: hasPermission(user, 'teams.members.remove'),
-            updateLegendary: hasPermission(user, 'legendarios.update'),
+            addMembership: can(user, 'teams.members.add'),
+            updateMembership: can(user, 'teams.members.update'),
+            removeMembership: can(user, 'teams.members.remove'),
+            // `PATCH /legendarios/:id` é `@AnyPermissions('legendarios.update',
+            // 'organogram.person.edit')`. Exigir só a primeira escondia a ação de quem edita
+            // pelo Organograma — gate mais restrito que a própria API.
+            updateLegendary: can(user, { anyOf: ['legendarios.update', 'organogram.person.edit'] }),
           }}
         />
       </div>

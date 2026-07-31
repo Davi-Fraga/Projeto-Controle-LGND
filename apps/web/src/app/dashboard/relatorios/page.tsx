@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { downloadCsv, getByChurchReport, getByCityReport, getByExpertiseReport, getByProfessionReport, getByTeamReport, getLegendariosReport, getPendingReviewReport, getSocialActionParticipantsReport, getSocialInterestedReport, getTopFamiliesReport, getTopParticipantsReport, getTopServantsReport } from '@/features/reports/api';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useCan } from '@/hooks/use-can';
 import { FileSpreadsheet, Download, Search } from 'lucide-react';
 
 type ReportKey = 'legendarios' | 'city' | 'church' | 'team' | 'profession' | 'expertise' | 'social' | 'pendingReview' | 'topParticipants' | 'topServants' | 'topFamilies' | 'socialParticipants';
@@ -24,7 +25,8 @@ const reports: Array<{ key: ReportKey; label: string }> = [
 ];
 
 export default function ReportsPage() {
-  const { loading: authLoading } = useRequireAuth();
+  const { user, loading: authLoading } = useRequireAuth();
+  const canDo = useCan(user);
   const [active, setActive] = useState<ReportKey>('legendarios');
   const [rows, setRows] = useState<any[]>([]);
   const [topId, setTopId] = useState('');
@@ -79,7 +81,11 @@ export default function ReportsPage() {
   }
 
   const columns = rows[0] ? Object.keys(flatten(rows[0])).slice(0, 8) : [];
-  const canExport = ['legendarios', 'topParticipants', 'topServants', 'topFamilies', 'socialParticipants'].includes(active);
+  // `reportHasCsv` é sobre o RELATÓRIO ter exportação; `canDo('reports.export')` é sobre o
+  // USUÁRIO poder exportar. Os dois precisam valer — antes só o primeiro era checado, e o
+  // botão aparecia para quem só tinha `reports.read`.
+  const reportHasCsv = ['legendarios', 'topParticipants', 'topServants', 'topFamilies', 'socialParticipants'].includes(active);
+  const canExport = reportHasCsv && canDo('reports.export');
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

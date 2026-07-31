@@ -57,6 +57,11 @@ export function ActionMenu({ items, label = 'Ações' }: { items: ActionMenuItem
     action?.();
   }
 
+  // Com as ações filtradas por permission, um usuário sem nenhuma ação disponível não pode
+  // ver um "⋮" que abre um menu vazio. O early-return fica DEPOIS dos hooks de propósito:
+  // antes deles, mudar de 0 para N itens alteraria a ordem de chamada entre renders.
+  if (items.length === 0) return null;
+
   return (
     <div ref={ref} className="relative inline-flex justify-end">
       <button

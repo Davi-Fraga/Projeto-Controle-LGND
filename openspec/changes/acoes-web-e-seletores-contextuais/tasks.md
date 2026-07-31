@@ -12,10 +12,13 @@
 
 ## 2. Primitiva de autorização visual
 
-- [ ] 2.1 Criar helper/hook comum de permission efetiva com API tipada
-- [ ] 2.2 Criar composição opcional para renderização condicional sem duplicar regra
-- [ ] 2.3 Atualizar `ActionMenu` ou seus consumidores para não renderizar menus vazios
-- [ ] 2.4 Adicionar testes do helper, ações permitidas/proibidas e links sem permission
+- [x] 2.1 Criar helper/hook comum de permission efetiva com API tipada — `can(user, input)` em `apps/web/src/lib/permissions.ts` + `useCan(user)` em `apps/web/src/hooks/use-can.ts`. `CanInput` aceita `'perm'` (AND de um), `{ allOf }` e `{ anyOf }`, obrigando a declarar o modo. **Não criou um segundo jeito:** a forma canônica da regra já existia em `packages/shared/src/nav-manifest.ts` embutida no avaliador da navegação; foi **extraída** para `PermissionRule` + `satisfiesPermissionRule`, e `isPrimaryNavVisible` passou a consumir a extração — uma implementação só para navegação e ações. Endurecimento aproveitado: regra com `keys: []` agora é **fail-closed** nos dois modos (antes `allOf: []` passaria por vacuidade, já que `[].every() === true`).
+- [x] 2.2 Criar composição opcional para renderização condicional sem duplicar regra — `<Can user rule fallback>` em `apps/web/src/components/ui/Can.tsx`, delegando ao mesmo `can`. Documentado que para montar arrays de `ActionMenu` o certo é `useCan`, porque o menu precisa saber quantos itens sobraram.
+- [x] 2.3 Atualizar `ActionMenu` ou seus consumidores para não renderizar menus vazios — guarda `items.length === 0 → null` no próprio componente, o que cobre todos os consumidores de uma vez. O early-return fica **depois dos hooks** de propósito: antes deles, ir de 0 para N itens mudaria a ordem de chamada entre renders.
+- [x] 2.4 Adicionar testes do helper, ações permitidas/proibidas e links sem permission — `permissions.test.ts` (14) + `ActionMenu.test.tsx` (4), verdes. Cobrem AND, OR, fail-closed sem usuário, regra vazia, e a **regressão do inventário**: um usuário com apenas `organogram.person.edit` é negado por `allOf` e permitido por `anyOf` em `PATCH /legendarios/:id`.
+
+> Suítes completas após a §2: **web 149/149 · api 489/489 · `pnpm lint` verde.** A API entra na
+> conta porque `nav-manifest.spec.ts` exercita o avaliador extraído.
 
 ## 3. Endpoints contextuais
 

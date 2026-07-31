@@ -104,25 +104,4 @@ export class CreateLegendarioDto {
   @IsOptional()
   @IsString()
   firstTopNotes?: string;
-
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
-  alreadyServedAsService?: boolean;
-
-  @IsOptional()
-  @IsUUID()
-  serviceTopEventId?: string;
-
-  @IsOptional()
-  @IsUUID()
-  serviceTeamId?: string;
-
-  @IsOptional()
-  @IsString()
-  serviceRole?: string;
-
-  @IsOptional()
-  @IsString()
-  serviceNotes?: string;
 }

@@ -369,7 +369,7 @@ export class TopsService {
     const family = await this.findExistingFamily(topEventId, familyId);
     const participant = await this.findEligibleFamilyParticipant(topEventId, dto.topParticipantId);
     await this.ensureParticipantNotInActiveFamily(topEventId, dto.topParticipantId);
-    const member = await this.prisma.topFamilyMember.create({ data: { topEventId, topFamilyId: familyId, topParticipantId: dto.topParticipantId, notes: dto.notes?.trim() || null, sourceNotes: dto.sourceNotes?.trim() || null, needsReview: dto.needsReview ?? false }, include: includeFamilyMember });
+    const member = await this.prisma.topFamilyMember.create({ data: { topEventId, topFamilyId: familyId, topParticipantId: dto.topParticipantId, notes: dto.notes?.trim() || null, needsReview: dto.needsReview ?? false }, include: includeFamilyMember });
     await this.audit.create({ actorUserId, entityType: 'TopFamilyMember', entityId: member.id, action: 'add_family_member', after: member });
     await this.createHistory(participant.legendaryId, LegendaryHistoryType.FAMILY_JOINED, 'Entrou em família', `Entrou na família ${family.name}.`, actorUserId, { topEventId, topFamilyId: familyId });
     return member;
@@ -378,7 +378,7 @@ export class TopsService {
   async updateFamilyMember(topEventId: string, familyId: string, memberId: string, dto: UpdateTopFamilyMemberDto, actorUserId?: string) {
     await this.findExistingFamily(topEventId, familyId);
     const before = await this.findExistingFamilyMember(topEventId, familyId, memberId);
-    const after = await this.prisma.topFamilyMember.update({ where: { id: memberId }, data: { status: dto.status, notes: dto.notes === null ? null : (dto.notes !== undefined ? dto.notes.trim() : undefined), sourceNotes: dto.sourceNotes === null ? null : (dto.sourceNotes !== undefined ? dto.sourceNotes.trim() : undefined), needsReview: dto.needsReview }, include: includeFamilyMember });
+    const after = await this.prisma.topFamilyMember.update({ where: { id: memberId }, data: { status: dto.status, notes: dto.notes === null ? null : (dto.notes !== undefined ? dto.notes.trim() : undefined), needsReview: dto.needsReview }, include: includeFamilyMember });
     await this.audit.create({ actorUserId, entityType: 'TopFamilyMember', entityId: memberId, action: 'update_family_member', before, after });
     return after;
   }

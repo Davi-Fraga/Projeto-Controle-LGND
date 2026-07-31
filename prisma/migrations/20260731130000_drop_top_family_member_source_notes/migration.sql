@@ -1,0 +1,29 @@
+-- Change: ajustes-top-familias-historico-servico — FASE 2 (contrato).
+--
+-- A Fase 1 (migration 20260722120000, deployada em 22/07/2026) mesclou `sourceNotes` em
+-- `notes` e deixou `sourceNotes = NULL`. Esta migration fecha o ciclo expand/contract
+-- removendo a coluna.
+--
+-- PRÉ-CONDIÇÕES VERIFICADAS EM PRODUÇÃO (31/07/2026, antes de escrever esta migration):
+--   SELECT count(*) AS membros, count("sourceNotes") AS com_source_notes FROM "TopFamilyMember";
+--   -> membros = 0, com_source_notes = 0
+-- Ou seja: nenhum dado é perdido — não há linha alguma na tabela, muito menos com valor
+-- nesta coluna. A janela de observação desde a Fase 1 (9 dias) está cumprida.
+--
+-- ORDEM DE DEPLOY (importante): o `deploy.sh` roda `migrate deploy` ANTES de subir os
+-- containers novos, então existe uma janela em que o schema já perdeu a coluna e a API
+-- ANTIGA — que ainda escreve `sourceNotes` — segue servindo. Escrita de membro de família
+-- nessa janela falharia. Aceito conscientemente porque `TopFamilyMember` está VAZIA em
+-- produção e o módulo não está em uso; caso a tabela passe a ter movimento, o correto é
+-- separar em dois deploys (código primeiro, DROP depois).
+--
+-- ROLLBACK: a partir daqui, rollback binário para a versão anterior NÃO é permitido — a
+-- API antiga referencia uma coluna que deixou de existir. O procedimento vigente passa a
+-- ser forward-fix (corrigir e redeployar) ou restore do backup verificado.
+--
+-- VALIDAÇÃO PÓS-MIGRATION (esperado: 0 linhas, coluna ausente):
+--   SELECT count(*) FROM information_schema.columns
+--    WHERE table_name = 'TopFamilyMember' AND column_name = 'sourceNotes';
+
+-- AlterTable
+ALTER TABLE "TopFamilyMember" DROP COLUMN IF EXISTS "sourceNotes";

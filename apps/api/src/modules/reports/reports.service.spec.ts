@@ -163,12 +163,13 @@ describe('ReportsService (CITY scope / PII)', () => {
     expect(prisma.topFamilyMember.findMany.mock.calls[0][0].where.topEvent.AND).toEqual([{}]);
   });
 
+  // `sourceNotes` foi removida na Fase 2 da change ajustes-top-familias: a observação do
+  // membro é um campo único (`notes`), sem prefixo/linha "Origem".
   it('pendingReview uses only notes for family members', async () => {
     prisma.topFamilyMember.findMany.mockResolvedValueOnce([
       {
         id: 'm1',
         notes: 'nota geral',
-        sourceNotes: 'texto de origem',
         topFamily: { name: 'Fam' },
         topParticipant: { legendary: { fullName: 'João' } },
       },

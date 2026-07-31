@@ -156,8 +156,6 @@ export class LegendariosService {
       include: includeLegendario,
     });
 
-    await this.handleServiceInfo(legendario.id, dto, actorUserId, db);
-
     await this.audit.create({
       actorUserId,
       entityType: 'Legendary',
@@ -230,8 +228,6 @@ export class LegendariosService {
 
       return updated;
     });
-
-    await this.handleServiceInfo(id, dto, actorUserId);
 
     await this.audit.create({
       actorUserId,
@@ -568,63 +564,5 @@ export class LegendariosService {
         topFamilyId: context?.topFamilyId || null,
       },
     });
-  }
-
-  private async handleServiceInfo(legendaryId: string, dto: Partial<CreateLegendarioDto>, actorUserId?: string, db: Prisma.TransactionClient = this.prisma) {
-    if (dto.alreadyServedAsService && dto.serviceTopEventId && dto.serviceTeamId) {
-      const topTeamExists = await db.topTeam.findFirst({
-        where: { topEventId: dto.serviceTopEventId, teamId: dto.serviceTeamId, deletedAt: null }
-      });
-      if (!topTeamExists) {
-        await db.topTeam.create({
-          data: {
-            topEventId: dto.serviceTopEventId,
-            teamId: dto.serviceTeamId
-          }
-        });
-      }
-
-      const existingServant = await db.topServant.findFirst({
-        where: {
-          topEventId: dto.serviceTopEventId,
-          legendaryId,
-          teamId: dto.serviceTeamId,
-          deletedAt: null,
-          status: { not: 'CANCELLED' }
-        }
-      });
-
-      if (!existingServant) {
-        const topServant = await db.topServant.create({
-          data: {
-            topEventId: dto.serviceTopEventId,
-            legendaryId,
-            teamId: dto.serviceTeamId,
-            role: dto.serviceRole?.trim() || null,
-            status: 'COMPLETED',
-            notes: dto.serviceNotes?.trim() || null
-          },
-          include: { team: true }
-        });
-
-        await this.createHistory(
-          legendaryId,
-          LegendaryHistoryType.TOP_SERVED,
-          'Serviu em TOP',
-          `Adicionado como servo do TOP${topServant.team?.name ? ` na equipe ${topServant.team.name}` : ''}.`,
-          actorUserId,
-          { topEventId: dto.serviceTopEventId, teamId: dto.serviceTeamId },
-          db
-        );
-      } else {
-        await db.topServant.update({
-          where: { id: existingServant.id },
-          data: {
-            role: dto.serviceRole?.trim() || null,
-            notes: dto.serviceNotes?.trim() || null
-          }
-        });
-      }
-    }
   }
 }

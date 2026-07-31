@@ -84,15 +84,16 @@ describe('TopFamiliesSection', () => {
     vi.mocked(api.getTopFamilies).mockResolvedValueOnce({
       data: [{ id: 'fam1', name: 'Família 1', needsReview: false, representative: null, deputyRepresentative: null }],
     } as any);
+    // `sourceNotes` deixou de existir na Fase 2: a API não devolve mais o campo. O card
+    // exibe só `notes`, e a linha "Origem" não pode voltar por regressão de UI.
     vi.mocked(api.getTopFamilyMembers).mockResolvedValueOnce({
-      data: [{ id: 'm1', topParticipantId: 'pp1', status: 'ACTIVE', needsReview: false, notes: 'nota geral', sourceNotes: 'texto de origem', topParticipant: { legendary: { fullName: 'João' } } }],
+      data: [{ id: 'm1', topParticipantId: 'pp1', status: 'ACTIVE', needsReview: false, notes: 'nota geral', topParticipant: { legendary: { fullName: 'João' } } }],
     } as any);
 
     render(<TopFamiliesSection topId="top-1" permissions={allPermissions} />);
 
     await waitFor(() => expect(screen.getByText('nota geral')).toBeInTheDocument());
     expect(screen.queryByText(/Origem:/)).not.toBeInTheDocument();
-    expect(screen.queryByText('texto de origem')).not.toBeInTheDocument();
   });
 
   it('adiciona membro sem enviar sourceNotes e limpa a seleção após sucesso', async () => {

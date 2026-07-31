@@ -480,7 +480,6 @@ export type TopFamilyMember = {
   topParticipant?: TopParticipant;
   status: TopFamilyMemberStatus;
   notes?: string | null;
-  sourceNotes?: string | null;
   needsReview: boolean;
   startedAt: string;
   endedAt?: string | null;

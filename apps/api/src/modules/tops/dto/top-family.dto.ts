@@ -25,14 +25,12 @@ export class UpdateTopFamilyDto {
 export class CreateTopFamilyMemberDto {
   @IsUUID() topParticipantId: string;
   @IsOptional() @IsString() notes?: string;
-  @IsOptional() @IsString() sourceNotes?: string;
   @IsOptional() @Type(() => Boolean) @IsBoolean() needsReview?: boolean;
 }
 
 export class UpdateTopFamilyMemberDto {
   @IsOptional() @IsEnum(TopFamilyMemberStatus) status?: TopFamilyMemberStatus;
   @IsOptional() @IsString() notes?: string;
-  @IsOptional() @IsString() sourceNotes?: string;
   @IsOptional() @Type(() => Boolean) @IsBoolean() needsReview?: boolean;
 }
 

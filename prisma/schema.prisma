@@ -657,7 +657,6 @@ model TopFamilyMember {
   topParticipant   TopParticipant        @relation(fields: [topParticipantId], references: [id])
   status           TopFamilyMemberStatus @default(ACTIVE)
   notes            String?
-  sourceNotes      String?
   needsReview      Boolean               @default(false)
   startedAt        DateTime              @default(now())
   endedAt          DateTime?

@@ -7,6 +7,7 @@ import { deleteSocialAction, getSocialActions } from '@/features/social-actions/
 import type { SocialAction } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/hooks/use-can';
 import { useDebounce } from '@/hooks/use-debounce';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -15,6 +16,9 @@ import { Search, MapPin, Eye, Edit2, ShieldAlert, Calendar } from 'lucide-react'
 
 export default function SocialActionsPage() {
   const { user, loading: authLoading } = useRequireAuth();
+  const canDo = useCan(user);
+  const canEdit = canDo('social-actions.update');
+  const canRemove = canDo('social-actions.delete');
   const [items, setItems] = useState<SocialAction[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -180,8 +184,8 @@ export default function SocialActionsPage() {
                         <ActionMenu
                           items={[
                             { label: 'Ver', href: `/dashboard/acoes-sociais/${item.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
-                            { label: 'Editar', href: `/dashboard/acoes-sociais/${item.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> },
-                            { label: 'Excluir', onClick: () => setDeletingId(item.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true },
+                            ...(canEdit ? [{ label: 'Editar', href: `/dashboard/acoes-sociais/${item.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
+                            ...(canRemove ? [{ label: 'Excluir', onClick: () => setDeletingId(item.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true }] : []),
                           ]}
                         />
                       </div>

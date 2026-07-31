@@ -7,9 +7,37 @@
 //   ao conjunto VIEW dessa tela; exceções administrativas (Usuários) ficam FORA do catálogo e
 //   declaram o papel exigido.
 
+/**
+ * Regra de permission efetiva — forma CANÔNICA, compartilhada entre a navegação e a
+ * autorização visual de ações (change acoes-web-e-seletores-contextuais).
+ *
+ * `allOf` espelha `@Permissions` (AND) e `anyOf` espelha `@AnyPermissions` (OR) do backend.
+ * Toda regra visual deve declarar o modo explicitamente: usar AND onde a API exige OR
+ * esconde ação que o usuário pode executar; o contrário mostra ação que vai falhar com 403.
+ */
+export type PermissionRule = { mode: 'allOf' | 'anyOf'; keys: string[] };
+
+/**
+ * Avaliador único da regra de permission. NÃO é barreira de segurança — o backend continua
+ * decidindo; isto governa apenas o que a interface oferece.
+ *
+ * Regra vazia (`keys: []`) é **fail-closed** nos dois modos. Sem isso, `allOf: []` passaria
+ * por vacuidade (`[].every() === true`) e liberaria um controle por engano de digitação.
+ */
+export function satisfiesPermissionRule(
+  permissions: string[] | null | undefined,
+  rule: PermissionRule,
+): boolean {
+  if (rule.keys.length === 0) return false;
+  const perms = permissions ?? [];
+  return rule.mode === 'allOf'
+    ? rule.keys.every((key) => perms.includes(key))
+    : rule.keys.some((key) => perms.includes(key));
+}
+
 // Regra de entrada de uma aba: por permissions efetivas (allOf/anyOf) ou exceção por papel admin.
 export type NavEntryRule =
-  | { kind: 'permissions'; mode: 'allOf' | 'anyOf'; keys: string[] }
+  | ({ kind: 'permissions' } & PermissionRule)
   | { kind: 'admin-role'; role: string };
 
 export type PrimaryNavItem = {
@@ -49,11 +77,7 @@ export function isPrimaryNavVisible(user: NavUser, item: PrimaryNavItem): boolea
   if (rule.kind === 'admin-role') {
     return (user.roles ?? []).includes(rule.role);
   }
-  const perms = user.permissions ?? [];
-  const permitted = rule.mode === 'allOf'
-    ? rule.keys.every((key) => perms.includes(key))
-    : rule.keys.some((key) => perms.includes(key));
-  if (!permitted) return false;
+  if (!satisfiesPermissionRule(user.permissions, rule)) return false;
   const access = (user as NavUser & { screenAccess?: Array<{ screenId: string; usable: boolean }> }).screenAccess;
   // Ausência do contrato novo é fail-closed para telas protegidas; a exceção admin acima
   // continua explícita e não depende do catálogo concedível.

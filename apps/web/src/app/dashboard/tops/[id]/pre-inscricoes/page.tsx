@@ -11,6 +11,7 @@ import {
   rejectPreRegistration,
 } from '@/features/pre-registrations/api';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useCan } from '@/hooks/use-can';
 import { DataTable } from '@/components/ui/DataTable';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -19,7 +20,12 @@ import { ClipboardCheck, Check, X } from 'lucide-react';
 export default function TopPreRegistrationsPage() {
   const params = useParams<{ id: string }>();
   const topId = params.id;
-  const { loading: authLoading } = useRequireAuth();
+  const { user, loading: authLoading } = useRequireAuth();
+  const canDo = useCan(user);
+  // Aprovar e rejeitar são permissions DISTINTAS no backend: quem tria pode rejeitar sem
+  // poder efetivar a inscrição.
+  const canApprove = canDo('tops.preregistrations.approve');
+  const canReject = canDo('tops.preregistrations.reject');
 
   const [items, setItems] = useState<TopPreRegistration[]>([]);
   const [pendingCount, setPendingCount] = useState<number>(0);
@@ -126,22 +132,26 @@ export default function TopPreRegistrationsPage() {
             className: 'text-right',
             accessor: (i) => (
               <div className="flex items-center justify-end gap-2">
-                <button
-                  disabled={busyId === i.id}
-                  onClick={() => setApprovingId(i.id)}
-                  className="flex h-7 items-center gap-1 rounded bg-emerald-600 px-3 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-emerald-500 disabled:opacity-40"
-                >
-                  <Check className="h-3 w-3" />
-                  Aprovar
-                </button>
-                <button
-                  disabled={busyId === i.id}
-                  onClick={() => handleReject(i.id)}
-                  className="flex h-7 items-center gap-1 rounded border border-rose-900/30 bg-rose-950/20 px-3 text-[10px] font-bold uppercase tracking-wider text-rose-400 transition-colors hover:bg-rose-950/50 hover:text-rose-300 disabled:opacity-40"
-                >
-                  <X className="h-3 w-3" />
-                  Rejeitar
-                </button>
+                {canApprove && (
+                  <button
+                    disabled={busyId === i.id}
+                    onClick={() => setApprovingId(i.id)}
+                    className="flex h-7 items-center gap-1 rounded bg-emerald-600 px-3 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-emerald-500 disabled:opacity-40"
+                  >
+                    <Check className="h-3 w-3" />
+                    Aprovar
+                  </button>
+                )}
+                {canReject && (
+                  <button
+                    disabled={busyId === i.id}
+                    onClick={() => handleReject(i.id)}
+                    className="flex h-7 items-center gap-1 rounded border border-rose-900/30 bg-rose-950/20 px-3 text-[10px] font-bold uppercase tracking-wider text-rose-400 transition-colors hover:bg-rose-950/50 hover:text-rose-300 disabled:opacity-40"
+                  >
+                    <X className="h-3 w-3" />
+                    Rejeitar
+                  </button>
+                )}
               </div>
             ),
           },

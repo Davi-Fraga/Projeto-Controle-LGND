@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { formatPhone, LegendaryStatus } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/hooks/use-can';
 import { useDebounce } from '@/hooks/use-debounce';
 import {
   deactivateLegendario,
@@ -35,6 +36,11 @@ function LegendariosContent() {
   const churchIdParam = searchParams.get('churchId') ?? '';
   const churchNameParam = searchParams.get('churchName') ?? '';
   const { user, loading: authLoading } = useRequireAuth();
+  const canDo = useCan(user);
+  // `PATCH /legendarios/:id` é `@AnyPermissions('legendarios.update', 'organogram.person.edit')`:
+  // exigir só a primeira esconderia a ação de quem edita pelo Organograma.
+  const canEdit = canDo({ anyOf: ['legendarios.update', 'organogram.person.edit'] });
+  const canDeactivate = canDo('legendarios.delete');
   const [items, setItems] = useState<Legendary[]>([]);
   const [churches, setChurches] = useState<Church[]>([]);
   const [professions, setProfessions] = useState<Profession[]>([]);
@@ -330,9 +336,14 @@ function LegendariosContent() {
                       <div className="flex justify-end">
                         <ActionMenu
                           items={[
+                            // "Ver" não precisa de gate: estar nesta lista já exige `legendarios.read`.
                             { label: 'Ver', href: `/dashboard/legendarios/${item.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
-                            { label: 'Editar', href: `/dashboard/legendarios/${item.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> },
-                            { label: 'Inativar', onClick: () => setDeactivatingId(item.id), icon: <UserMinus className="h-3.5 w-3.5" />, destructive: true },
+                            ...(canEdit
+                              ? [{ label: 'Editar', href: `/dashboard/legendarios/${item.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }]
+                              : []),
+                            ...(canDeactivate
+                              ? [{ label: 'Inativar', onClick: () => setDeactivatingId(item.id), icon: <UserMinus className="h-3.5 w-3.5" />, destructive: true }]
+                              : []),
                           ]}
                         />
                       </div>

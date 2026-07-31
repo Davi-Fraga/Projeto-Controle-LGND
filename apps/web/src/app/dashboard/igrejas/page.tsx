@@ -7,6 +7,7 @@ import { formatPhone } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useDebounce } from '@/hooks/use-debounce';
 import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/hooks/use-can';
 import { deleteChurch, getChurchCities, getChurchesPage } from '@/features/churches/api';
 import type { Church } from '@/features/churches/api';
 import { ActionMenu } from '@/components/ui/ActionMenu';
@@ -18,6 +19,9 @@ const PER_PAGE = 10;
 
 export default function IgrejasPage() {
   const { user, loading: authLoading } = useRequireAuth();
+  const canDo = useCan(user);
+  const canEdit = canDo('churches.update');
+  const canRemove = canDo('churches.delete');
   const [churches, setChurches] = useState<Church[]>([]);
   const [cities, setCities] = useState<string[]>([]);
   const [page, setPage] = useState(1);
@@ -198,8 +202,8 @@ export default function IgrejasPage() {
                   <td className="px-6 py-4">{church.latitude != null && church.longitude != null ? <span className="inline-flex items-center gap-1 text-emerald-400"><MapPin className="h-3.5 w-3.5" /> Sim</span> : <span className="text-zinc-600">—</span>}</td>
                   <td className="px-6 py-4"><div className="flex justify-end"><ActionMenu items={[
                     { label: 'Ver', onClick: () => setViewingId(church.id), icon: <Eye className="h-3.5 w-3.5" /> },
-                    { label: 'Editar', href: `/dashboard/igrejas/${church.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> },
-                    { label: 'Excluir', onClick: () => setDeletingChurch(church), icon: <Trash2 className="h-3.5 w-3.5" />, destructive: true },
+                    ...(canEdit ? [{ label: 'Editar', href: `/dashboard/igrejas/${church.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
+                    ...(canRemove ? [{ label: 'Excluir', onClick: () => setDeletingChurch(church), icon: <Trash2 className="h-3.5 w-3.5" />, destructive: true }] : []),
                   ]} /></div></td>
                 </tr>
               ))}

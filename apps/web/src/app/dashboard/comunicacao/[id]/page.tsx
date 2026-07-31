@@ -8,12 +8,19 @@ import { cancelCommunication, confirmRecipient, getCommunication, getRecipients,
 import { CommunicationForm } from '@/features/communications/communication-form';
 import type { InternalMessage, MessageRecipient } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useCan } from '@/hooks/use-can';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 
 export default function CommunicationDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { loading: authLoading } = useRequireAuth();
+  const { user, loading: authLoading } = useRequireAuth();
+  const canDo = useCan(user);
+  // `communications.send` é permission PRÓPRIA no backend, distinta de
+  // `communications.update` — que cobre tanto editar quanto cancelar o envio.
+  const canSend = canDo('communications.send');
+  const canUpdate = canDo('communications.update');
+  const canUpdateRecipients = canDo('communications.recipients.update');
   const [message, setMessage] = useState<InternalMessage | null>(null);
   const [payload, setPayload] = useState<CommunicationPayload | null>(null);
   const [recipients, setRecipients] = useState<MessageRecipient[]>([]);
@@ -105,7 +112,7 @@ export default function CommunicationDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {draft && (
+          {draft && canSend && (
             <button
               className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500"
               onClick={() => action('send')}
@@ -113,7 +120,7 @@ export default function CommunicationDetailPage() {
               Enviar Mensagem
             </button>
           )}
-          {message.status !== InternalMessageStatus.CANCELLED && (
+          {message.status !== InternalMessageStatus.CANCELLED && canUpdate && (
             <button
               onClick={() => action('cancel')}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-rose-900/30 bg-rose-950/20 px-5 text-xs font-bold uppercase tracking-wider text-rose-400 transition-all hover:bg-rose-950/50 hover:text-rose-300"
@@ -152,7 +159,7 @@ export default function CommunicationDetailPage() {
         <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
           {draft ? 'Editar Rascunho do Comunicado' : 'Conteúdo do Comunicado'}
         </h2>
-        {draft ? (
+        {draft && canUpdate ? (
           <div className="space-y-4">
             <CommunicationForm value={payload} onChange={setPayload} onSubmit={save} />
             <div className="flex justify-end pt-2 border-t border-zinc-850">
@@ -201,18 +208,22 @@ export default function CommunicationDetailPage() {
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            className="flex h-7 items-center rounded bg-zinc-800 px-3 text-[10px] font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-700"
-                            onClick={() => updateRecipient(recipient.id, 'read')}
-                          >
-                            Marcar como lido
-                          </button>
-                          <button
-                            className="flex h-7 items-center rounded bg-zinc-800 px-3 text-[10px] font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-700"
-                            onClick={() => updateRecipient(recipient.id, 'confirm')}
-                          >
-                            Marcar como confirmado
-                          </button>
+                          {canUpdateRecipients && (
+                            <>
+                              <button
+                                className="flex h-7 items-center rounded bg-zinc-800 px-3 text-[10px] font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-700"
+                                onClick={() => updateRecipient(recipient.id, 'read')}
+                              >
+                                Marcar como lido
+                              </button>
+                              <button
+                                className="flex h-7 items-center rounded bg-zinc-800 px-3 text-[10px] font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-700"
+                                onClick={() => updateRecipient(recipient.id, 'confirm')}
+                              >
+                                Marcar como confirmado
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -7,6 +7,7 @@ import { getCommunications, deleteCommunication } from '@/features/communication
 import type { InternalMessage } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/hooks/use-can';
 import { useDebounce } from '@/hooks/use-debounce';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -15,6 +16,8 @@ import { Search, Eye, ShieldAlert, MessageSquare, Target } from 'lucide-react';
 
 export default function CommunicationsPage() {
   const { user, loading: authLoading } = useRequireAuth();
+  const canDo = useCan(user);
+  const canRemove = canDo('communications.delete');
   const [items, setItems] = useState<InternalMessage[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -181,7 +184,7 @@ export default function CommunicationsPage() {
                         <ActionMenu
                           items={[
                             { label: 'Ver', href: `/dashboard/comunicacao/${item.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
-                            { label: 'Excluir', onClick: () => setDeletingId(item.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true },
+                            ...(canRemove ? [{ label: 'Excluir', onClick: () => setDeletingId(item.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true }] : []),
                           ]}
                         />
                       </div>

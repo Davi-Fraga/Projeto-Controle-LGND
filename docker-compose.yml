@@ -8,7 +8,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-central}
       POSTGRES_DB: ${POSTGRES_DB:-central_da_manada}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Loopback: a senha default de dev é fraca (`central`) — não pode ficar
+      # escutando em todas as interfaces da máquina.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -29,7 +31,7 @@ services:
       - DB_NAME=${POSTGRES_DB:-central_da_manada}
       - LISTEN_PORT=6432
     ports:
-      - "6432:6432"
+      - "127.0.0.1:6432:6432"
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,7 +41,9 @@ services:
     container_name: central-da-manada-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      # Preso ao loopback: sem isto o Redis (sem senha, em dev) fica acessível a
+      # qualquer máquina da rede local. Produção usa senha — ver docker-compose.prod.yml.
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
 

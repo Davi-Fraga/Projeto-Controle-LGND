@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TeamMembershipStatus } from '@central-da-manada/shared';
+import { LEGENDARY_RELATION } from '../../common/access/legendary-relation.select';
 import { ReportsService } from './reports.service';
 
 const adminUser = { sub: 'admin-id', email: 'a@x.com', roles: ['COORDINATION_ADMIN'], permissions: [] } as any;
@@ -55,7 +56,7 @@ describe('ReportsService (CITY scope / PII)', () => {
     expect(accessPolicy.assertCityAllowed).toHaveBeenCalledWith(scope, 'Goiânia');
     expect(prisma.topParticipant.findMany).toHaveBeenCalledWith({
       where: { topEventId: 'top-1', deletedAt: null },
-      include: { legendary: true },
+      include: { legendary: LEGENDARY_RELATION },
       orderBy: { createdAt: 'asc' },
     });
   });

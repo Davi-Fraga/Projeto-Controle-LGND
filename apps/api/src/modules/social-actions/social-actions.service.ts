@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { LegendaryHistoryType, LegendaryStatus, normalizeName, SocialActionParticipantStatus, SocialActionStatus } from '@central-da-manada/shared';
+import { LEGENDARY_RELATION } from '../../common/access/legendary-relation.select';
 import { CandidateOptionsQueryDto } from '../../common/options/candidate-options-query.dto';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { PrismaService } from '../../database/prisma.service';
@@ -8,8 +9,8 @@ import { AuthenticatedUser } from '../../common/decorators/current-user.decorato
 import { AuditService } from '../audit/audit.service';
 import { AddSocialActionParticipantDto, CompleteSocialActionDto, CreateSocialActionDto, SocialActionsQueryDto, UpdateSocialActionDto, UpdateSocialActionParticipantDto, VolunteerSuggestionsQueryDto } from './dto/social-actions.dto';
 
-const includeAction = { responsible: true, _count: { select: { participants: { where: { deletedAt: null, status: { not: SocialActionParticipantStatus.CANCELLED } } } } } };
-const includeParticipant = { legendary: true };
+const includeAction = { responsible: LEGENDARY_RELATION, _count: { select: { participants: { where: { deletedAt: null, status: { not: SocialActionParticipantStatus.CANCELLED } } } } } };
+const includeParticipant = { legendary: LEGENDARY_RELATION };
 
 @Injectable()
 export class SocialActionsService {

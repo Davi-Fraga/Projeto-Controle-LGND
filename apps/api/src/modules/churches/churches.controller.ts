@@ -70,7 +70,7 @@ export class ChurchesController {
 
   @Delete(':id')
   @Permissions('churches.delete')
-  async remove(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
-    return { data: await this.churchesService.remove(id, user.sub) };
+  async remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.churchesService.remove(id, user) };
   }
 }

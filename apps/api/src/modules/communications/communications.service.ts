@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InternalMessageStatus, InternalMessageTargetType, LegendaryStatus, MessageRecipientStatus } from '@central-da-manada/shared';
+import { LEGENDARY_RELATION } from '../../common/access/legendary-relation.select';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -10,7 +11,7 @@ const includeMessage = {
   createdBy: { select: { id: true, name: true, email: true } },
   _count: { select: { recipients: true } },
 };
-const includeRecipient = { legendary: true, user: { select: { id: true, name: true, email: true } } };
+const includeRecipient = { legendary: LEGENDARY_RELATION, user: { select: { id: true, name: true, email: true } } };
 
 @Injectable()
 export class CommunicationsService {

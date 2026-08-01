@@ -29,6 +29,26 @@ const userInclude = {
   },
 };
 
+// Custo do bcrypt usado em toda gravação de senha (invites, password-reset, seed).
+const BCRYPT_COST = 12;
+
+/**
+ * Hash descartável, de senha aleatória, usado só para equalizar o tempo do login.
+ *
+ * Sem ele o `!user ||` curto-circuita o `bcrypt.compare` quando o e-mail não existe:
+ * e-mail cadastrado paga ~100ms de bcrypt, e-mail inexistente responde na hora. A
+ * mensagem de erro é genérica, mas a LATÊNCIA denuncia quais e-mails têm conta —
+ * é enumeração de usuário por canal lateral (CWE-208).
+ *
+ * Calculado uma vez, sob demanda: gerar no import atrasaria o boot e todo suite de
+ * teste que importa este arquivo.
+ */
+let dummyPasswordHash: Promise<string> | null = null;
+const getDummyPasswordHash = (): Promise<string> => {
+  dummyPasswordHash ??= bcrypt.hash(randomBytes(32).toString('hex'), BCRYPT_COST);
+  return dummyPasswordHash;
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -44,7 +64,13 @@ export class AuthService {
       include: userInclude,
     });
 
-    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    // Os dois caminhos de falha pagam um bcrypt.compare — ver `getDummyPasswordHash`.
+    if (!user) {
+      await bcrypt.compare(password, await getDummyPasswordHash());
+      throw new UnauthorizedException('Invalid credentials.');
+    }
+
+    if (!(await bcrypt.compare(password, user.passwordHash))) {
       throw new UnauthorizedException('Invalid credentials.');
     }
 

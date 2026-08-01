@@ -7,25 +7,32 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 import { LegendaryStatus } from '@central-da-manada/shared';
 
+// Limites de tamanho na mesma escala do `FormsSyncWebhookDto` (referência do projeto):
+// sem eles, um usuário autenticado pode gravar centenas de KB por campo de texto.
 export class CreateLegendarioDto {
   @IsString()
   @MinLength(3)
+  @MaxLength(200)
   fullName: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   lgndNumber?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   phone?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   city?: string;
 
   @Type(() => Boolean)
@@ -42,6 +49,7 @@ export class CreateLegendarioDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   churchRole?: string;
 
   /**
@@ -60,6 +68,7 @@ export class CreateLegendarioDto {
    */
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   professionText?: string;
 
   @IsEnum(LegendaryStatus)
@@ -71,6 +80,7 @@ export class CreateLegendarioDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   notes?: string;
 
   @IsOptional()
@@ -99,9 +109,11 @@ export class CreateLegendarioDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(300)
   firstTopExternalText?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   firstTopNotes?: string;
 }

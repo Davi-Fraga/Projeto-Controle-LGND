@@ -2,9 +2,11 @@ import type { NextConfig } from 'next';
 import path from 'path';
 
 const securityHeaders = [
-  // Anti-clickjacking (as páginas não devem ser embutidas em iframes)
+  // Anti-clickjacking (as páginas não devem ser embutidas em iframes).
+  // Mantido aqui porque vale para TODA resposta, inclusive as que o middleware não
+  // intercepta (assets estáticos). O `frame-ancestors` equivalente — e o resto da
+  // CSP, com nonce por requisição — fica em `src/middleware.ts`.
   { key: 'X-Frame-Options', value: 'DENY' },
-  { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
   // Anti MIME-sniffing
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },

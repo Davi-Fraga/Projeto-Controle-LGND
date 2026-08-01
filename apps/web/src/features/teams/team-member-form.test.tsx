@@ -1,13 +1,26 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TeamMemberForm } from './team-member-form';
-import { addTeamMember } from './api';
+import { addTeamMember, getTeamMemberCandidateOptions } from './api';
 
-vi.mock('./api', () => ({ addTeamMember: vi.fn().mockResolvedValue({}), updateTeamMember: vi.fn() }));
+vi.mock('./api', () => ({
+  addTeamMember: vi.fn().mockResolvedValue({}),
+  updateTeamMember: vi.fn(),
+  getTeamMemberCandidateOptions: vi.fn().mockResolvedValue({ data: [] }),
+}));
+
+/** Captura o `fetchOptions` recebido pelo combobox para provar QUAL endpoint o formulário usa. */
+let capturedFetchOptions: ((search: string, limit: number) => Promise<unknown>) | undefined;
+
 vi.mock('@/features/legendarios/legendario-combobox', () => ({
-  LegendarioCombobox: ({ onChange, noneLabel, disabled }: any) => (
-    <button type="button" aria-label={noneLabel} disabled={disabled} onClick={() => onChange('lgnd-1', 'Fulano')}>{noneLabel}</button>
-  ),
+  // A fonte contextual é injetada pelo formulário; no teste basta um passe-adiante.
+  contextualLegendarioSource: (fetcher: any) => fetcher,
+  LegendarioCombobox: ({ onChange, noneLabel, disabled, fetchOptions }: any) => {
+    capturedFetchOptions = fetchOptions;
+    return (
+      <button type="button" aria-label={noneLabel} disabled={disabled} onClick={() => onChange('lgnd-1', 'Fulano')}>{noneLabel}</button>
+    );
+  },
 }));
 
 describe('TeamMemberForm', () => {
@@ -26,5 +39,17 @@ describe('TeamMemberForm', () => {
     expect(screen.getByRole('button', { name: 'Selecione' })).toBeDisabled();
     expect(screen.getByRole('heading', { name: 'Editar vínculo com a equipe' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Salvar vínculo' })).toBeInTheDocument();
+  });
+
+  it('busca candidatos no endpoint contextual da equipe, não no diretório global', async () => {
+    capturedFetchOptions = undefined;
+    render(<TeamMemberForm teamId="tm1" onSaved={vi.fn()} onCancel={vi.fn()} />);
+
+    expect(capturedFetchOptions).toBeDefined();
+    await capturedFetchOptions!('ana', 20);
+
+    // É esta chamada que faz `teams.members.add` bastar: sem ela o seletor voltaria a
+    // depender de `legendarios.read` e devolveria 403 para quem só pode adicionar membro.
+    expect(getTeamMemberCandidateOptions).toHaveBeenCalledWith('tm1', 'ana', 20);
   });
 });

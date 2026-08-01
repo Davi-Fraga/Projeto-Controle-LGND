@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { cleanPhone, LegendaryHistoryType, TeamMembershipStatus, TeamStatus } from '@central-da-manada/shared';
+import { cleanPhone, LegendaryHistoryType, LegendaryStatus, normalizeName, TeamMembershipStatus, TeamStatus } from '@central-da-manada/shared';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
@@ -237,6 +237,60 @@ export class TeamsService {
     ]);
 
     return toPaginatedResponse(items, total, page, perPage);
+  }
+
+  /**
+   * Candidatos a MEMBRO da equipe (`GET /teams/:id/member-candidates/options`).
+   *
+   * Autorizado pela permission da OPERAÇÃO (`teams.members.add`) e pelo escopo da equipe-pai —
+   * não pela tela global de Legendários. Três invariantes que não podem se perder:
+   *
+   * 1. **Pai antes de candidatos:** equipe fora do escopo vira `404`, sem consultar ninguém.
+   * 2. **Nunca amplia:** aplica o MESMO recorte geográfico de `GET /legendarios/options`
+   *    (`buildLegendaryWhere`), então o resultado é subconjunto estrito do diretório global.
+   *    Escopo vazio continua fail-closed (`{ id: { in: [] } }`).
+   * 3. **Projeção mínima:** id, nome e número LGND. Sem e-mail, telefone, nascimento, endereço,
+   *    cidade, igreja ou objeto Prisma completo — conceder a ação não abre o perfil.
+   *
+   * Elegibilidade: ativos e ainda não vinculados como membro ATIVO desta equipe.
+   */
+  async memberCandidateOptions(teamId: string, query: OptionsQueryDto, user: AuthenticatedUser) {
+    await this.assertTeamVisible(teamId, user);
+    await this.findExistingTeam(teamId);
+
+    const where: any = {
+      deletedAt: null,
+      status: { not: LegendaryStatus.INACTIVE },
+      teamMemberships: {
+        none: { teamId, deletedAt: null, status: TeamMembershipStatus.ACTIVE },
+      },
+    };
+
+    // Busca canônica do domínio: `searchText` normalizado (acento/caixa insensível), que já
+    // agrega nome, cidade e número LGND. Não repetir `contains` campo a campo — é o mesmo
+    // caminho de `GET /legendarios`. Termo vazio não vira clause: `contains: ''` casaria todos.
+    const term = normalizeName(query.search ?? '');
+    if (term) where.searchText = { contains: term };
+
+    const scope = await this.accessPolicy.resolveScope(user);
+    if (!scope.isAdmin) {
+      where.AND = [...(where.AND ?? []), this.accessPolicy.buildLegendaryWhere(scope)];
+    }
+
+    const items = await this.prisma.legendary.findMany({
+      where,
+      select: { id: true, fullName: true, lgndNumber: true },
+      // `id` desempata homônimos: sem ele a paginação por limite não é determinística.
+      orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
+      take: query.limit ?? 20,
+    });
+
+    return items.map((item: any) => ({
+      id: item.id,
+      label: item.lgndNumber ? `${item.fullName} - LGND ${item.lgndNumber}` : item.fullName,
+      value: item.id,
+      metadata: { fullName: item.fullName, lgndNumber: item.lgndNumber },
+    }));
   }
 
   async addMember(teamId: string, dto: AddTeamMemberDto, user: AuthenticatedUser) {

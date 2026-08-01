@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from './Sidebar';
 
@@ -58,5 +58,33 @@ describe('Sidebar (navegação permission-driven via manifesto)', () => {
     mocks.getCurrentUser.mockResolvedValue(user(['dashboard.read'], ['COORDINATION_ADMIN']));
     render(<Sidebar />);
     expect(await screen.findByText('Usuários')).toBeInTheDocument();
+  });
+
+  it('expõe o estado do menu mobile e permite fechar pelo mesmo controle', async () => {
+    mocks.getCurrentUser.mockResolvedValue(user(['dashboard.read']));
+    render(<Sidebar />);
+
+    const openButton = screen.getByRole('button', { name: 'Abrir menu' });
+    expect(openButton).toHaveAttribute('aria-controls', 'primary-navigation');
+    expect(openButton).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(openButton);
+    const closeButton = screen.getByRole('button', { name: 'Fechar menu' });
+    expect(closeButton).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(closeButton);
+    expect(screen.getByRole('button', { name: 'Abrir menu' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('sidebar-backdrop')).toBeNull();
+  });
+
+  it('permite fechar o menu mobile pelo backdrop', async () => {
+    mocks.getCurrentUser.mockResolvedValue(user(['dashboard.read']));
+    render(<Sidebar />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menu' }));
+    fireEvent.click(screen.getByTestId('sidebar-backdrop'));
+
+    expect(screen.getByRole('button', { name: 'Abrir menu' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('sidebar-backdrop')).toBeNull();
   });
 });

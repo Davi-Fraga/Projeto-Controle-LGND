@@ -4,9 +4,11 @@ import { Network } from 'lucide-react';
 import { OrganogramaSection } from '@/features/org-chart/organograma-section';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { hasPermission } from '@/lib/permissions';
+import { useCanOpenRoute } from '@/hooks/use-can';
 
 export default function OrganogramaPage() {
   const { user, loading: authLoading } = useRequireAuth();
+  const canOpen = useCanOpenRoute(user);
 
   if (authLoading) return <main className="p-6 text-sm text-zinc-600">Carregando...</main>;
 
@@ -18,6 +20,10 @@ export default function OrganogramaPage() {
   const canReorder = hasPermission(user, 'organogram.group.reorder');
   // Mudança estrutural crítica — mover uma liderança (Fase 4).
   const canStructureChange = hasPermission(user, 'organogram.structure.change');
+  // Links CRUZADOS do painel da pessoa ("Ver ficha completa" / "Editar dados") levam para a aba
+  // Legendários. `organogram.person.edit` autoriza a EDIÇÃO pela API, não a abertura daquela
+  // tela — sem esta checagem o painel oferece uma rota barrada.
+  const canOpenLegendaryScreen = canOpen('/dashboard/legendarios');
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -31,7 +37,7 @@ export default function OrganogramaPage() {
         </p>
       </div>
 
-      <OrganogramaSection canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} />
+      <OrganogramaSection canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} canOpenLegendaryScreen={canOpenLegendaryScreen} />
     </div>
   );
 }

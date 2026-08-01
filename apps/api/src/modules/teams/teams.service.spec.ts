@@ -22,7 +22,7 @@ describe('TeamsService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
-      legendary: { findFirst: jest.fn() },
+      legendary: { findFirst: jest.fn(), findMany: jest.fn() },
       teamMembership: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -35,6 +35,7 @@ describe('TeamsService', () => {
     accessPolicy = {
       resolveScope: jest.fn().mockResolvedValue({ isAdmin: true, churchIds: [], teamIds: [], legendaryIds: [] }),
       buildTeamWhere: jest.fn(),
+      buildLegendaryWhere: jest.fn(),
       assertTeamAllowed: jest.fn(),
     };
     service = new TeamsService(prisma, audit, accessPolicy);
@@ -403,5 +404,121 @@ describe('TeamsService', () => {
     expect(audit.create).toHaveBeenCalledWith(
       expect.objectContaining({ actorUserId: coordinatorUser.sub, action: 'update' }),
     );
+  });
+
+  describe('memberCandidateOptions', () => {
+    /** Deixa a equipe-pai visível e existente, para isolar o que cada teste quer provar. */
+    function parentTeamIsReachable() {
+      prisma.team.findFirst.mockResolvedValueOnce({ id: 'team-1', name: 'Midia' });
+    }
+
+    it('valida o pai ANTES de consultar candidatos: equipe fora do escopo é 404', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false, churchIds: [], teamIds: ['other-team'], legendaryIds: [] });
+      accessPolicy.assertTeamAllowed.mockImplementationOnce(() => {
+        throw new ForbiddenException();
+      });
+
+      await expect(service.memberCandidateOptions('team-1', { limit: 20 } as any, coordinatorUser))
+        .rejects.toBeInstanceOf(NotFoundException);
+      // O ponto do teste: nenhuma pessoa foi consultada para um pai inacessível.
+      expect(prisma.legendary.findMany).not.toHaveBeenCalled();
+    });
+
+    it('equipe inexistente é 404 antes de consultar candidatos', async () => {
+      prisma.team.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.memberCandidateOptions('team-1', { limit: 20 } as any, adminUser))
+        .rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.legendary.findMany).not.toHaveBeenCalled();
+    });
+
+    it('exclui quem já é membro ATIVO da equipe e os inativos', async () => {
+      parentTeamIsReachable();
+      prisma.legendary.findMany.mockResolvedValueOnce([]);
+
+      await service.memberCandidateOptions('team-1', { limit: 20 } as any, adminUser);
+
+      const [call] = prisma.legendary.findMany.mock.calls;
+      expect(call[0].where.teamMemberships).toEqual({
+        none: { teamId: 'team-1', deletedAt: null, status: TeamMembershipStatus.ACTIVE },
+      });
+      expect(call[0].where.status).toEqual({ not: 'INACTIVE' });
+      expect(call[0].where.deletedAt).toBeNull();
+    });
+
+    it('não amplia o diretório: aplica o mesmo recorte geográfico do endpoint global', async () => {
+      const scopeFilter = { OR: [{ city: { in: ['Goiânia'] } }] };
+      parentTeamIsReachable();
+      // `mockResolvedValue`, não `Once`: `assertTeamVisible` já consome uma resolução de escopo
+      // antes de a busca de candidatos consumir a sua.
+      accessPolicy.resolveScope.mockResolvedValue({ isAdmin: false, churchIds: [], teamIds: ['team-1'], legendaryIds: [] });
+      accessPolicy.buildLegendaryWhere.mockReturnValueOnce(scopeFilter);
+      prisma.legendary.findMany.mockResolvedValueOnce([]);
+
+      await service.memberCandidateOptions('team-1', { limit: 20 } as any, coordinatorUser);
+
+      const [call] = prisma.legendary.findMany.mock.calls;
+      expect(call[0].where.AND).toContainEqual(scopeFilter);
+    });
+
+    it('admin não recebe filtro de escopo', async () => {
+      parentTeamIsReachable();
+      prisma.legendary.findMany.mockResolvedValueOnce([]);
+
+      await service.memberCandidateOptions('team-1', { limit: 20 } as any, adminUser);
+
+      const [call] = prisma.legendary.findMany.mock.calls;
+      expect(call[0].where.AND).toBeUndefined();
+      expect(accessPolicy.buildLegendaryWhere).not.toHaveBeenCalled();
+    });
+
+    it('projeta o mínimo: sem e-mail, telefone, nascimento, endereço, cidade ou igreja', async () => {
+      parentTeamIsReachable();
+      prisma.legendary.findMany.mockResolvedValueOnce([
+        { id: 'legendary-1', fullName: 'Ana Souza', lgndNumber: '1234' },
+      ]);
+
+      const result = await service.memberCandidateOptions('team-1', { limit: 20 } as any, adminUser);
+
+      const [call] = prisma.legendary.findMany.mock.calls;
+      expect(call[0].select).toEqual({ id: true, fullName: true, lgndNumber: true });
+      expect(result).toEqual([
+        {
+          id: 'legendary-1',
+          label: 'Ana Souza - LGND 1234',
+          value: 'legendary-1',
+          metadata: { fullName: 'Ana Souza', lgndNumber: '1234' },
+        },
+      ]);
+      // Guarda explícita: a serialização não pode ganhar PII por descuido.
+      const serialized = JSON.stringify(result);
+      ['email', 'phone', 'birthDate', 'address', 'city', 'church', 'notes'].forEach((field) => {
+        expect(serialized).not.toContain(field);
+      });
+    });
+
+    it('usa a busca canônica normalizada, com limite e ordenação determinística', async () => {
+      parentTeamIsReachable();
+      prisma.legendary.findMany.mockResolvedValueOnce([]);
+
+      await service.memberCandidateOptions('team-1', { search: '  Ângela  ', limit: 5 } as any, adminUser);
+
+      const [call] = prisma.legendary.findMany.mock.calls;
+      // `searchText` já agrega nome, cidade e LGND — mesmo caminho de `GET /legendarios`.
+      expect(call[0].where.searchText).toEqual({ contains: 'angela' });
+      expect(call[0].take).toBe(5);
+      // `id` desempata homônimos — sem ele o corte por limite não é estável.
+      expect(call[0].orderBy).toEqual([{ fullName: 'asc' }, { id: 'asc' }]);
+    });
+
+    it('busca vazia não vira clause (contains: "" casaria todo o diretório)', async () => {
+      parentTeamIsReachable();
+      prisma.legendary.findMany.mockResolvedValueOnce([]);
+
+      await service.memberCandidateOptions('team-1', { search: '   ', limit: 20 } as any, adminUser);
+
+      const [call] = prisma.legendary.findMany.mock.calls;
+      expect(call[0].where.searchText).toBeUndefined();
+    });
   });
 });

@@ -1,10 +1,10 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { TeamMembershipStatus } from '@central-da-manada/shared';
 import type { TeamMembership } from '@central-da-manada/shared';
-import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
-import { addTeamMember, updateTeamMember } from './api';
+import { contextualLegendarioSource, LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
+import { addTeamMember, getTeamMemberCandidateOptions, updateTeamMember } from './api';
 import type { TeamMemberPayload } from './types';
 
 const membershipStatusLabels: Record<TeamMembershipStatus, string> = {
@@ -21,6 +21,12 @@ type Props = {
 };
 
 export function TeamMemberForm({ teamId, member, onSaved, onCancel }: Props) {
+  // Busca contextual: quem tem `teams.members.add` encontra candidatos sem precisar da tela
+  // de Legendários. `useMemo` para a identidade não mudar a cada render do formulário.
+  const fetchCandidates = useMemo(
+    () => contextualLegendarioSource((search, limit) => getTeamMemberCandidateOptions(teamId, search, limit)),
+    [teamId],
+  );
   const [payload, setPayload] = useState<TeamMemberPayload>({
     legendaryId: member?.legendaryId ?? '',
     role: member?.role ?? '',
@@ -78,7 +84,15 @@ export function TeamMemberForm({ teamId, member, onSaved, onCancel }: Props) {
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-2">
           <span className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Legendário</span>
-          <LegendarioCombobox value={payload.legendaryId ?? ''} onChange={(value) => setField('legendaryId', value)} clearable={false} disabled={Boolean(member)} noneLabel="Selecione" />
+          <LegendarioCombobox
+            value={payload.legendaryId ?? ''}
+            onChange={(value) => setField('legendaryId', value)}
+            fetchOptions={fetchCandidates}
+            initialLabel={member?.legendary?.fullName}
+            clearable={false}
+            disabled={Boolean(member)}
+            noneLabel="Selecione"
+          />
         </label>
         <label className="space-y-2">
           <span className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Função</span>

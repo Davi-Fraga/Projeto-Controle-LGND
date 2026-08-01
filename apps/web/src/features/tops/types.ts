@@ -22,7 +22,6 @@ export type TopServantsResponse = PaginatedResponse<TopServant>;
 export type TopFamiliesResponse = { data: TopFamily[] };
 export type TopFamilyResponse = { data: TopFamily };
 export type TopFamilyMembersResponse = { data: TopFamilyMember[] };
-export type TeamsOptionsResponse = PaginatedResponse<Team>;
 export type OptionItem = { id: string; label: string; value: string; metadata?: Record<string, unknown> };
 export type OptionsResponse = { data: OptionItem[] };
 
@@ -46,9 +45,10 @@ export type TopPayload = {
 
 export type TopTeamPayload = {
   teamId?: string;
-  coordinatorLegendaryId?: string;
-  deputyCoordinatorLegendaryId?: string;
-  notes?: string;
+  // `null` limpa o vínculo na edição; string vazia NÃO passa no `@IsUUID()` da API.
+  coordinatorLegendaryId?: string | null;
+  deputyCoordinatorLegendaryId?: string | null;
+  notes?: string | null;
 };
 
 export type TopParticipantPayload = {

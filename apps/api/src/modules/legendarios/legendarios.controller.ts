@@ -10,6 +10,45 @@ import { CreateLegendaryHistoryNoteDto, LegendaryHistoryQueryDto } from './dto/l
 import { UpdateLegendarioDto } from './dto/update-legendario.dto';
 import { LegendariosService } from './legendarios.service';
 
+/**
+ * Permissions que autorizam a BUSCA mínima de Legendários (`GET /legendarios/options`).
+ *
+ * O inventário da change classificou os formulários de dirigente como caso B ("`@AnyPermissions`
+ * no endpoint existente"), cada um com seu próprio `anyOf`. Na implementação eles COLAPSAM numa
+ * lista só: todos consomem o mesmo `LegendarioCombobox` → o mesmo endpoint. Um endpoint tem um
+ * decorator; não há `anyOf` por consumidor. Portanto o efeito real é a UNIÃO abaixo — quem pode
+ * criar/editar o recurso-pai pode pesquisar o diretório mínimo de Legendários dentro do seu
+ * escopo (`AccessPolicyService`), com projeção sem PII.
+ *
+ * A varredura dos 13 consumidores do combobox achou 3 campos de dirigente que a tabela do
+ * inventário não listava, todos com a mesma natureza: `social-action-form` (Responsável),
+ * `church-form` (Legendário vinculado à igreja) e `communication-form` (destinatário quando o
+ * alvo é uma pessoa). Sem eles, a permission da operação continuaria valendo nada no seletor.
+ *
+ * Isso NÃO amplia acesso a detalhe: `GET /legendarios/:id` continua exigindo
+ * `legendarios.read` ou `teams.members.read`.
+ *
+ * Formulários de CANDIDATOS (adicionar membro/participante/servo) não entram aqui — eles têm
+ * endpoint contextual próprio sob o recurso-pai.
+ */
+export const LEGENDARY_OPTIONS_PERMISSIONS = [
+  'legendarios.read',
+  'tops.create',
+  'tops.update',
+  'tops.teams.add',
+  'tops.teams.update',
+  'tops.families.create',
+  'tops.families.update',
+  'teams.create',
+  'teams.update',
+  'social-actions.create',
+  'social-actions.update',
+  'churches.create',
+  'churches.update',
+  'communications.create',
+  'communications.update',
+] as const;
+
 @Controller('legendarios')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class LegendariosController {
@@ -22,7 +61,7 @@ export class LegendariosController {
   }
 
   @Get('options')
-  @Permissions('legendarios.read')
+  @AnyPermissions(...LEGENDARY_OPTIONS_PERMISSIONS)
   async options(@Query() query: OptionsQueryDto, @CurrentUser() user: AuthenticatedUser) {
     return { data: await this.legendariosService.options(query, user) };
   }

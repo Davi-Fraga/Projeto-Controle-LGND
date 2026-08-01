@@ -44,10 +44,18 @@ Respostas contextuais MUST ser paginadas ou limitadas, MUST exigir busca conform
 ### Requirement: Elegibilidade segue o contexto de negócio
 O conjunto candidato MUST ser limitado pela regra da operação e MUST excluir registros inativos, já vinculados ou incompatíveis quando aplicável.
 
+A geografia do recurso-pai MUST NOT restringir candidatos: participação em TOP e em Ação Social independe da cidade do Legendário. Cidade MAY ser oferecida como filtro explícito do cliente.
+
 #### Scenario: Candidato de TOP ou Ação Social
 - **GIVEN** um TOP ou Ação Social com cidade definida
-- **WHEN** candidatos Legendários são pesquisados
-- **THEN** a cidade do pai participa da elegibilidade
+- **WHEN** candidatos Legendários são pesquisados sem filtro explícito de cidade
+- **THEN** candidatos de qualquer cidade dentro do escopo do usuário são retornados
+- **AND** a cidade do pai não é aplicada como filtro
+
+#### Scenario: Filtro de cidade pedido pelo cliente
+- **GIVEN** um cliente que envia `city` na busca de candidatos
+- **WHEN** a consulta é executada
+- **THEN** somente candidatos dessa cidade são retornados
 
 #### Scenario: Membro de Equipe
 - **GIVEN** um usuário autorizado a adicionar membros à Equipe

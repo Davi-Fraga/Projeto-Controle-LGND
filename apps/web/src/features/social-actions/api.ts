@@ -1,5 +1,6 @@
 import { api } from '@/lib/api';
 import type { Legendary, PaginatedResponse, SocialAction, SocialActionParticipant, SocialActionParticipantStatus, SocialActionStatus } from '@central-da-manada/shared';
+import type { LegendarioOption } from '@/features/legendarios/api';
 
 export type VolunteerSuggestion = Pick<Legendary, 'id' | 'fullName' | 'lgndNumber' | 'city'> & {
   profession?: { id: string; name: string } | null;
@@ -54,3 +55,13 @@ export const addSocialActionParticipant = (id: string, payload: SocialActionPart
 export const updateSocialActionParticipant = (id: string, participantId: string, payload: SocialActionParticipantPayload) => api<{ data: SocialActionParticipant }>(`/social-actions/${id}/participants/${participantId}`, { method: 'PATCH', body: JSON.stringify(payload) });
 export const removeSocialActionParticipant = (id: string, participantId: string) => api<{ data: SocialActionParticipant }>(`/social-actions/${id}/participants/${participantId}`, { method: 'DELETE' });
 export const getVolunteerSuggestions = (filters: Record<string, unknown>) => api<PaginatedResponse<VolunteerSuggestion>>(`/social-actions/volunteers/suggestions${query(filters) ? `?${query(filters)}` : ''}`);
+
+/**
+ * Candidatos a participante DESTA ação. Autorizado por `social-actions.participants.add` — não
+ * exige `legendarios.read`. Exclui quem já participa; cidade não restringe.
+ * Não confundir com `getVolunteerSuggestions`, que é a curadoria por interesse/profissão.
+ */
+export const getSocialActionParticipantCandidateOptions = (id: string, search: string, limit = 20) => {
+  const qs = query({ search: search.trim() || undefined, limit });
+  return api<{ data: LegendarioOption[] }>(`/social-actions/${id}/participant-candidates/options${qs ? `?${qs}` : ''}`);
+};

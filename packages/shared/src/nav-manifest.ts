@@ -88,6 +88,33 @@ export function visiblePrimaryNav(user: NavUser): PrimaryNavItem[] {
   return PRIMARY_NAV.filter((item) => isPrimaryNavVisible(user, item));
 }
 
+/**
+ * Item do manifesto que governa uma rota do dashboard — inclusive sub-rotas
+ * (`/dashboard/legendarios/:id/editar` → aba Legendários).
+ *
+ * Casa pelo prefixo MAIS ESPECÍFICO: `/dashboard` é prefixo de todas as rotas, então a busca
+ * ingênua devolveria sempre a aba Painel. Exige limite de segmento para `/dashboard/tops` não
+ * casar uma hipotética `/dashboard/tops-arquivados`.
+ */
+export function navItemForHref(href: string): PrimaryNavItem | undefined {
+  const path = href.split('?')[0].split('#')[0].replace(/\/+$/, '') || '/dashboard';
+  return PRIMARY_NAV
+    .filter((item) => path === item.href || path.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0];
+}
+
+/**
+ * O usuário pode ABRIR a tela de destino de um link cruzado?
+ *
+ * Mesma regra da aba correspondente — permissions de entrada **e** escopo utilizável
+ * (`screenAccess`). Rota fora do manifesto é fail-closed: um link novo não se autoriza
+ * sozinho por esquecimento de declarar a tela.
+ */
+export function canOpenRoute(user: NavUser, href: string): boolean {
+  const item = navItemForHref(href);
+  return item ? isPrimaryNavVisible(user, item) : false;
+}
+
 // Destino inicial: Painel se permitido; senão a primeira OUTRA aba permitida na ordem do
 // manifesto; `null` quando nenhuma aba primária é permitida (estado "acesso não configurado").
 export function firstAllowedRoute(user: NavUser): string | null {

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { LegendaryHistoryType, SocialActionParticipantStatus, SocialActionStatus } from '@central-da-manada/shared';
+import { LegendaryHistoryType, LegendaryStatus, normalizeName, SocialActionParticipantStatus, SocialActionStatus } from '@central-da-manada/shared';
+import { CandidateOptionsQueryDto } from '../../common/options/candidate-options-query.dto';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
@@ -129,6 +130,58 @@ export class SocialActionsService {
     await this.audit.create({ actorUserId: user.sub, entityType: 'SocialActionParticipant', entityId: participantId, action: 'remove_participant', before, after });
     await this.createHistory(before.legendaryId, LegendaryHistoryType.SOCIAL_ACTION_LEFT, 'Saiu de ação social', 'Participação em ação social cancelada.', user.sub, id);
     return after;
+  }
+
+  /**
+   * Candidatos a PARTICIPANTE da ação social
+   * (`GET /social-actions/:id/participant-candidates/options`).
+   *
+   * Distinto de `suggestions`: aquele é a curadoria por interesse/profissão/expertise, exige
+   * `social-actions.participants.add` e devolve payload maior. Este é o seletor do formulário —
+   * projeção mínima e busca por termo.
+   *
+   * Invariantes: `findExisting` valida a ação e o escopo de cidade antes de tudo (`404` fora do
+   * escopo); o recorte de `buildLegendaryWhere` impede ampliar o diretório; quem já participa
+   * (status ativo) é excluído. `city` é filtro OPCIONAL do cliente — nunca herdado da ação,
+   * igual ao de `volunteers/suggestions`.
+   */
+  async participantCandidateOptions(id: string, query: CandidateOptionsQueryDto, user: AuthenticatedUser) {
+    const scope = await this.accessPolicy.resolveScope(user);
+    // Valida a ação e o escopo de cidade (404 fora do escopo) ANTES de consultar candidatos.
+    // O retorno não é usado: a cidade da ação deixou de restringir a busca.
+    await this.findExisting(id, user, scope);
+
+    const where: any = {
+      deletedAt: null,
+      status: { not: LegendaryStatus.INACTIVE },
+      socialActionParticipants: {
+        none: { socialActionId: id, deletedAt: null, status: { not: SocialActionParticipantStatus.CANCELLED } },
+      },
+    };
+
+    const term = normalizeName(query.search ?? '');
+    if (term) where.searchText = { contains: term };
+
+    // Filtro opcional do cliente, igual ao de `volunteers/suggestions` — nunca herdado da ação.
+    if (query.city) where.city = { contains: query.city, mode: 'insensitive' };
+
+    if (!scope.isAdmin) {
+      where.AND = [...(where.AND ?? []), this.accessPolicy.buildLegendaryWhere(scope)];
+    }
+
+    const items = await this.prisma.legendary.findMany({
+      where,
+      select: { id: true, fullName: true, lgndNumber: true, city: true },
+      orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
+      take: query.limit ?? 20,
+    });
+
+    return items.map((item: any) => ({
+      id: item.id,
+      label: item.lgndNumber ? `${item.fullName} - LGND ${item.lgndNumber}` : item.fullName,
+      value: item.id,
+      metadata: { fullName: item.fullName, lgndNumber: item.lgndNumber, city: item.city },
+    }));
   }
 
   async suggestions(query: VolunteerSuggestionsQueryDto, user: AuthenticatedUser) {

@@ -65,8 +65,12 @@ export function Sidebar() {
           </span>
         </div>
         <button
+          type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none"
+          aria-label={isOpen ? 'Fechar menu' : 'Abrir menu'}
+          aria-controls="primary-navigation"
+          aria-expanded={isOpen}
+          className="relative z-50 inline-flex h-10 w-10 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
         >
           {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
@@ -74,6 +78,7 @@ export function Sidebar() {
 
       {/* Sidebar Container */}
       <aside
+        id="primary-navigation"
         className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-zinc-800 bg-[#0B0B0B] transition-transform duration-300 md:static md:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
@@ -136,6 +141,8 @@ export function Sidebar() {
       {/* Overlay for Mobile */}
       {isOpen && (
         <div
+          data-testid="sidebar-backdrop"
+          aria-hidden="true"
           onClick={() => setIsOpen(false)}
           className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm md:hidden"
         />

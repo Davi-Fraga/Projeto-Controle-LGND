@@ -8,6 +8,7 @@ import { getDashboardSummary, type DashboardSummary } from '@/features/dashboard
 import type { CurrentUser } from '@/features/auth/types';
 import { hasPermission } from '@/lib/permissions';
 import { firstAllowedRoute } from '@central-da-manada/shared';
+import { useCanOpenRoute } from '@/hooks/use-can';
 import { DashboardCard } from '@/components/ui/DashboardCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
@@ -32,6 +33,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const canOpen = useCanOpenRoute(user);
 
   useEffect(() => {
     getCurrentUser()
@@ -128,9 +130,10 @@ export default function DashboardPage() {
           Ações Rápidas
         </h2>
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-          {/* Cada ação rápida só aparece com a permissão de criar correspondente
-              (usabilidade; o backend já barra). Gating alinhado às telas de lista. */}
-          {hasPermission(user, 'legendarios.create') && (
+          {/* Cada ação rápida é um link CRUZADO: precisa da permission de criar E de o usuário
+              conseguir ABRIR a tela de destino (regra da aba, escopo incluso). Só a permission
+              de criar deixaria passar link para tela sem escopo utilizável. */}
+          {canOpen('/dashboard/legendarios/novo') && hasPermission(user, 'legendarios.create') && (
             <Link
               href="/dashboard/legendarios/novo"
               className="flex items-center justify-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500"
@@ -139,7 +142,7 @@ export default function DashboardPage() {
               Legendário
             </Link>
           )}
-          {hasPermission(user, 'tops.create') && (
+          {canOpen('/dashboard/tops/novo') && hasPermission(user, 'tops.create') && (
             <Link
               href="/dashboard/tops/novo"
               className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
@@ -148,7 +151,7 @@ export default function DashboardPage() {
               Novo TOP
             </Link>
           )}
-          {hasPermission(user, 'teams.create') && (
+          {canOpen('/dashboard/equipes/nova') && hasPermission(user, 'teams.create') && (
             <Link
               href="/dashboard/equipes/nova"
               className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
@@ -157,7 +160,7 @@ export default function DashboardPage() {
               Nova Equipe
             </Link>
           )}
-          {hasPermission(user, 'communications.create') && (
+          {canOpen('/dashboard/comunicacao/novo') && hasPermission(user, 'communications.create') && (
             <Link
               href="/dashboard/comunicacao/novo"
               className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
@@ -166,7 +169,8 @@ export default function DashboardPage() {
               Comunicação
             </Link>
           )}
-          {hasPermission(user, 'reports.read') && (
+          {/* Relatórios não tem ação de criar: a regra da aba já é a condição inteira. */}
+          {canOpen('/dashboard/relatorios') && (
             <Link
               href="/dashboard/relatorios"
               className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-zinc-100"
@@ -209,7 +213,7 @@ export default function DashboardPage() {
                 </p>
               )}
             </div>
-            {summary.highlightedTop && (
+            {summary.highlightedTop && canOpen(`/dashboard/tops/${summary.highlightedTop.id}`) && (
               <Link
                 href={`/dashboard/tops/${summary.highlightedTop.id}`}
                 className="inline-flex rounded-lg border border-zinc-800 bg-zinc-900/80 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-all text-center"

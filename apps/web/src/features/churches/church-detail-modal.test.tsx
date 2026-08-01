@@ -35,7 +35,7 @@ describe('ChurchDetailModal — líder espiritual', () => {
       },
     });
 
-    render(<ChurchDetailModal churchId="church-1" onClose={vi.fn()} />);
+    render(<ChurchDetailModal churchId="church-1" canOpenLegendaryScreen onClose={vi.fn()} />);
 
     const link = await screen.findByRole('link', { name: 'Legendário Atualizado' });
     expect(link).toHaveAttribute('href', '/dashboard/legendarios/legendary-1');
@@ -60,8 +60,32 @@ describe('ChurchDetailModal — líder espiritual', () => {
       },
     });
 
-    render(<ChurchDetailModal churchId="church-1" onClose={vi.fn()} />);
+    render(<ChurchDetailModal churchId="church-1" canOpenLegendaryScreen onClose={vi.fn()} />);
 
     expect(await screen.findByText('Pastor em texto livre')).toBeInTheDocument();
+  });
+  it('sem acesso à tela de Legendários, mostra o nome do líder sem link', async () => {
+    mocks.getChurch.mockResolvedValue({
+      data: {
+        id: 'church-1',
+        name: 'Igreja Central',
+        city: null,
+        spiritualLeaderName: 'Nome livre preservado',
+        spiritualLeaderEffectiveName: 'Legendário Atualizado',
+        spiritualLeaderLegendaryId: 'legendary-1',
+        spiritualLeaderLegendary: { id: 'legendary-1', fullName: 'Legendário Atualizado' },
+        spiritualLeaderPhone: null,
+        latitude: null,
+        longitude: null,
+        notes: null,
+        legendarios: [],
+      },
+    });
+
+    render(<ChurchDetailModal churchId="church-1" canOpenLegendaryScreen={false} onClose={vi.fn()} />);
+
+    // A informação continua; o que some é a navegação para uma tela barrada.
+    expect(await screen.findByText('Legendário Atualizado')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Legendário Atualizado' })).not.toBeInTheDocument();
   });
 });

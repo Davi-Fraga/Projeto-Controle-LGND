@@ -12,7 +12,7 @@ const VIEWS: { value: OrgChartView; label: string }[] = [
   { value: 'cities', label: 'Cidades' },
 ];
 
-export function OrgChartView({ topId, canEditPerson, canReorder, canStructureChange }: { topId: string; canEditPerson: boolean; canReorder: boolean; canStructureChange: boolean }) {
+export function OrgChartView({ topId, canEditPerson, canReorder, canStructureChange, canOpenLegendaryScreen }: { topId: string; canEditPerson: boolean; canReorder: boolean; canStructureChange: boolean; canOpenLegendaryScreen: boolean }) {
   const [view, setView] = useState<OrgChartView>('teams');
   const [root, setRoot] = useState<OrgChartNode | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,7 +69,7 @@ export function OrgChartView({ topId, canEditPerson, canReorder, canStructureCha
         ) : root ? (
           // Move (Fase 3) não se aplica à visão de TOP (não é hierarquia de cidade);
           // onDataChanged é no-op aqui.
-          <OrgChartTree root={root} canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} onDataChanged={() => {}} />
+          <OrgChartTree root={root} canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} canOpenLegendaryScreen={canOpenLegendaryScreen} onDataChanged={() => {}} />
         ) : null}
       </div>
     </div>

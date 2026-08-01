@@ -15,6 +15,8 @@ type Props = {
     updateMembership: boolean;
     removeMembership: boolean;
     updateLegendary: boolean;
+    /** O usuário consegue ABRIR a tela de Legendários (destino dos dois links cruzados)? */
+    openLegendaryScreen: boolean;
   };
 };
 
@@ -98,13 +100,17 @@ export function TeamMembersTable({ teamId, capabilities }: Props) {
                 members.map((member) => (
                   <tr key={member.id} className="hover:bg-zinc-900/20 transition-colors">
                     <td className="px-6 py-4 font-bold text-white">
-                      {member.legendary ? (
+                      {member.legendary && capabilities.openLegendaryScreen ? (
                         <Link
                           href={`/dashboard/legendarios/${member.legendaryId}?fromTeamId=${teamId}`}
                           className="transition-colors hover:text-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
                         >
                           {member.legendary.fullName}
                         </Link>
+                      ) : member.legendary ? (
+                        // Sem acesso à tela de Legendários o nome continua visível (ele já veio
+                        // na lista de membros) — o que some é a navegação para uma rota barrada.
+                        member.legendary.fullName
                       ) : '-'}
                     </td>
                     <td className="px-6 py-4 text-zinc-300 font-medium">
@@ -115,7 +121,7 @@ export function TeamMembersTable({ teamId, capabilities }: Props) {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        {capabilities.updateLegendary && member.legendary ? (
+                        {capabilities.updateLegendary && capabilities.openLegendaryScreen && member.legendary ? (
                           <Link
                             href={`/dashboard/legendarios/${member.legendaryId}/editar?fromTeamId=${encodeURIComponent(teamId)}`}
                             className="flex h-8 items-center gap-1.5 rounded-lg bg-orange-600 px-3 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500"

@@ -1,5 +1,6 @@
 import { api } from '@/lib/api';
 import type { Legendary, LegendaryFilters, PaginatedResponse } from '@central-da-manada/shared';
+import type { LegendarioOption } from '@/features/legendarios/api';
 import type {
   TeamFilters,
   TeamMemberPayload,
@@ -36,6 +37,15 @@ export type TeamOption = {
 export function getTeamOptions(search: string, limit = 20) {
   const query = buildQuery({ search: search.trim() || undefined, limit });
   return api<{ data: TeamOption[] }>(`/teams/options?${query}`);
+}
+
+/**
+ * Candidatos a membro DESTA equipe. Autorizado por `teams.members.add` — não exige
+ * `legendarios.read`. Exclui quem já é membro ativo e devolve só id/nome/LGND.
+ */
+export function getTeamMemberCandidateOptions(teamId: string, search: string, limit = 20) {
+  const query = buildQuery({ search: search.trim() || undefined, limit });
+  return api<{ data: LegendarioOption[] }>(`/teams/${teamId}/member-candidates/options${query ? `?${query}` : ''}`);
 }
 
 export function createTeam(payload: TeamPayload) {

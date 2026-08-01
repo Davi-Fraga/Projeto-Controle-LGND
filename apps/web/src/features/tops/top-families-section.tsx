@@ -9,9 +9,9 @@ import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
 import { ParticipantCombobox } from './participant-combobox';
 import { ApiError } from '@/lib/api';
 
-type FamilyForm = { name: string; representativeLegendaryId: string; representativeRole: string; deputyRepresentativeLegendaryId: string; deputyRepresentativeRole: string; notes: string; needsReview: boolean };
+type FamilyForm = { name: string; representativeLegendaryId: string; representativeLabel: string; representativeRole: string; deputyRepresentativeLegendaryId: string; deputyRepresentativeLabel: string; deputyRepresentativeRole: string; notes: string; needsReview: boolean };
 
-const emptyForm: FamilyForm = { name: '', representativeLegendaryId: '', representativeRole: '', deputyRepresentativeLegendaryId: '', deputyRepresentativeRole: '', notes: '', needsReview: false };
+const emptyForm: FamilyForm = { name: '', representativeLegendaryId: '', representativeLabel: '', representativeRole: '', deputyRepresentativeLegendaryId: '', deputyRepresentativeLabel: '', deputyRepresentativeRole: '', notes: '', needsReview: false };
 
 export type FamilyPermissions = {
   create: boolean;
@@ -116,7 +116,9 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
 
   function editFamily(family: TopFamily) {
     setEditingId(family.id);
-    setForm({ name: family.name, representativeLegendaryId: family.representativeLegendaryId ?? '', representativeRole: family.representativeRole ?? '', deputyRepresentativeLegendaryId: family.deputyRepresentativeLegendaryId ?? '', deputyRepresentativeRole: family.deputyRepresentativeRole ?? '', notes: family.notes ?? '', needsReview: family.needsReview });
+    // Os rótulos vêm do payload da Família (que já inclui os dirigentes): sem eles o combobox
+    // iria buscar `GET /legendarios/:id`, rota que exige `legendarios.read`.
+    setForm({ name: family.name, representativeLegendaryId: family.representativeLegendaryId ?? '', representativeLabel: family.representative?.fullName ?? '', representativeRole: family.representativeRole ?? '', deputyRepresentativeLegendaryId: family.deputyRepresentativeLegendaryId ?? '', deputyRepresentativeLabel: family.deputyRepresentative?.fullName ?? '', deputyRepresentativeRole: family.deputyRepresentativeRole ?? '', notes: family.notes ?? '', needsReview: family.needsReview });
   }
 
   async function deactivateFamily(familyId: string) {
@@ -171,7 +173,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
         </div>
         <div className="md:col-span-1 block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Representante</span>
-          <LegendarioCombobox value={form.representativeLegendaryId} onChange={(value) => setForm({ ...form, representativeLegendaryId: value })} noneLabel="Não informado" />
+          <LegendarioCombobox value={form.representativeLegendaryId} onChange={(value) => setForm({ ...form, representativeLegendaryId: value })} initialLabel={form.representativeLabel || undefined} noneLabel="Não informado" />
         </div>
         <div className="md:col-span-1 block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Função rep.</span>
@@ -179,7 +181,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
         </div>
         <div className="md:col-span-1 block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Sub-representante</span>
-          <LegendarioCombobox value={form.deputyRepresentativeLegendaryId} onChange={(value) => setForm({ ...form, deputyRepresentativeLegendaryId: value })} noneLabel="Não informado" />
+          <LegendarioCombobox value={form.deputyRepresentativeLegendaryId} onChange={(value) => setForm({ ...form, deputyRepresentativeLegendaryId: value })} initialLabel={form.deputyRepresentativeLabel || undefined} noneLabel="Não informado" />
         </div>
         <div className="md:col-span-1 block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Função sub</span>

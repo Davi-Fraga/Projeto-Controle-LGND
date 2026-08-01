@@ -18,7 +18,7 @@ describe('TopsService', () => {
     prisma = {
       $transaction: jest.fn(),
       topEvent: { findMany: jest.fn(), count: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
-      legendary: { findFirst: jest.fn() },
+      legendary: { findFirst: jest.fn(), findMany: jest.fn() },
       team: { findFirst: jest.fn() },
       topTeam: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
       topFamily: { findFirst: jest.fn(), update: jest.fn() },
@@ -27,7 +27,7 @@ describe('TopsService', () => {
       topServant: { findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn(), create: jest.fn(), update: jest.fn() },
     };
     audit = { create: jest.fn() };
-    accessPolicy = { resolveScope: jest.fn().mockResolvedValue({ isAdmin: true }), buildTopWhere: jest.fn().mockReturnValue({}) } as any;
+    accessPolicy = { resolveScope: jest.fn().mockResolvedValue({ isAdmin: true }), buildTopWhere: jest.fn().mockReturnValue({}), buildLegendaryWhere: jest.fn() } as any;
     service = new TopsService(prisma, audit, accessPolicy);
   });
 
@@ -235,6 +235,115 @@ describe('TopsService', () => {
       await expect(
         service.addFamilyMember('top-1', 'fam-1', { topParticipantId: 'pp-x' } as any),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('candidatos a participante e servo do TOP', () => {
+    const adminUser = { sub: 'admin-1', email: 'a@x.com', roles: ['COORDINATION_ADMIN'], permissions: [] } as any;
+
+    /** O TOP existe e tem cidade — o `TopScopeGuard` já cuidou do escopo antes do service. */
+    function parentTopIsReachable(city: string | null = 'Goiânia') {
+      prisma.topEvent.findFirst.mockResolvedValueOnce({ id: 'top-1', name: 'TOP 10', city });
+    }
+
+    it('TOP inexistente é 404 antes de consultar candidatos', async () => {
+      prisma.topEvent.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.participantCandidateOptions('top-1', { limit: 20 } as any, adminUser)).rejects.toThrow();
+      expect(prisma.legendary.findMany).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['participantCandidateOptions'],
+      ['servantCandidateOptions'],
+    ])('%s exclui participantes E servos ativos (os papéis são mutuamente exclusivos)', async (method) => {
+      parentTopIsReachable();
+      prisma.legendary.findMany.mockResolvedValueOnce([]);
+
+      await (service as any)[method]('top-1', { limit: 20 }, adminUser);
+
+      const [call] = prisma.legendary.findMany.mock.calls;
+      expect(call[0].where.topParticipants).toEqual({
+        none: { topEventId: 'top-1', deletedAt: null, status: { not: TopParticipantStatus.CANCELLED } },
+      });
+      expect(call[0].where.topServants).toEqual({
+        none: { topEventId: 'top-1', deletedAt: null, status: { not: TopServantStatus.CANCELLED } },
+      });
+      expect(call[0].where.status).toEqual({ not: 'INACTIVE' });
+    });
+
+    // Participação em TOP independe da cidade do Legendário: qualquer um pode ir a qualquer TOP,
+    // de qualquer rota. Herdar a cidade do TOP escondia 99 de 242 candidatos na homologação.
+    it('NÃO herda a cidade do TOP como filtro', async () => {
+      parentTopIsReachable('Goiânia');
+      prisma.legendary.findMany.mockResolvedValueOnce([]);
+
+      await service.participantCandidateOptions('top-1', { limit: 20 } as any, adminUser);
+
+      const [call] = prisma.legendary.findMany.mock.calls;
+      expect(call[0].where.city).toBeUndefined();
+    });
+
+    it('filtra por cidade só quando o cliente pede', async () => {
+      parentTopIsReachable('Goiânia');
+      prisma.legendary.findMany.mockResolvedValueOnce([]);
+
+      await service.participantCandidateOptions('top-1', { city: 'Anápolis', limit: 20 } as any, adminUser);
+
+      const [call] = prisma.legendary.findMany.mock.calls;
+      expect(call[0].where.city).toEqual({ contains: 'Anápolis', mode: 'insensitive' });
+    });
+
+    it('não amplia o diretório: aplica o mesmo recorte geográfico do endpoint global', async () => {
+      const scopeFilter = { OR: [{ churchId: { in: ['church-1'] } }] };
+      parentTopIsReachable();
+      accessPolicy.resolveScope.mockResolvedValue({ isAdmin: false, topIds: ['top-1'] });
+      accessPolicy.buildLegendaryWhere.mockReturnValueOnce(scopeFilter);
+      prisma.legendary.findMany.mockResolvedValueOnce([]);
+
+      await service.participantCandidateOptions('top-1', { limit: 20 } as any, adminUser);
+
+      const [call] = prisma.legendary.findMany.mock.calls;
+      expect(call[0].where.AND).toContainEqual(scopeFilter);
+    });
+
+    it('projeta o mínimo e ordena de forma determinística', async () => {
+      parentTopIsReachable();
+      prisma.legendary.findMany.mockResolvedValueOnce([
+        { id: 'legendary-1', fullName: 'Ana Souza', lgndNumber: '1234', city: 'Goiânia' },
+      ]);
+
+      const result = await service.participantCandidateOptions('top-1', { limit: 20 } as any, adminUser);
+
+      const [call] = prisma.legendary.findMany.mock.calls;
+      expect(call[0].select).toEqual({ id: true, fullName: true, lgndNumber: true, city: true });
+      expect(call[0].orderBy).toEqual([{ fullName: 'asc' }, { id: 'asc' }]);
+      expect(result).toEqual([
+        {
+          id: 'legendary-1',
+          label: 'Ana Souza - LGND 1234',
+          value: 'legendary-1',
+          metadata: { fullName: 'Ana Souza', lgndNumber: '1234', city: 'Goiânia' },
+        },
+      ]);
+      // Cidade É a dimensão de elegibilidade aqui, então entra. PII de contato, nunca.
+      const serialized = JSON.stringify(result);
+      ['email', 'phone', 'birthDate', 'address', 'notes'].forEach((field) => {
+        expect(serialized).not.toContain(field);
+      });
+    });
+
+    it('busca pelo `searchText` normalizado, e termo vazio não vira clause', async () => {
+      parentTopIsReachable();
+      prisma.legendary.findMany.mockResolvedValueOnce([]);
+      await service.participantCandidateOptions('top-1', { search: '  Ângela ', limit: 20 } as any, adminUser);
+      expect(prisma.legendary.findMany.mock.calls[0][0].where.searchText).toEqual({ contains: 'angela' });
+
+      prisma.legendary.findMany.mockReset();
+      parentTopIsReachable();
+      prisma.legendary.findMany.mockResolvedValueOnce([]);
+      await service.participantCandidateOptions('top-1', { search: '   ', limit: 20 } as any, adminUser);
+      expect(prisma.legendary.findMany.mock.calls[0][0].where.searchText).toBeUndefined();
     });
   });
 });

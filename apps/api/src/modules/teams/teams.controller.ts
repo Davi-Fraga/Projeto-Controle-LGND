@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Permissions } from '../../common/decorators/permissions.decorator';
+import { AnyPermissions, Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -11,6 +11,23 @@ import { TeamQueryDto } from './dto/team-query.dto';
 import { UpdateTeamMemberDto } from './dto/update-team-member.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { TeamsService } from './teams.service';
+
+/**
+ * Permissions que autorizam a BUSCA mínima de Equipes (`GET /teams/options`).
+ *
+ * Caso B do inventário: vincular uma Equipe a um TOP precisa identificar a Equipe, mas não
+ * exige a tela global de Equipes. A projeção do endpoint já é mínima (id, nome, status) e
+ * escopada pelo `AccessPolicyService`. Só a LISTA (`GET /teams`) e o DETALHE (`GET /teams/:id`)
+ * continuam exigindo `teams.read`.
+ */
+export const TEAM_OPTIONS_PERMISSIONS = [
+  'teams.read',
+  'tops.teams.add',
+  'tops.teams.update',
+  // `communication-form` escolhe uma Equipe como destinatário da mensagem.
+  'communications.create',
+  'communications.update',
+] as const;
 
 @Controller('teams')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -24,7 +41,7 @@ export class TeamsController {
   }
 
   @Get('options')
-  @Permissions('teams.read')
+  @AnyPermissions(...TEAM_OPTIONS_PERMISSIONS)
   async options(@Query() query: OptionsQueryDto, @CurrentUser() user: AuthenticatedUser) {
     return { data: await this.teamsService.options(query, user) };
   }
@@ -69,6 +86,12 @@ export class TeamsController {
   @Permissions('teams.members.read')
   findMembers(@Param('id') id: string, @Query() query: TeamMembersQueryDto, @CurrentUser() user: AuthenticatedUser) {
     return this.teamsService.findMembers(id, query, user);
+  }
+
+  @Get(':id/member-candidates/options')
+  @Permissions('teams.members.add')
+  async memberCandidateOptions(@Param('id') id: string, @Query() query: OptionsQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.teamsService.memberCandidateOptions(id, query, user) };
   }
 
   @Post(':id/members')

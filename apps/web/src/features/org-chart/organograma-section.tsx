@@ -18,7 +18,7 @@ const SCOPES: { value: Scope; label: string }[] = [
   { value: 'tops', label: 'TOPs' },
 ];
 
-export function OrganogramaSection({ canEditPerson, canReorder, canStructureChange }: { canEditPerson: boolean; canReorder: boolean; canStructureChange: boolean }) {
+export function OrganogramaSection({ canEditPerson, canReorder, canStructureChange, canOpenLegendaryScreen }: { canEditPerson: boolean; canReorder: boolean; canStructureChange: boolean; canOpenLegendaryScreen: boolean }) {
   const [scope, setScope] = useState<Scope>('equipes');
   // Incrementa para forçar refetch da árvore após uma movimentação estrutural (Fase 3).
   const [reloadKey, setReloadKey] = useState(0);
@@ -198,7 +198,7 @@ export function OrganogramaSection({ canEditPerson, canReorder, canStructureChan
         needsTop ? (
           <Placeholder text="Selecione um TOP para ver o organograma." />
         ) : (
-          <TopOrgChartView topId={topId} canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} />
+          <TopOrgChartView topId={topId} canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} canOpenLegendaryScreen={canOpenLegendaryScreen} />
         )
       ) : (
         <div className="h-[74vh] w-full overflow-hidden rounded-xl border border-[#1e1e24] bg-[#0b0b0d]">
@@ -216,7 +216,7 @@ export function OrganogramaSection({ canEditPerson, canReorder, canStructureChan
               <p className="text-sm">Ainda não há dados para esta visão.</p>
             </div>
           ) : root ? (
-            <OrgChartTree root={root} canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} onDataChanged={() => setReloadKey((k) => k + 1)} />
+            <OrgChartTree root={root} canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} canOpenLegendaryScreen={canOpenLegendaryScreen} onDataChanged={() => setReloadKey((k) => k + 1)} />
           ) : null}
         </div>
       )}

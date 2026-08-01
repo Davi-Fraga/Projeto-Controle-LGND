@@ -1,9 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { LegendaryHistoryType, TopEventStatus, TopFamilyMemberStatus, TopParticipantStatus, TopServantStatus, normalizeName, teamDisplayName } from '@central-da-manada/shared';
+import { LegendaryHistoryType, LegendaryStatus, TopEventStatus, TopFamilyMemberStatus, TopParticipantStatus, TopServantStatus, normalizeName, teamDisplayName } from '@central-da-manada/shared';
 import type { OrgChartNode, OrgChartView } from '@central-da-manada/shared';
 import { annotateCounts, normalizeCityKey, orgNode } from '../../common/org-chart/org-chart.util';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
+import { CandidateOptionsQueryDto } from '../../common/options/candidate-options-query.dto';
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
@@ -447,6 +448,72 @@ export class TopsService {
       this.prisma.topParticipant.count({ where }),
     ]);
     return toPaginatedResponse(items, total, page, perPage);
+  }
+
+  /**
+   * Candidatos a PARTICIPANTE e a SERVO do TOP.
+   *
+   * Não confundir com `participantOptions`, que lista quem JÁ é participante (para montar
+   * Famílias). Aqui o universo é o diretório de Legendários, para quem ainda vai ser vinculado.
+   *
+   * Invariantes (iguais às de `memberCandidateOptions` em Equipes):
+   * 1. Pai antes de candidatos — o `TopScopeGuard` já converte TOP fora de escopo em `404`, e
+   *    `findExistingTop` cobre o TOP inexistente. Nada é consultado antes disso.
+   * 2. Nunca amplia — aplica o mesmo `buildLegendaryWhere` do endpoint global.
+   * 3. Projeção mínima — id, nome, LGND e cidade. A cidade é desempate visual entre homônimos,
+   *    NÃO filtro.
+   *
+   * Elegibilidade espelha `addParticipant`/`addServant`: ambos excluem quem já é participante
+   * **ou** servo ativo do mesmo TOP, porque os dois papéis são mutuamente exclusivos.
+   *
+   * **Cidade NÃO restringe** (regra confirmada pelo Davi em 31/07/2026): qualquer Legendário
+   * pode ir a qualquer TOP, de qualquer rota. Uma versão anterior herdava a cidade do TOP como
+   * filtro padrão — na base de homologação isso escondia 99 dos 242 candidatos, sem escape pela
+   * interface, e ainda transformava a busca por nome de quem morava fora em resultado vazio.
+   */
+  private async topCandidateOptions(topEventId: string, query: CandidateOptionsQueryDto, user: AuthenticatedUser) {
+    await this.findExistingTop(topEventId);
+
+    const where: any = {
+      deletedAt: null,
+      status: { not: LegendaryStatus.INACTIVE },
+      topParticipants: { none: { topEventId, deletedAt: null, status: { not: TopParticipantStatus.CANCELLED } } },
+      topServants: { none: { topEventId, deletedAt: null, status: { not: TopServantStatus.CANCELLED } } },
+    };
+
+    const term = normalizeName(query.search ?? '');
+    if (term) where.searchText = { contains: term };
+
+    // Filtro de cidade só quando o CLIENTE pede. Participação em TOP independe da cidade do
+    // Legendário — qualquer um pode ir a qualquer TOP, de qualquer rota.
+    if (query.city) where.city = { contains: query.city, mode: 'insensitive' };
+
+    const scope = await this.accessPolicy.resolveScope(user);
+    if (!scope.isAdmin) {
+      where.AND = [...(where.AND ?? []), this.accessPolicy.buildLegendaryWhere(scope)];
+    }
+
+    const items = await this.prisma.legendary.findMany({
+      where,
+      select: { id: true, fullName: true, lgndNumber: true, city: true },
+      orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
+      take: query.limit ?? 20,
+    });
+
+    return items.map((item: any) => ({
+      id: item.id,
+      label: item.lgndNumber ? `${item.fullName} - LGND ${item.lgndNumber}` : item.fullName,
+      value: item.id,
+      metadata: { fullName: item.fullName, lgndNumber: item.lgndNumber, city: item.city },
+    }));
+  }
+
+  participantCandidateOptions(topEventId: string, query: CandidateOptionsQueryDto, user: AuthenticatedUser) {
+    return this.topCandidateOptions(topEventId, query, user);
+  }
+
+  servantCandidateOptions(topEventId: string, query: CandidateOptionsQueryDto, user: AuthenticatedUser) {
+    return this.topCandidateOptions(topEventId, query, user);
   }
 
   async addParticipant(topEventId: string, dto: CreateTopParticipantDto, actorUserId?: string, db: Prisma.TransactionClient = this.prisma) {

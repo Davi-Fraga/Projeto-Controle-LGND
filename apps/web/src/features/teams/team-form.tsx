@@ -71,11 +71,11 @@ export function TeamForm({ team }: Props) {
         </label>
         <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Coordenador</span>
-          <LegendarioCombobox value={payload.coordinatorLegendaryId ?? ''} onChange={(value) => setField('coordinatorLegendaryId', value)} noneLabel="Não definido" />
+          <LegendarioCombobox value={payload.coordinatorLegendaryId ?? ''} onChange={(value) => setField('coordinatorLegendaryId', value)} initialLabel={team?.coordinator?.fullName} noneLabel="Não definido" />
         </label>
         <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Subcoordenador</span>
-          <LegendarioCombobox value={payload.deputyCoordinatorLegendaryId ?? ''} onChange={(value) => setField('deputyCoordinatorLegendaryId', value)} noneLabel="Não definido" />
+          <LegendarioCombobox value={payload.deputyCoordinatorLegendaryId ?? ''} onChange={(value) => setField('deputyCoordinatorLegendaryId', value)} initialLabel={team?.deputyCoordinator?.fullName} noneLabel="Não definido" />
         </label>
         <label className="md:col-span-2 block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Descrição</span>

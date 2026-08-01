@@ -40,7 +40,7 @@ const nodeTypes = { orgNode: OrgChartNodeCard };
 // e o usuário expande sob demanda (não renderiza a árvore inteira de uma vez).
 const DEFAULT_OPEN_DEPTH = 1;
 
-function OrgChartCanvas({ root, canEditPerson, canReorder, canStructureChange, onDataChanged }: { root: OrgChartNode; canEditPerson: boolean; canReorder: boolean; canStructureChange: boolean; onDataChanged: () => void }) {
+function OrgChartCanvas({ root, canEditPerson, canReorder, canStructureChange, canOpenLegendaryScreen, onDataChanged }: { root: OrgChartNode; canEditPerson: boolean; canReorder: boolean; canStructureChange: boolean; canOpenLegendaryScreen: boolean; onDataChanged: () => void }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(() => collapsedByDefault(root, DEFAULT_OPEN_DEPTH));
   // Nós cujo limite de filhos foi expandido via "carregar mais" (Fase 5).
   const [expandedCaps, setExpandedCaps] = useState<Set<string>>(new Set());
@@ -374,6 +374,7 @@ function OrgChartCanvas({ root, canEditPerson, canReorder, canStructureChange, o
           personLabel={selectedNode.label}
           managerLabel={managerNode?.label}
           canEdit={canEditPerson}
+          canOpenLegendaryScreen={canOpenLegendaryScreen}
           canReorder={canReorder}
           canStructureChange={canStructureChange}
           isCriticalMove={moveCtx.isCriticalMove}
@@ -390,10 +391,10 @@ function OrgChartCanvas({ root, canEditPerson, canReorder, canStructureChange, o
   );
 }
 
-export function OrgChartTree({ root, canEditPerson, canReorder, canStructureChange, onDataChanged }: { root: OrgChartNode; canEditPerson: boolean; canReorder: boolean; canStructureChange: boolean; onDataChanged: () => void }) {
+export function OrgChartTree({ root, canEditPerson, canReorder, canStructureChange, canOpenLegendaryScreen, onDataChanged }: { root: OrgChartNode; canEditPerson: boolean; canReorder: boolean; canStructureChange: boolean; canOpenLegendaryScreen: boolean; onDataChanged: () => void }) {
   return (
     <ReactFlowProvider>
-      <OrgChartCanvas root={root} canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} onDataChanged={onDataChanged} />
+      <OrgChartCanvas root={root} canEditPerson={canEditPerson} canReorder={canReorder} canStructureChange={canStructureChange} canOpenLegendaryScreen={canOpenLegendaryScreen} onDataChanged={onDataChanged} />
     </ReactFlowProvider>
   );
 }

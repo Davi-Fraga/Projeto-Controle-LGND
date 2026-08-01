@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
+import { canOpenRoute } from '@central-da-manada/shared';
 import { can, type CanInput } from '@/lib/permissions';
 import type { CurrentUser } from '@/features/auth/types';
 
@@ -22,4 +23,21 @@ import type { CurrentUser } from '@/features/auth/types';
  */
 export function useCan(user: CurrentUser | null | undefined) {
   return useCallback((input: CanInput) => can(user, input), [user]);
+}
+
+/**
+ * Autorização de LINK CRUZADO: o usuário consegue abrir a tela de destino?
+ *
+ * Um link para outro domínio não é governado pela permission da tela de origem. Estar em
+ * Líderes Espirituais não dá direito ao detalhe do Legendário; ver a Equipe não dá direito ao
+ * perfil do membro. Delega ao manifesto de navegação — a MESMA regra que decide a aba lateral,
+ * incluindo escopo utilizável — para o link não sobreviver a uma mudança na regra da tela.
+ *
+ * ```tsx
+ * const canOpen = useCanOpenRoute(user);
+ * {canOpen(`/dashboard/legendarios/${id}`) ? <Link .../> : <span>{nome}</span>}
+ * ```
+ */
+export function useCanOpenRoute(user: CurrentUser | null | undefined) {
+  return useCallback((href: string) => canOpenRoute(user ?? null, href), [user]);
 }

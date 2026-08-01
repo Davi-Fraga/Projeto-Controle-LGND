@@ -1,4 +1,4 @@
-import { PRIMARY_NAV, isPrimaryNavVisible, visiblePrimaryNav, firstAllowedRoute } from '@central-da-manada/shared';
+import { PRIMARY_NAV, isPrimaryNavVisible, visiblePrimaryNav, firstAllowedRoute, navItemForHref, canOpenRoute } from '@central-da-manada/shared';
 import { getScreen } from './screen-catalog';
 
 // Paridade manifesto de navegação ↔ SCREEN_CATALOG (change alinhar-abas-controle-acessos).
@@ -102,5 +102,58 @@ describe('nav-manifest — visibilidade e destino inicial', () => {
     expect(firstAllowedRoute(u(['dashboard.read']))).toBe('/dashboard');
     expect(firstAllowedRoute(u(['spiritual-leaders.read']))).toBe('/dashboard/lideres-espirituais');
     expect(firstAllowedRoute(u([]))).toBeNull();
+  });
+});
+
+// Links CRUZADOS (§4.9 da change acoes-web-e-seletores-contextuais): uma tela oferece atalho
+// para outra (Líderes Espirituais → Legendários, Equipes → detalhe do Legendário...). O destino
+// tem que ser governado pela regra da TELA DE DESTINO, não pela tela de origem.
+describe('nav-manifest — rota de destino de link cruzado', () => {
+  const u = (permissions: string[], roles: string[] = ['MEMBER'], unavailable: string[] = []) => ({
+    permissions,
+    roles,
+    screenAccess: permissions
+      .filter((permission) => permission.endsWith('.read'))
+      .map((permission) => ({
+        screenId: permission.replace('.read', ''),
+        level: 'VIEW' as const,
+        state: unavailable.includes(permission.replace('.read', '')) ? 'MISSING_SCOPE' as const : 'AVAILABLE' as const,
+        usable: !unavailable.includes(permission.replace('.read', '')),
+      })),
+  });
+
+  it('resolve sub-rotas para a aba dona, pelo prefixo mais específico', () => {
+    expect(navItemForHref('/dashboard/legendarios/abc-123')?.screenId).toBe('legendarios');
+    expect(navItemForHref('/dashboard/legendarios/abc/editar?fromTeamId=t1')?.screenId).toBe('legendarios');
+    expect(navItemForHref('/dashboard/tops/t1/pre-inscricoes')?.screenId).toBe('tops');
+    // `/dashboard` é prefixo de todas: a busca ingênua devolveria sempre o Painel.
+    expect(navItemForHref('/dashboard')?.screenId).toBe('dashboard');
+    expect(navItemForHref('/dashboard/')?.screenId).toBe('dashboard');
+  });
+
+  it('não casa por prefixo parcial de segmento', () => {
+    expect(navItemForHref('/dashboard/tops-arquivados')?.screenId).not.toBe('tops');
+  });
+
+  it('rota fora do manifesto é fail-closed', () => {
+    expect(navItemForHref('/outra-app/coisa')).toBeUndefined();
+    expect(canOpenRoute(u(['legendarios.read']), '/outra-app/coisa')).toBe(false);
+  });
+
+  it('exige a permission da tela de DESTINO, não a da origem', () => {
+    const spiritualLeaderOnly = u(['spiritual-leaders.read']);
+    // Está na tela de Líderes Espirituais, mas não pode abrir o detalhe do Legendário.
+    expect(canOpenRoute(spiritualLeaderOnly, '/dashboard/lideres-espirituais')).toBe(true);
+    expect(canOpenRoute(spiritualLeaderOnly, '/dashboard/legendarios/abc')).toBe(false);
+
+    expect(canOpenRoute(u(['legendarios.read']), '/dashboard/legendarios/abc')).toBe(true);
+  });
+
+  it('escopo inutilizável fecha o link, mesmo com a permission', () => {
+    expect(canOpenRoute(u(['legendarios.read'], ['MEMBER'], ['legendarios']), '/dashboard/legendarios/abc')).toBe(false);
+  });
+
+  it('sem usuário, nenhum link cruzado aparece', () => {
+    expect(canOpenRoute(null, '/dashboard/legendarios/abc')).toBe(false);
   });
 });

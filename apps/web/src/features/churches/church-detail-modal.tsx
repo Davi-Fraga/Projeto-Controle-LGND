@@ -14,7 +14,7 @@ const STATUS_LABELS: Record<string, string> = {
   UNKNOWN: '—',
 };
 
-export function ChurchDetailModal({ churchId, onClose }: { churchId: string | null; onClose: () => void }) {
+export function ChurchDetailModal({ churchId, canOpenLegendaryScreen, onClose }: { churchId: string | null; /** Link cruzado: o nome do líder leva para a aba Legendários. */ canOpenLegendaryScreen: boolean; onClose: () => void }) {
   const [detail, setDetail] = useState<ChurchDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -63,14 +63,14 @@ export function ChurchDetailModal({ churchId, onClose }: { churchId: string | nu
                 <Info label="Cidade" value={detail.city} icon={<MapPin className="h-3.5 w-3.5 text-zinc-500" />} />
                 <Info
                   label="Líder espiritual"
-                  value={detail.spiritualLeaderLegendary ? (
+                  value={detail.spiritualLeaderLegendary && canOpenLegendaryScreen ? (
                     <Link
                       href={`/dashboard/legendarios/${detail.spiritualLeaderLegendary.id}`}
                       className="font-semibold text-orange-400 transition-colors hover:text-orange-300"
                     >
                       {detail.spiritualLeaderLegendary.fullName}
                     </Link>
-                  ) : detail.spiritualLeaderEffectiveName}
+                  ) : detail.spiritualLeaderLegendary?.fullName ?? detail.spiritualLeaderEffectiveName}
                   icon={<User className="h-3.5 w-3.5 text-zinc-500" />}
                 />
                 <Info label="Telefone do líder" value={formatPhone(detail.spiritualLeaderPhone)} icon={<Phone className="h-3.5 w-3.5 text-zinc-500" />} />

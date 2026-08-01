@@ -21,6 +21,7 @@ export function PersonPanel({
   personLabel,
   managerLabel,
   canEdit,
+  canOpenLegendaryScreen,
   canReorder,
   canStructureChange,
   isCriticalMove,
@@ -36,6 +37,8 @@ export function PersonPanel({
   personLabel: string;
   managerLabel?: string;
   canEdit: boolean;
+  /** Link cruzado: o destino fica sob a aba Legendários, que tem regra própria de entrada. */
+  canOpenLegendaryScreen: boolean;
   canReorder: boolean;
   canStructureChange: boolean;
   isCriticalMove: boolean;
@@ -221,13 +224,15 @@ export function PersonPanel({
       </div>
 
       <footer className="flex flex-col gap-2 border-t border-zinc-800 p-4">
+        {canOpenLegendaryScreen ? (
         <Link
           href={`/dashboard/legendarios/${refId}`}
           className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
         >
           <ExternalLink className="h-3.5 w-3.5" /> Ver ficha completa
         </Link>
-        {canEdit ? (
+        ) : null}
+        {canEdit && canOpenLegendaryScreen ? (
           <Link
             href={`/dashboard/legendarios/${refId}/editar`}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange-600 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white transition-colors hover:bg-orange-500"

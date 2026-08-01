@@ -46,6 +46,7 @@ describe('TeamMembersTable', () => {
     updateMembership: false,
     removeMembership: false,
     updateLegendary: false,
+    openLegendaryScreen: true,
   };
 
   afterEach(() => {
@@ -97,5 +98,21 @@ describe('TeamMembersTable', () => {
     expect(screen.queryByRole('link', { name: 'Editar cadastro' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Editar vínculo' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Inativar' })).not.toBeInTheDocument();
+  });
+  it('sem acesso à tela de Legendários, mostra o nome sem link e esconde a edição do cadastro', async () => {
+    vi.mocked(getTeamMembers).mockResolvedValue(memberResponse as any);
+
+    render(
+      <TeamMembersTable
+        teamId="team-1"
+        capabilities={{ ...readOnlyCapabilities, updateLegendary: true, openLegendaryScreen: false }}
+      />,
+    );
+
+    // O nome continua legível — ele já veio na lista de membros; some só a NAVEGAÇÃO.
+    expect(await screen.findByText('Joao Silva')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Joao Silva' })).not.toBeInTheDocument();
+    // Poder editar o cadastro pela API não dá direito de abrir a tela que o edita.
+    expect(screen.queryByRole('link', { name: 'Editar cadastro' })).not.toBeInTheDocument();
   });
 });

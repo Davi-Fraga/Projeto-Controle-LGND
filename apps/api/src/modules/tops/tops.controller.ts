@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } f
 import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { CandidateOptionsQueryDto } from '../../common/options/candidate-options-query.dto';
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TopScopeGuard } from './guards/top-scope.guard';
@@ -48,11 +49,13 @@ export class TopsController {
   @Delete(':id/teams/:topTeamId') @Permissions('tops.teams.remove') async removeTeam(@Param('id') id: string, @Param('topTeamId') topTeamId: string, @CurrentUser() u: { sub: string }) { return { data: await this.tops.removeTeam(id, topTeamId, u.sub) }; }
   @Get(':id/participants') @Permissions('tops.participants.read') findParticipants(@Param('id') id: string, @Query() q: TopParticipantsQueryDto) { return this.tops.findParticipants(id, q); }
   @Get(':id/participants/options') @Permissions('tops.participants.read') async participantOptions(@Param('id') id: string, @Query() q: ParticipantOptionsQueryDto) { return { data: await this.tops.participantOptions(id, q) }; }
+  @Get(':id/participant-candidates/options') @Permissions('tops.participants.add') async participantCandidateOptions(@Param('id') id: string, @Query() q: CandidateOptionsQueryDto, @CurrentUser() user: AuthenticatedUser) { return { data: await this.tops.participantCandidateOptions(id, q, user) }; }
   @Post(':id/participants') @Permissions('tops.participants.add') async addParticipant(@Param('id') id: string, @Body() dto: CreateTopParticipantDto, @CurrentUser() u: { sub: string }) { return { data: await this.tops.addParticipant(id, dto, u.sub) }; }
   @Patch(':id/participants/:participantId') @Permissions('tops.participants.update') async updateParticipant(@Param('id') id: string, @Param('participantId') participantId: string, @Body() dto: UpdateTopParticipantDto, @CurrentUser() u: { sub: string }) { return { data: await this.tops.updateParticipant(id, participantId, dto, u.sub) }; }
   @Patch(':id/participants/:participantId/cancel') @Permissions('tops.participants.remove') async cancelParticipant(@Param('id') id: string, @Param('participantId') participantId: string, @CurrentUser() u: { sub: string }) { return { data: await this.tops.cancelParticipant(id, participantId, u.sub) }; }
   @Delete(':id/participants/:participantId') @Permissions('tops.participants.remove') async deleteParticipant(@Param('id') id: string, @Param('participantId') participantId: string, @CurrentUser() u: { sub: string }) { return { data: await this.tops.cancelParticipant(id, participantId, u.sub) }; }
   @Get(':id/servants') @Permissions('tops.servants.read') findServants(@Param('id') id: string, @Query() q: TopServantsQueryDto) { return this.tops.findServants(id, q); }
+  @Get(':id/servant-candidates/options') @Permissions('tops.servants.add') async servantCandidateOptions(@Param('id') id: string, @Query() q: CandidateOptionsQueryDto, @CurrentUser() user: AuthenticatedUser) { return { data: await this.tops.servantCandidateOptions(id, q, user) }; }
   @Post(':id/servants') @Permissions('tops.servants.add') async addServant(@Param('id') id: string, @Body() dto: CreateTopServantDto, @CurrentUser() u: { sub: string }) { return { data: await this.tops.addServant(id, dto, u.sub) }; }
   @Patch(':id/servants/:servantId') @Permissions('tops.servants.update') async updateServant(@Param('id') id: string, @Param('servantId') servantId: string, @Body() dto: UpdateTopServantDto, @CurrentUser() u: { sub: string }) { return { data: await this.tops.updateServant(id, servantId, dto, u.sub) }; }
   @Patch(':id/servants/:servantId/cancel') @Permissions('tops.servants.remove') async cancelServant(@Param('id') id: string, @Param('servantId') servantId: string, @CurrentUser() u: { sub: string }) { return { data: await this.tops.cancelServant(id, servantId, u.sub) }; }

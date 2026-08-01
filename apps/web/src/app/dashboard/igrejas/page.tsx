@@ -7,7 +7,7 @@ import { formatPhone } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useDebounce } from '@/hooks/use-debounce';
 import { hasPermission } from '@/lib/permissions';
-import { useCan } from '@/hooks/use-can';
+import { useCan, useCanOpenRoute } from '@/hooks/use-can';
 import { deleteChurch, getChurchCities, getChurchesPage } from '@/features/churches/api';
 import type { Church } from '@/features/churches/api';
 import { ActionMenu } from '@/components/ui/ActionMenu';
@@ -20,6 +20,7 @@ const PER_PAGE = 10;
 export default function IgrejasPage() {
   const { user, loading: authLoading } = useRequireAuth();
   const canDo = useCan(user);
+  const canOpen = useCanOpenRoute(user);
   const canEdit = canDo('churches.update');
   const canRemove = canDo('churches.delete');
   const [churches, setChurches] = useState<Church[]>([]);
@@ -220,7 +221,7 @@ export default function IgrejasPage() {
         </div>
       )}
 
-      <ChurchDetailModal churchId={viewingId} onClose={() => setViewingId(null)} />
+      <ChurchDetailModal churchId={viewingId} canOpenLegendaryScreen={canOpen('/dashboard/legendarios')} onClose={() => setViewingId(null)} />
       <ConfirmDialog isOpen={deletingChurch !== null} title="Excluir Igreja" description={`Tem certeza que deseja excluir "${deletingChurch?.name ?? ''}"? Só é possível excluir igrejas sem Legendários vinculados.`} confirmLabel={deleteBusy ? 'Excluindo...' : 'Excluir'} cancelLabel="Cancelar" onConfirm={handleConfirmDelete} onCancel={() => setDeletingChurch(null)} variant="danger" />
     </div>
   );

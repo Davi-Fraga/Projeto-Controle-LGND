@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import SocialActionDetailPage from './page';
-import { addSocialActionParticipant } from '@/features/social-actions/api';
+import { addSocialActionParticipant, getSocialActionParticipantCandidateOptions } from '@/features/social-actions/api';
 
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'sa1' }), useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock('next/link', () => ({ default: ({ children }: any) => <a>{children}</a> }));
@@ -17,11 +17,20 @@ vi.mock('@/features/social-actions/api', () => ({
   removeSocialActionParticipant: vi.fn(),
   cancelSocialAction: vi.fn(),
   completeSocialAction: vi.fn(),
+  getSocialActionParticipantCandidateOptions: vi.fn().mockResolvedValue({ data: [] }),
 }));
+/** Captura o `fetchOptions` recebido pelo combobox para provar QUAL endpoint a tela usa. */
+let capturedFetchOptions: ((search: string, limit: number) => Promise<unknown>) | undefined;
+
 vi.mock('@/features/legendarios/legendario-combobox', () => ({
-  LegendarioCombobox: ({ onChange, noneLabel }: any) => (
-    <button type="button" aria-label={noneLabel} onClick={() => onChange('lgnd-1', 'Fulano')}>{noneLabel}</button>
-  ),
+  // A fonte contextual é injetada pelo formulário; no teste basta um passe-adiante.
+  contextualLegendarioSource: (fetcher: any) => fetcher,
+  LegendarioCombobox: ({ onChange, noneLabel, fetchOptions }: any) => {
+    capturedFetchOptions = fetchOptions;
+    return (
+      <button type="button" aria-label={noneLabel} onClick={() => onChange('lgnd-1', 'Fulano')}>{noneLabel}</button>
+    );
+  },
 }));
 
 /** Substitui as permissions efetivas do usuário mockado para o teste seguinte. */
@@ -40,6 +49,20 @@ describe('SocialActionDetailPage', () => {
 
     await waitFor(() => expect(addSocialActionParticipant).toHaveBeenCalledWith('sa1', expect.objectContaining({ legendaryId: 'lgnd-1' })));
     expect(screen.queryByPlaceholderText('ID do Legendário')).toBeNull();
+  });
+
+  it('busca candidatos no endpoint contextual da ação, não no diretório global', async () => {
+    withPermissions('social-actions.participants.add');
+    capturedFetchOptions = undefined;
+    render(<SocialActionDetailPage />);
+
+    await screen.findByRole('button', { name: 'Selecione o Legendário' });
+    expect(capturedFetchOptions).toBeDefined();
+    await capturedFetchOptions!('ana', 20);
+
+    // Sem isso o seletor exigiria `legendarios.read` e daria 403 para quem só tem
+    // `social-actions.participants.add`.
+    expect(getSocialActionParticipantCandidateOptions).toHaveBeenCalledWith('sa1', 'ana', 20);
   });
 
   /**

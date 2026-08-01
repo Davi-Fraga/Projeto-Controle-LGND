@@ -24,7 +24,7 @@ vi.mock('@/features/spiritual-leaders/api', () => ({
 describe('LideresEspirituaisPage', () => {
   beforeEach(() => {
     // Por padrão o usuário também tem legendarios.read (links cruzados habilitados).
-    mocks.useRequireAuth.mockReturnValue({ loading: false, user: { permissions: ['legendarios.read'] } });
+    mocks.useRequireAuth.mockReturnValue({ loading: false, user: { permissions: ['legendarios.read'], roles: ['MEMBER'], screenAccess: [{ screenId: 'legendarios', level: 'VIEW', state: 'AVAILABLE', usable: true }] } });
     mocks.getChurches.mockReset().mockResolvedValue([
       {
         id: '11111111-1111-4111-8111-111111111111',
@@ -129,7 +129,7 @@ describe('LideresEspirituaisPage', () => {
 
   // change alinhar-abas: sem legendarios.read os links cruzados somem, mas os dados ficam.
   it('sem legendarios.read: dados do líder aparecem como texto, sem links para Legendários', async () => {
-    mocks.useRequireAuth.mockReturnValue({ loading: false, user: { permissions: ['spiritual-leaders.read'] } });
+    mocks.useRequireAuth.mockReturnValue({ loading: false, user: { permissions: ['spiritual-leaders.read'], roles: ['MEMBER'], screenAccess: [{ screenId: 'spiritual-leaders', level: 'VIEW', state: 'AVAILABLE', usable: true }] } });
     mocks.getChurches.mockReset().mockResolvedValueOnce([
       {
         id: 'church-1',

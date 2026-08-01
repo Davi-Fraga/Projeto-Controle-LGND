@@ -7,6 +7,7 @@ import { getTeam } from '@/features/teams/api';
 import { TeamMembersTable } from '@/features/teams/team-members-table';
 import type { Team } from '@/features/teams/types';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useCanOpenRoute } from '@/hooks/use-can';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatTeamName } from '@/lib/teams';
 import { can } from '@/lib/permissions';
@@ -15,6 +16,7 @@ export default function TeamDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { loading: authLoading, user } = useRequireAuth();
+  const canOpen = useCanOpenRoute(user);
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -71,6 +73,10 @@ export default function TeamDetailPage() {
             // 'organogram.person.edit')`. Exigir só a primeira escondia a ação de quem edita
             // pelo Organograma — gate mais restrito que a própria API.
             updateLegendary: can(user, { anyOf: ['legendarios.update', 'organogram.person.edit'] }),
+            // Link CRUZADO: os dois atalhos levam para telas sob a aba Legendários. Poder editar
+            // o cadastro (inclusive via `organogram.person.edit`) não implica poder ABRIR essa
+            // tela — sem isto o link entrega uma rota que o usuário não consegue usar.
+            openLegendaryScreen: canOpen('/dashboard/legendarios'),
           }}
         />
       </div>

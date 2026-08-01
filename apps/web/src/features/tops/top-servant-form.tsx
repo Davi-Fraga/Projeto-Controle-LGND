@@ -1,9 +1,9 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { TopServantStatus } from '@central-da-manada/shared';
-import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
-import { addTopServant, getTopTeams, updateTopServant } from './api';
+import { contextualLegendarioSource, LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
+import { addTopServant, getTopServantCandidateOptions, getTopTeams, updateTopServant } from './api';
 import type { TopServant, TopServantPayload, TopTeam } from './types';
 
 export function TopServantForm({
@@ -17,6 +17,11 @@ export function TopServantForm({
   onSaved: () => void;
   onCancel: () => void;
 }) {
+  // Busca contextual: `tops.servants.add` basta; a tela de Legendários não é exigida.
+  const fetchCandidates = useMemo(
+    () => contextualLegendarioSource((search, limit) => getTopServantCandidateOptions(topId, search, limit)),
+    [topId],
+  );
   const [teams, setTeams] = useState<TopTeam[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<TopServantPayload>({
@@ -62,7 +67,7 @@ export function TopServantForm({
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-5">
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Legendário</span>
-          <LegendarioCombobox value={payload.legendaryId ?? ''} onChange={(v) => setPayload({ ...payload, legendaryId: v })} clearable={false} noneLabel="Selecione..." />
+          <LegendarioCombobox value={payload.legendaryId ?? ''} onChange={(v) => setPayload({ ...payload, legendaryId: v })} fetchOptions={fetchCandidates} initialLabel={item?.legendary?.fullName} clearable={false} noneLabel="Selecione..." />
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Equipe de Serviço</span>

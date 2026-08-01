@@ -2,16 +2,16 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { SocialActionParticipantStatus } from '@central-da-manada/shared';
-import { addSocialActionParticipant, cancelSocialAction, completeSocialAction, getSocialAction, getSocialActionParticipants, getVolunteerSuggestions, removeSocialActionParticipant, updateSocialActionParticipant } from '@/features/social-actions/api';
+import { addSocialActionParticipant, cancelSocialAction, completeSocialAction, getSocialAction, getSocialActionParticipantCandidateOptions, getSocialActionParticipants, getVolunteerSuggestions, removeSocialActionParticipant, updateSocialActionParticipant } from '@/features/social-actions/api';
 import type { VolunteerSuggestion } from '@/features/social-actions/api';
 import type { SocialAction, SocialActionParticipant } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useCan } from '@/hooks/use-can';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
+import { contextualLegendarioSource, LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
 
 export default function SocialActionDetailPage() {
   const params = useParams<{ id: string }>();
@@ -28,6 +28,13 @@ export default function SocialActionDetailPage() {
   const [participants, setParticipants] = useState<SocialActionParticipant[]>([]);
   const [suggestions, setSuggestions] = useState<VolunteerSuggestion[]>([]);
   const [newParticipant, setNewParticipant] = useState({ legendaryId: '', role: '', notes: '' });
+  // Busca contextual: `social-actions.participants.add` basta. Filtra pela cidade da ação e
+  // esconde quem já participa — não é a mesma coisa que o card de Sugestões de Voluntários,
+  // que é curadoria por interesse/profissão e segue exigindo `social-actions.read`.
+  const fetchCandidates = useMemo(
+    () => contextualLegendarioSource((search, limit) => getSocialActionParticipantCandidateOptions(params.id, search, limit)),
+    [params.id],
+  );
   const [resultSummary, setResultSummary] = useState('');
   const [suggestionCity, setSuggestionCity] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -161,6 +168,7 @@ export default function SocialActionDetailPage() {
             <LegendarioCombobox
               value={newParticipant.legendaryId}
               onChange={(id) => setNewParticipant((current) => ({ ...current, legendaryId: id }))}
+              fetchOptions={fetchCandidates}
               clearable={false}
               noneLabel="Selecione o Legendário"
             />

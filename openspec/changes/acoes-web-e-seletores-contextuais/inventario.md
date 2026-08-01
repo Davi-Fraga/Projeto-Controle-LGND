@@ -165,6 +165,42 @@ recurso que o usuário administra; o contrato de options já é mínimo):
 **Placar:** dos 6 endpoints propostos no design, **4 sobrevivem**. Os de Equipes candidatas em TOP
 e de líder de Igreja saem: o primeiro vira caso B, o segundo é o caso C acima.
 
+### Correções à tabela B, apuradas na implementação (§3.1/§3.4)
+
+**1. Os quatro `anyOf` do caso B colapsam em dois endpoints.** A tabela sugere um `anyOf` por
+formulário, mas `top-form`, `team-form`, `top-team-form` e `top-families-section` usam todos o
+mesmo `LegendarioCombobox`, logo o mesmo `GET /legendarios/options`. Um endpoint tem **um**
+decorator: não existe `anyOf` por consumidor. O efeito real é a **união**:
+
+```
+legendarios.read · tops.create · tops.update · tops.teams.add · tops.teams.update
+tops.families.create · tops.families.update · teams.create · teams.update
+```
+
+Aceitável porque a projeção já é mínima e escopada, e porque **lista e detalhe continuam
+fechados** (`GET /legendarios` e `GET /legendarios/:id` inalterados). Constantes exportadas e
+comentadas: `LEGENDARY_OPTIONS_PERMISSIONS` e `TEAM_OPTIONS_PERMISSIONS`.
+
+**2. Hoje a união não amplia nada.** As 10 roles do `prisma/seed.ts` têm **todas**
+`legendarios.read`. O 403 que a change corrige só aparece via `UserPermissionOverride`
+(revogação por usuário) — não pelas roles base. Isso não invalida o trabalho: torna o modelo
+coerente e remove a armadilha para qualquer concessão customizada.
+
+**3. `top-team-form` nem usava o endpoint de options de Equipe.** Usa
+`getTeamsOptions` → `GET /teams?page=1&perPage=100`, ou seja, a **lista completa** com objetos
+`Team` inteiros num `<select>` — contra o non-goal "não carregar coleções completas", e gated por
+`teams.read`. O contrato certo (`getTeamsOptionsList` → `/teams/options`) já existe e está
+ocioso. Trocar o consumidor é §5.2. Atenção: `/teams/options` tem `take: limit ?? 20`, então um
+`<select>` simples truncaria em silêncio — a troca exige `AsyncCombobox` com busca.
+
+**4. Pendência do rótulo na edição (§5.5).** `LegendarioCombobox` resolve o rótulo do valor já
+gravado via `getLegendario(value)` → `GET /legendarios/:id`, que é
+`anyOf('legendarios.read', 'teams.members.read')`. Quem tiver só `teams.update` **busca**
+normalmente, mas vê `(legendário vinculado)` no lugar do nome do coordenador atual. Não se
+resolve afrouxando `/legendarios/:id` — ele devolve o detalhe com PII. A saída correta é passar
+`initialLabel`, o que exige os payloads-pai carregarem o nome do dirigente (hoje `Team` só traz
+`coordinatorLegendaryId`). **Decisão do Davi pendente** — ver nota no fim de §7.
+
 ## 7. Ordem de implementação sugerida
 
 1. **§2** — `useCan` com `allOf`/`anyOf` + guarda de menu vazio no `ActionMenu`, migrando os 32
@@ -174,5 +210,19 @@ e de líder de Igreja saem: o primeiro vira caso B, o segundo é o caso C acima.
 3. **Corrigir o gate estrito** de `equipes/[id]` (`legendarios.update` → `anyOf`).
 4. **§4.1-4.8** — itens de `ActionMenu` das 6 listas.
 5. **§3 (A)** — os 4 endpoints contextuais, cada um com teste de 403/404/elegibilidade/projeção.
-6. **§3 (B)** — `@AnyPermissions` nos 4 formulários de dirigente.
+6. **§3 (B)** — `@AnyPermissions` nos 4 formulários de dirigente. ✅ **feito** (§3.1/§3.4), com as
+   correções acima.
 7. **§5-§6** — ligar formulários e verificação integrada.
+
+> **Fork aberto para o Davi, a decidir antes de §5.5** — o rótulo do dirigente já gravado
+> (achado 4 acima):
+>
+> - **(i) aceitar a degradação:** quem não tem `legendarios.read` vê `(legendário vinculado)` em
+>   vez do nome ao abrir o formulário de edição. Custo zero, nenhum risco de PII, e hoje não
+>   atinge nenhuma role semeada.
+> - **(ii) incluir o nome do dirigente nos payloads-pai** (`Team`, `Top`, `TopTeam`, família de
+>   TOP) e passar `initialLabel`. Corrige o rótulo, **elimina uma requisição por combobox** para
+>   todo mundo, e não amplia permission nenhuma — mas toca 4 services + DTOs + tipos do web.
+>
+> Recomendação: **(ii)**, porém como tarefa própria — é ganho de UX e de performance para todos
+> os usuários, não só para o caso de escopo restrito, e não deve entrar de contrabando na §5.

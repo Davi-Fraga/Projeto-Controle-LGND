@@ -1,7 +1,7 @@
 import { api } from '@/lib/api';
-import type { Legendary, LegendaryFilters, PaginatedResponse, TeamFilters } from '@central-da-manada/shared';
+import type { Legendary, LegendaryFilters, PaginatedResponse } from '@central-da-manada/shared';
+import type { LegendarioOption } from '@/features/legendarios/api';
 import type {
-  TeamsOptionsResponse,
   TopFilters,
   TopFamiliesResponse,
   TopFamilyMemberPayload,
@@ -59,6 +59,23 @@ export const updateTopServant = (id: string, servantId: string, payload: TopServ
 export const cancelTopServant = (id: string, servantId: string) => api(`/tops/${id}/servants/${servantId}/cancel`, { method: 'PATCH' });
 export const searchLegendarios = (filters: LegendaryFilters) => api<PaginatedResponse<Legendary>>(`/legendarios${query(filters) ? `?${query(filters)}` : ''}`);
 export const getLegendarioOptions = (filters: Record<string, unknown> = {}) => api<OptionsResponse>(`/legendarios/options${query(filters) ? `?${query(filters)}` : ''}`);
-export const getTeamsOptions = (filters: TeamFilters) => api<TeamsOptionsResponse>(`/teams${query(filters) ? `?${query(filters)}` : ''}`);
 export const getTopOptions = (filters: Record<string, unknown> = {}) => api<OptionsResponse>(`/tops/options${query(filters) ? `?${query(filters)}` : ''}`);
 export const getTeamsOptionsList = (filters: Record<string, unknown> = {}) => api<OptionsResponse>(`/teams/options${query(filters) ? `?${query(filters)}` : ''}`);
+
+/**
+ * Candidatos a participante e a servo DESTE TOP. Autorizados por `tops.participants.add` /
+ * `tops.servants.add` — não exigem `legendarios.read`. Ambos excluem quem já é participante ou
+ * servo ativo do TOP (os papéis são mutuamente exclusivos).
+ *
+ * NÃO filtram por cidade: participação em TOP independe da cidade do Legendário — qualquer um
+ * pode ir a qualquer TOP, de qualquer rota.
+ */
+export const getTopParticipantCandidateOptions = (topId: string, search: string, limit = 20) => {
+  const qs = query({ search: search.trim() || undefined, limit });
+  return api<{ data: LegendarioOption[] }>(`/tops/${topId}/participant-candidates/options${qs ? `?${qs}` : ''}`);
+};
+
+export const getTopServantCandidateOptions = (topId: string, search: string, limit = 20) => {
+  const qs = query({ search: search.trim() || undefined, limit });
+  return api<{ data: LegendarioOption[] }>(`/tops/${topId}/servant-candidates/options${qs ? `?${qs}` : ''}`);
+};

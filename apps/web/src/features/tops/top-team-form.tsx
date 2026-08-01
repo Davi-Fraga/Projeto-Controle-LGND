@@ -1,9 +1,9 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
-import type { Team } from '@central-da-manada/shared';
+import { FormEvent, useState } from 'react';
+import { AsyncCombobox } from '@/components/ui/AsyncCombobox';
 import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
-import { addTopTeam, getTeamsOptions, updateTopTeam } from './api';
+import { addTopTeam, getTeamsOptionsList, updateTopTeam } from './api';
 import type { TopTeam, TopTeamPayload } from './types';
 
 export function TopTeamForm({
@@ -17,7 +17,6 @@ export function TopTeamForm({
   onSaved: () => void;
   onCancel: () => void;
 }) {
-  const [teams, setTeams] = useState<Team[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<TopTeamPayload>({
     teamId: item?.teamId ?? '',
@@ -26,18 +25,33 @@ export function TopTeamForm({
     notes: item?.notes ?? '',
   });
 
-  useEffect(() => {
-    getTeamsOptions({ page: 1, perPage: 100 })
-      .then((r) => setTeams(r.data))
-      .catch(() => setError('Não foi possível carregar equipes.'));
-  }, []);
-
   async function submit(e: FormEvent) {
     e.preventDefault();
+    setError(null);
+
+    // O `<select required>` antigo era barrado pelo browser; o `AsyncCombobox` não é controle
+    // nativo, então a obrigatoriedade da Equipe passa a ser checada aqui.
+    if (!payload.teamId) {
+      setError('Selecione a equipe.');
+      return;
+    }
+
+    // Campo de dirigente em branco vira `null`, NÃO string vazia: `@IsOptional()` do
+    // class-validator só ignora `null`/`undefined`, então `''` chega no `@IsUUID()` e a API
+    // responde 400 ("coordinatorLegendaryId must be a UUID"). `null` também é o valor que
+    // LIMPA o vínculo na edição — com `undefined` a chave sumiria do corpo e o backend
+    // manteria o dirigente anterior.
+    const cleaned = {
+      ...payload,
+      coordinatorLegendaryId: payload.coordinatorLegendaryId || null,
+      deputyCoordinatorLegendaryId: payload.deputyCoordinatorLegendaryId || null,
+      notes: payload.notes?.trim() || null,
+    };
+
     try {
       item
-        ? await updateTopTeam(topId, item.id, payload)
-        : await addTopTeam(topId, payload);
+        ? await updateTopTeam(topId, item.id, cleaned)
+        : await addTopTeam(topId, cleaned);
       onSaved();
     } catch {
       setError('Não foi possível salvar a equipe do TOP.');
@@ -55,32 +69,39 @@ export function TopTeamForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Equipe</span>
-          <select
-            className="input"
-            value={payload.teamId}
+          {/*
+            Era um `<select>` alimentado por `GET /teams?perPage=100` — a LISTA completa, com
+            objetos `Team` inteiros e gated por `teams.read`. Agora usa `/teams/options`
+            (projeção mínima, autorizado também por `tops.teams.add/update`). A troca para
+            `AsyncCombobox` não é cosmética: o endpoint de options tem `take` padrão 20, então
+            um `<select>` truncaria a lista em silêncio.
+          */}
+          <AsyncCombobox
+            value={payload.teamId ?? ''}
+            selectedLabel={item?.team?.name}
+            onChange={(value) => setPayload({ ...payload, teamId: value })}
+            fetchOptions={async (search) =>
+              (await getTeamsOptionsList({ search: search.trim() || undefined, limit: 20 })).data.map((option) => ({
+                value: option.value,
+                label: option.label,
+              }))
+            }
+            placeholder="Buscar equipe..."
+            clearable={false}
             disabled={Boolean(item)}
-            onChange={(e) => setPayload({ ...payload, teamId: e.target.value })}
-            required
-          >
-            <option value="">Selecione...</option>
-            {teams.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+          />
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Coordenador da Equipe</span>
-          <LegendarioCombobox value={payload.coordinatorLegendaryId ?? ''} onChange={(v) => setPayload({ ...payload, coordinatorLegendaryId: v })} noneLabel="Não definido" />
+          <LegendarioCombobox value={payload.coordinatorLegendaryId ?? ''} onChange={(v) => setPayload({ ...payload, coordinatorLegendaryId: v })} initialLabel={item?.coordinator?.fullName} noneLabel="Não definido" />
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Subcoordenador da Equipe</span>
-          <LegendarioCombobox value={payload.deputyCoordinatorLegendaryId ?? ''} onChange={(v) => setPayload({ ...payload, deputyCoordinatorLegendaryId: v })} noneLabel="Não definido" />
+          <LegendarioCombobox value={payload.deputyCoordinatorLegendaryId ?? ''} onChange={(v) => setPayload({ ...payload, deputyCoordinatorLegendaryId: v })} initialLabel={item?.deputyCoordinator?.fullName} noneLabel="Não definido" />
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Observações</span>
-          <input className="input" placeholder="..." value={payload.notes} onChange={(e) => setPayload({ ...payload, notes: e.target.value })} />
+          <input className="input" placeholder="..." value={payload.notes ?? ''} onChange={(e) => setPayload({ ...payload, notes: e.target.value })} />
         </label>
       </div>
 

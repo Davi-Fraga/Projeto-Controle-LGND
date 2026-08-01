@@ -1,9 +1,9 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { TopParticipantStatus, TopParticipantType } from '@central-da-manada/shared';
-import { LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
-import { addTopParticipant, updateTopParticipant } from './api';
+import { contextualLegendarioSource, LegendarioCombobox } from '@/features/legendarios/legendario-combobox';
+import { addTopParticipant, getTopParticipantCandidateOptions, updateTopParticipant } from './api';
 import type { TopParticipant, TopParticipantPayload } from './types';
 
 export function TopParticipantForm({
@@ -17,6 +17,11 @@ export function TopParticipantForm({
   onSaved: () => void;
   onCancel: () => void;
 }) {
+  // Busca contextual: `tops.participants.add` basta; a tela de Legendários não é exigida.
+  const fetchCandidates = useMemo(
+    () => contextualLegendarioSource((search, limit) => getTopParticipantCandidateOptions(topId, search, limit)),
+    [topId],
+  );
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<TopParticipantPayload>({
     legendaryId: item?.legendaryId ?? '',
@@ -48,7 +53,7 @@ export function TopParticipantForm({
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Legendário</span>
-          <LegendarioCombobox value={payload.legendaryId ?? ''} onChange={(v) => setPayload({ ...payload, legendaryId: v })} clearable={false} noneLabel="Selecione..." />
+          <LegendarioCombobox value={payload.legendaryId ?? ''} onChange={(v) => setPayload({ ...payload, legendaryId: v })} fetchOptions={fetchCandidates} initialLabel={item?.legendary?.fullName} clearable={false} noneLabel="Selecione..." />
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Tipo de Participação</span>

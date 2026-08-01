@@ -5,7 +5,7 @@ import { Building2, User, Phone, Users, Mail, MapPin, Search, ShieldCheck } from
 import { formatPhone } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useDebouncedSearch } from '@/hooks/use-debounced-search';
-import { hasPermission } from '@/lib/permissions';
+import { useCanOpenRoute } from '@/hooks/use-can';
 import { getSpiritualLeaderChurches } from '@/features/spiritual-leaders/api';
 import type { SpiritualLeaderChurch } from '@/features/spiritual-leaders/api';
 
@@ -14,7 +14,10 @@ export default function LideresEspirituaisPage() {
   // Links cruzados para Legendários só quando a tela de destino está concedida (change
   // alinhar-abas). Sem a permission, os dados de líder/igreja continuam visíveis como texto,
   // apenas sem navegação — e a API de Legendários segue barrando por conta própria.
-  const canSeeLegendarios = hasPermission(user, 'legendarios.read');
+  // Link cruzado: governado pela tela de DESTINO. Usa o manifesto de navegação (mesma regra da
+  // aba lateral), então também respeita escopo inutilizável — checar só a key não bastava.
+  const canOpen = useCanOpenRoute(user);
+  const canSeeLegendarios = canOpen('/dashboard/legendarios');
   const {
     search,
     setSearch,

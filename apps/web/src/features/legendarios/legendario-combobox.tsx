@@ -27,11 +27,32 @@ export async function fetchLegendarioOptions(search: string, limit = 20): Promis
   return response.data.map(toLegendarioOption);
 }
 
+/**
+ * Adapta um endpoint CONTEXTUAL de candidatos ao mesmo formato do combobox. Existe para que o
+ * mapeamento `LegendarioOption → ComboboxOption` continue num lugar só: cada formulário passa a
+ * sua função de busca, não a sua própria conversão.
+ */
+export function contextualLegendarioSource(
+  fetcher: (search: string, limit: number) => Promise<{ data: LegendarioOption[] }>,
+) {
+  return async (search: string, limit: number): Promise<ComboboxOption[]> => {
+    const response = await fetcher(search, limit);
+    return response.data.map(toLegendarioOption);
+  };
+}
+
 type Props = {
   value: string;
   onChange: (value: string, label: string) => void;
   /** Rótulo já conhecido do valor atual (evita a busca por id na abertura). */
   initialLabel?: string;
+  /**
+   * Fonte contextual de opções — `GET /<pai>/:id/<algo>-candidates/options`, autorizado pela
+   * permission da AÇÃO. Quando informada, substitui `GET /legendarios/options` e o componente
+   * deixa de tentar resolver o rótulo por `GET /legendarios/:id`: quem tem só a permission da
+   * ação tomaria `403` nessa rota. Nesses casos, passe `initialLabel`.
+   */
+  fetchOptions?: (search: string, limit: number) => Promise<ComboboxOption[]>;
   placeholder?: string;
   noneLabel?: string;
   clearable?: boolean;
@@ -43,6 +64,7 @@ export function LegendarioCombobox({
   value,
   onChange,
   initialLabel,
+  fetchOptions,
   placeholder = 'Buscar por nome, cidade ou LGND...',
   noneLabel = 'Nenhum',
   clearable = true,
@@ -52,6 +74,10 @@ export function LegendarioCombobox({
   const [selectedLabel, setSelectedLabel] = useState(initialLabel ?? '');
   // Id cujo rótulo já resolvemos — evita refetch após seleção manual e loop de deps.
   const resolvedFor = useRef<string | null>(initialLabel ? value : null);
+  // Lido por ref, não por dependência: um `fetchOptions` inline muda a cada render e
+  // reiniciaria o efeito em loop antes de o rótulo chegar.
+  const contextualFetch = useRef(fetchOptions);
+  contextualFetch.current = fetchOptions;
 
   // Resolve o rótulo do Legendário já vinculado na edição, quando não veio pronto.
   useEffect(() => {
@@ -61,6 +87,12 @@ export function LegendarioCombobox({
       return;
     }
     if (resolvedFor.current === value) return;
+    if (contextualFetch.current) {
+      // Fonte contextual não concede o detalhe da pessoa — não sondar `/legendarios/:id`.
+      setSelectedLabel('(legendário vinculado)');
+      resolvedFor.current = value;
+      return;
+    }
     let active = true;
     getLegendario(value)
       .then((response) => {
@@ -88,7 +120,7 @@ export function LegendarioCombobox({
         resolvedFor.current = nextValue || null;
         onChange(nextValue, label);
       }}
-      fetchOptions={(search) => fetchLegendarioOptions(search, limit)}
+      fetchOptions={(search) => (fetchOptions ?? fetchLegendarioOptions)(search, limit)}
       placeholder={placeholder}
       noneLabel={noneLabel}
       clearable={clearable}

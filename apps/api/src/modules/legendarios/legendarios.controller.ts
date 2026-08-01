@@ -99,19 +99,19 @@ export class LegendariosController {
 
   @Patch(':id/deactivate')
   @Permissions('legendarios.delete')
-  async deactivate(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
-    return { data: await this.legendariosService.deactivate(id, user.sub) };
+  async deactivate(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.legendariosService.deactivate(id, user) };
   }
 
   @Patch(':id/restore')
   @Permissions('legendarios.restore')
-  async restore(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
-    return { data: await this.legendariosService.restore(id, user.sub) };
+  async restore(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.legendariosService.restore(id, user) };
   }
 
   @Delete(':id')
   @Permissions('legendarios.delete')
-  async delete(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
-    return { data: await this.legendariosService.deactivate(id, user.sub) };
+  async delete(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.legendariosService.deactivate(id, user) };
   }
 }

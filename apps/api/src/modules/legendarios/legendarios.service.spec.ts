@@ -512,6 +512,9 @@ describe('LegendariosService', () => {
   });
 
   it('soft deletes and marks as inactive', async () => {
+    // assertAccessible (barreira de escopo) roda antes: resolveScope + findFirst.
+    accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true });
+    prisma.legendary.findFirst.mockResolvedValueOnce({ id: '1' });
     prisma.legendary.findUnique.mockResolvedValueOnce({ id: '1', fullName: 'Joao', expertises: [] });
     // deactivate roda numa transação (libera geridos → sem gestor) e devolve o registro atualizado
     prisma.$transaction.mockImplementationOnce(async (cb: any) => cb(prisma));
@@ -523,7 +526,7 @@ describe('LegendariosService', () => {
       expertises: [],
     });
 
-    const result = await service.deactivate('1');
+    const result = await service.deactivate('1', adminUser as any);
 
     expect(result.status).toBe(LegendaryStatus.INACTIVE);
     expect(prisma.legendary.update).toHaveBeenCalledWith(
@@ -531,5 +534,44 @@ describe('LegendariosService', () => {
         data: expect.objectContaining({ status: LegendaryStatus.INACTIVE }),
       }),
     );
+  });
+
+  // Defesa em profundidade: hoje `legendarios.delete`/`restore` são admin-only pelo
+  // SCREEN_CATALOG, mas catálogo é declaração — a autorização tem que estar no ponto
+  // de mutação. Sem isto, quem obtivesse a permissão inativava QUALQUER legendário.
+  describe('escopo em deactivate/restore', () => {
+    it('deactivate devolve 404 para legendário fora do escopo, sem mutar', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false });
+      accessPolicy.buildLegendaryWhere.mockReturnValueOnce({ id: { in: ['outro'] } });
+      prisma.legendary.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.deactivate('1', restrictedUser as any)).rejects.toThrow(NotFoundException);
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.legendary.update).not.toHaveBeenCalled();
+    });
+
+    it('restore devolve 404 para legendário fora do escopo, sem mutar', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false });
+      accessPolicy.buildLegendaryWhere.mockReturnValueOnce({ id: { in: ['outro'] } });
+      prisma.legendary.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.restore('1', restrictedUser as any)).rejects.toThrow(NotFoundException);
+
+      expect(prisma.legendary.update).not.toHaveBeenCalled();
+    });
+
+    it('restore procura a linha JÁ excluída (senão nunca acharia o que restaurar)', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true });
+      prisma.legendary.findFirst.mockResolvedValueOnce({ id: '1' });
+      prisma.legendary.findUnique.mockResolvedValueOnce({ id: '1', fullName: 'Joao', expertises: [] });
+      prisma.legendary.update.mockResolvedValueOnce({ id: '1', fullName: 'Joao', deletedAt: null, expertises: [] });
+
+      await service.restore('1', adminUser as any);
+
+      expect(prisma.legendary.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.not.objectContaining({ deletedAt: null }) }),
+      );
+    });
   });
 });

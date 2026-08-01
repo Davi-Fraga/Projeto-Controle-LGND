@@ -27,6 +27,13 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+# Precisa existir DE NOVO aqui, não só no estágio de build: o middleware da CSP
+# (apps/web/src/middleware.ts) lê esta variável em RUNTIME para montar o `connect-src`.
+# Sem ela o middleware cai no fallback localhost e a CSP bloqueia TODA chamada do
+# browser à API em produção — falha que não aparece em dev nem no build.
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 # Saída standalone: server.js + node_modules tracados, estáticos e public
 COPY --from=build /app/apps/web/.next/standalone ./
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static

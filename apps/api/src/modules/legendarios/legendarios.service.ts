@@ -296,7 +296,12 @@ export class LegendariosService {
     });
   }
 
-  async deactivate(id: string, actorUserId?: string) {
+  async deactivate(id: string, user: AuthenticatedUser) {
+    // Barreira de escopo no próprio ponto de mutação. Hoje `legendarios.delete` é
+    // admin-only pelo SCREEN_CATALOG, mas isso é invariante de catálogo — não vale
+    // como autorização. Mesmo padrão de `teams.deactivate`/`social-actions.delete`.
+    await this.assertAccessible(id, user);
+    const actorUserId = user.sub;
     const before = await this.findExistingWithDeleted(id);
     const after = await this.prisma.$transaction(async (tx: any) => {
       // Transição (change hierarquia-limites-organograma): ao inativar um gestor, seus
@@ -328,7 +333,10 @@ export class LegendariosService {
     return this.toResponse(after);
   }
 
-  async restore(id: string, actorUserId?: string) {
+  async restore(id: string, user: AuthenticatedUser) {
+    // `includeDeleted`: restaurar age justamente sobre a linha com `deletedAt` preenchido.
+    await this.assertAccessible(id, user, { includeDeleted: true });
+    const actorUserId = user.sub;
     const before = await this.findExistingWithDeleted(id);
     const after = await this.prisma.legendary.update({
       where: { id },
@@ -348,9 +356,14 @@ export class LegendariosService {
     return this.toResponse(after);
   }
 
-  private async assertAccessible(id: string, user: AuthenticatedUser) {
+  private async assertAccessible(
+    id: string,
+    user: AuthenticatedUser,
+    options: { includeDeleted?: boolean } = {},
+  ) {
     const scope = await this.accessPolicy.resolveScope(user);
-    const where: any = { id, deletedAt: null };
+    const where: any = { id };
+    if (!options.includeDeleted) where.deletedAt = null;
     if (!scope.isAdmin) {
       where.AND = [this.accessPolicy.buildLegendaryWhere(scope)];
     }

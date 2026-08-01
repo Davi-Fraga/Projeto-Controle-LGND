@@ -10,6 +10,7 @@ export class RedisService implements OnModuleDestroy {
     this.client = new Redis({
       host: REDIS_CONFIG.host,
       port: REDIS_CONFIG.port,
+      password: REDIS_CONFIG.password,
     });
 
     this.client.on('error', (err) => {

@@ -8,6 +8,7 @@ import { CandidateOptionsQueryDto } from '../../common/options/candidate-options
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
+import { LEGENDARY_RELATION } from '../../common/access/legendary-relation.select';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { AuditService } from '../audit/audit.service';
 import { CreateTopDto, TopQueryDto } from './dto/top-query.dto';
@@ -19,19 +20,19 @@ import { CreateTopServantDto, TopServantsQueryDto, UpdateTopServantDto } from '.
 import { CreateTopFamilyDto, CreateTopFamilyMemberDto, TransferTopFamilyMemberDto, UpdateTopFamilyDto, UpdateTopFamilyMemberDto } from './dto/top-family.dto';
 
 const includeTop = {
-  representative: true,
-  deputyRepresentative: true,
-  generalCoordinator: true,
-  familyCoordinator: true,
-  familyDeputyCoordinator: true,
-  familyGeneralCoordinator: true,
+  representative: LEGENDARY_RELATION,
+  deputyRepresentative: LEGENDARY_RELATION,
+  generalCoordinator: LEGENDARY_RELATION,
+  familyCoordinator: LEGENDARY_RELATION,
+  familyDeputyCoordinator: LEGENDARY_RELATION,
+  familyGeneralCoordinator: LEGENDARY_RELATION,
   _count: { select: { participants: true, servants: true, teams: true, families: true } },
 };
-const includeTopTeam = { team: true, coordinator: true, deputyCoordinator: true };
-const includeParticipant = { legendary: true };
-const includeServant = { legendary: true, team: true };
-const includeFamily = { representative: true, deputyRepresentative: true, _count: { select: { members: { where: { status: TopFamilyMemberStatus.ACTIVE, deletedAt: null } } } } };
-const includeFamilyMember = { topParticipant: { include: { legendary: true } }, topFamily: true };
+const includeTopTeam = { team: true, coordinator: LEGENDARY_RELATION, deputyCoordinator: LEGENDARY_RELATION };
+const includeParticipant = { legendary: LEGENDARY_RELATION };
+const includeServant = { legendary: LEGENDARY_RELATION, team: true };
+const includeFamily = { representative: LEGENDARY_RELATION, deputyRepresentative: LEGENDARY_RELATION, _count: { select: { members: { where: { status: TopFamilyMemberStatus.ACTIVE, deletedAt: null } } } } };
+const includeFamilyMember = { topParticipant: { include: { legendary: LEGENDARY_RELATION } }, topFamily: true };
 
 @Injectable()
 export class TopsService {
@@ -86,8 +87,8 @@ export class TopsService {
 
   private async buildTeamsChart(top: any): Promise<OrgChartNode> {
     const [teams, servants] = await Promise.all([
-      this.prisma.topTeam.findMany({ where: { topEventId: top.id, deletedAt: null }, include: { team: true, coordinator: true, deputyCoordinator: true }, orderBy: { createdAt: 'asc' } }),
-      this.prisma.topServant.findMany({ where: { topEventId: top.id, deletedAt: null, status: { not: TopServantStatus.CANCELLED } }, include: { legendary: true }, orderBy: { createdAt: 'asc' } }),
+      this.prisma.topTeam.findMany({ where: { topEventId: top.id, deletedAt: null }, include: includeTopTeam, orderBy: { createdAt: 'asc' } }),
+      this.prisma.topServant.findMany({ where: { topEventId: top.id, deletedAt: null, status: { not: TopServantStatus.CANCELLED } }, include: { legendary: LEGENDARY_RELATION }, orderBy: { createdAt: 'asc' } }),
     ]);
     const root = orgNode(`top:${top.id}`, 'root', `TOP #${top.number} - ${top.name}`);
     const coordination = orgNode('coordination:general', 'group', 'Coordenação Geral', { leaderId: top.generalCoordinatorLegendaryId ?? top.representativeLegendaryId ?? undefined });
@@ -128,7 +129,7 @@ export class TopsService {
   private async buildFamiliesChart(top: any): Promise<OrgChartNode> {
     const families = await this.prisma.topFamily.findMany({
       where: { topEventId: top.id, deletedAt: null },
-      include: { representative: true, deputyRepresentative: true, members: { where: { status: TopFamilyMemberStatus.ACTIVE, deletedAt: null }, include: { topParticipant: { include: { legendary: true } } } } },
+      include: { representative: LEGENDARY_RELATION, deputyRepresentative: LEGENDARY_RELATION, members: { where: { status: TopFamilyMemberStatus.ACTIVE, deletedAt: null }, include: { topParticipant: { include: { legendary: LEGENDARY_RELATION } } } } },
       orderBy: { name: 'asc' },
     });
     const root = orgNode(`top:${top.id}`, 'root', `TOP #${top.number} - ${top.name}`);
@@ -157,7 +158,7 @@ export class TopsService {
   private async buildCitiesChart(top: any): Promise<OrgChartNode> {
     const participants = await this.prisma.topParticipant.findMany({
       where: { topEventId: top.id, deletedAt: null, status: { not: TopParticipantStatus.CANCELLED } },
-      include: { legendary: true },
+      include: includeParticipant,
       orderBy: { createdAt: 'asc' },
     });
     const root = orgNode(`top:${top.id}`, 'root', `TOP #${top.number} - ${top.name}`);

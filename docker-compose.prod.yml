@@ -82,10 +82,17 @@ services:
     image: redis:7-alpine
     container_name: cdm-redis
     restart: unless-stopped
+    # AUTH obrigatório mesmo o Redis estando só na rede interna `cdm`: defesa em
+    # profundidade — sem senha, qualquer container que alcance a rede lê/escreve o
+    # throttle de login e o cache. REDIS_PASSWORD é OBRIGATÓRIA em .env.production;
+    # sem ela o container sobe sem senha e a API (que manda AUTH) falha ao conectar.
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -41,6 +41,7 @@ import { RateLimitGuard } from './common/guards/rate-limit.guard';
       connection: {
         host: REDIS_CONFIG.host,
         port: REDIS_CONFIG.port,
+        password: REDIS_CONFIG.password,
       },
     }),
     AccessPolicyModule,

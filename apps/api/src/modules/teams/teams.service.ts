@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { cleanPhone, LegendaryHistoryType, LegendaryStatus, normalizeName, TeamMembershipStatus, TeamStatus } from '@central-da-manada/shared';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
+import { LEGENDARY_RELATION } from '../../common/access/legendary-relation.select';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { getPagination, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { OptionsQueryDto } from '../../common/options/options-query.dto';
@@ -14,8 +15,8 @@ import { UpdateTeamMemberDto } from './dto/update-team-member.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 
 const includeTeam = {
-  coordinator: true,
-  deputyCoordinator: true,
+  coordinator: LEGENDARY_RELATION,
+  deputyCoordinator: LEGENDARY_RELATION,
   _count: {
     select: {
       memberships: {
@@ -29,7 +30,7 @@ const includeTeam = {
 };
 
 const includeMember = {
-  legendary: true,
+  legendary: LEGENDARY_RELATION,
   team: true,
 };
 

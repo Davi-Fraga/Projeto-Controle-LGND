@@ -3,6 +3,7 @@ import { LegendaryStatus, TeamMembershipStatus, TeamStatus, teamDisplayName } fr
 import type { OrgChartNode } from '@central-da-manada/shared';
 import { PrismaService } from '../../database/prisma.service';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
+import { LEGENDARY_RELATION } from '../../common/access/legendary-relation.select';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { annotateCounts, normalizeCityKey, orgNode } from '../../common/org-chart/org-chart.util';
 import type { CitiesMode } from './dto/cities-query.dto';
@@ -27,9 +28,9 @@ export class OrgChartService {
     const team = await this.prisma.team.findFirst({
       where: { id: teamId, deletedAt: null },
       include: {
-        coordinator: true,
-        deputyCoordinator: true,
-        memberships: { where: { status: TeamMembershipStatus.ACTIVE, deletedAt: null }, include: { legendary: true }, orderBy: { startedAt: 'asc' } },
+        coordinator: LEGENDARY_RELATION,
+        deputyCoordinator: LEGENDARY_RELATION,
+        memberships: { where: { status: TeamMembershipStatus.ACTIVE, deletedAt: null }, include: { legendary: LEGENDARY_RELATION }, orderBy: { startedAt: 'asc' } },
       },
     });
     if (!team) throw new NotFoundException('Team not found.');
@@ -85,7 +86,7 @@ export class OrgChartService {
     if (!scope.isAdmin) Object.assign(where, this.accessPolicy.buildTeamWhere(scope));
     const teams = await this.prisma.team.findMany({
       where,
-      include: { coordinator: true },
+      include: { coordinator: LEGENDARY_RELATION },
       orderBy: { name: 'asc' },
     });
 

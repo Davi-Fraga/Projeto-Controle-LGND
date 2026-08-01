@@ -566,10 +566,11 @@ describe('ChurchesService geocoding integration', () => {
     });
 
     it('remove faz soft-delete quando a igreja está vazia', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true });
       prisma.church.findFirst.mockResolvedValueOnce({ id: 'c1', name: 'Igreja X' });
       prisma.legendary.count.mockResolvedValueOnce(0);
 
-      await service.remove('c1', 'actor');
+      await service.remove('c1', actor);
 
       expect(prisma.church.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'c1' }, data: expect.objectContaining({ deletedAt: expect.any(Date) }) }),
@@ -578,10 +579,24 @@ describe('ChurchesService geocoding integration', () => {
     });
 
     it('remove bloqueia (409) quando a igreja tem legendários, sem removê-los', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: true });
       prisma.church.findFirst.mockResolvedValueOnce({ id: 'c1', name: 'Igreja X' });
       prisma.legendary.count.mockResolvedValueOnce(3);
 
-      await expect(service.remove('c1', 'actor')).rejects.toThrow('Legendários');
+      await expect(service.remove('c1', actor)).rejects.toThrow('Legendários');
+      expect(prisma.church.update).not.toHaveBeenCalled();
+    });
+
+    // Defesa em profundidade: excluir não pode ser o único caminho que enxerga
+    // igreja fora do escopo (findOne/update já aplicam a mesma barreira).
+    it('remove devolve 404 para igreja fora do escopo, sem contar legendários nem mutar', async () => {
+      accessPolicy.resolveScope.mockResolvedValueOnce({ isAdmin: false });
+      accessPolicy.buildChurchWhere.mockReturnValueOnce({ id: { in: ['outra'] } });
+      prisma.church.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.remove('c1', actor)).rejects.toThrow('Church not found.');
+
+      expect(accessPolicy.buildChurchWhere).toHaveBeenCalled();
       expect(prisma.church.update).not.toHaveBeenCalled();
     });
   });

@@ -36,9 +36,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = this.getPrismaErrorMessage(exception);
     }
 
-    // Log the error for server-side tracking
+    // Log server-side. NÃO serializar a exceção inteira: `JSON.stringify(exception)`
+    // arrasta as props próprias do objeto — em erro de validação, a lista de mensagens
+    // do class-validator, que pode ecoar o valor submetido (CPF, telefone, e-mail) para
+    // o log (CWE-532). Aqui vai só mensagem + stack; o payload nunca.
     this.logger.error(
-      `${request.method} ${request.url} ${status} - ${JSON.stringify(exception)}`,
+      `${request.method} ${request.url} ${status} - ${this.describe(exception)}`,
+      exception instanceof Error ? exception.stack : undefined,
     );
 
     response.status(status).json({
@@ -49,6 +53,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
         path: request.url,
       },
     });
+  }
+
+  /** Identificação enxuta da exceção para o log — nunca o payload da requisição. */
+  private describe(exception: unknown): string {
+    if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      return `PrismaClientKnownRequestError(${exception.code})`;
+    }
+    if (exception instanceof Error) {
+      return `${exception.name}: ${exception.message}`;
+    }
+    return 'Unknown exception';
   }
 
   private handlePrismaError(exception: Prisma.PrismaClientKnownRequestError): number {

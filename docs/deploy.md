@@ -345,6 +345,53 @@ Hoje esse procedimento não existe.
 
 Restauração também exige plano, backup confirmado, comando completo e autorização específica.
 
+## Variáveis novas exigidas por uma release
+
+Uma release pode introduzir variável obrigatória em `.env.production`. Como o arquivo só
+existe na VPS e não é versionado, isso **não** chega junto com o `git pull` — quem faz o
+deploy precisa adicionar antes de subir os serviços, senão o container sobe degradado ou
+não sobe.
+
+Antes de cada deploy, comparar `.env.production.example` (versionado, atualizado pela
+release) com as chaves presentes em `.env.production`. Somente **nomes** de chave, nunca
+valores:
+
+~~~bash
+# Diagnóstico, exige aprovação como qualquer comando remoto.
+# Lista apenas os NOMES que faltam — nenhum valor é impresso.
+comm -23 \
+  <(grep -oE '^[A-Z_]+=' .env.production.example | tr -d '=' | sort) \
+  <(grep -oE '^[A-Z_]+=' .env.production        | tr -d '=' | sort)
+~~~
+
+### Pendente: `REDIS_PASSWORD` (auditoria de segurança, PR #47)
+
+A partir do PR #47 o Redis de produção sobe com `--requirepass` e a API autentica com a
+mesma variável. **`REDIS_PASSWORD` passa a ser obrigatória.** Sem ela:
+
+- o container do Redis sobe **sem senha** (o `--requirepass ""` é ignorado);
+- o healthcheck do Redis falha, e a API — que depende de `service_healthy` — não sobe.
+
+Passo a passo, cada comando sujeito a aprovação individual (ver "Regra de autorização"):
+
+~~~bash
+# 1. Gerar o valor LOCALMENTE e guardar no gerenciador de senhas do Davi.
+openssl rand -base64 36
+
+# 2. Na VPS, acrescentar a chave ao final de .env.production, SEM ecoar o valor.
+#    O `read -s` não imprime o que for digitado; a linha some do histórico do shell.
+cd /home/deploy/central-da-manada
+read -s -p 'REDIS_PASSWORD: ' V && printf 'REDIS_PASSWORD=%s\n' "$V" >> .env.production && unset V
+
+# 3. Conferir que a chave existe — sem exibir o valor.
+grep -c '^REDIS_PASSWORD=' .env.production   # deve responder 1
+~~~
+
+Só depois disso rodar o deploy. Como o Redis passa a exigir AUTH, o `up -d` recria o
+container: o volume `redis_data` persiste, e o que há nele é cache e contador de throttle
+de login — descartável. Na validação pós-deploy, o campo `redis` do `/api/health` é o que
+prova que a API autenticou.
+
 ## Permissões de .env.production
 
 Em diagnóstico realizado em 28/07/2026, `.env.production` foi observado com permissão
@@ -551,6 +598,7 @@ Cada item remete à sua seção; nenhum deles substitui a autorização individu
 - [ ] Estado do worktree remoto analisado (e cruzado com os arquivos que os commits tocam)
 - [ ] Pré-requisitos locais verdes (`pnpm lint` completo, testes, build)
 - [ ] Mudança integrada à `main` e commit a implantar identificado
+- [ ] `.env.production` comparado com `.env.production.example` — nenhuma variável nova faltando
 - [ ] Diagnóstico pré-deploy aprovado: branch, `git ls-remote`, containers, **health de baseline**
 - [ ] Cada migration pendente analisada individualmente
 - [ ] Backup criado e validado por `"$BACKUP_FILE"` na mesma sessão de shell

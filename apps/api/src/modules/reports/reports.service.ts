@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { TeamMembershipStatus } from '@central-da-manada/shared';
 import { AccessPolicyService, AccessScope } from '../../common/access/access-policy.service';
+import { LEGENDARY_RELATION } from '../../common/access/legendary-relation.select';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { getPagination, PaginationDto, toPaginatedResponse } from '../../common/pagination/pagination.dto';
 import { PrismaService } from '../../database/prisma.service';
@@ -85,7 +86,7 @@ export class ReportsService {
     await this.assertTopCityVisible(topId, user);
     return this.prisma.topParticipant.findMany({
       where: { topEventId: topId, deletedAt: null },
-      include: { legendary: true },
+      include: { legendary: LEGENDARY_RELATION },
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -94,7 +95,7 @@ export class ReportsService {
     await this.assertTopCityVisible(topId, user);
     return this.prisma.topServant.findMany({
       where: { topEventId: topId, deletedAt: null },
-      include: { legendary: true, team: true },
+      include: { legendary: LEGENDARY_RELATION, team: true },
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -104,11 +105,11 @@ export class ReportsService {
     return this.prisma.topFamily.findMany({
       where: { topEventId: topId, deletedAt: null },
       include: {
-        representative: true,
-        deputyRepresentative: true,
+        representative: LEGENDARY_RELATION,
+        deputyRepresentative: LEGENDARY_RELATION,
         members: {
           where: { deletedAt: null },
-          include: { topParticipant: { include: { legendary: true } } },
+          include: { topParticipant: { include: { legendary: LEGENDARY_RELATION } } },
         },
       },
       orderBy: { name: 'asc' },
@@ -119,7 +120,7 @@ export class ReportsService {
     await this.assertSocialActionCityVisible(id, user);
     return this.prisma.socialActionParticipant.findMany({
       where: { socialActionId: id, deletedAt: null },
-      include: { legendary: true },
+      include: { legendary: LEGENDARY_RELATION },
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -135,8 +136,8 @@ export class ReportsService {
     const [legendarios, tops, families, members] = await Promise.all([
       this.prisma.legendary.findMany({ where: legendaryWhere, select: { id: true, fullName: true, city: true, notes: true }, orderBy: { fullName: 'asc' }, take: 100 }),
       this.prisma.topEvent.findMany({ where: topWhere, select: { id: true, name: true, number: true, city: true, needsReview: true, familyCoordinatorLegendaryId: true }, orderBy: { startDate: 'desc' }, take: 100 }),
-      this.prisma.topFamily.findMany({ where: { deletedAt: null, OR: [{ needsReview: true }, { representativeLegendaryId: null }], topEvent: scopedTopRelation }, include: { topEvent: true, representative: true }, orderBy: { name: 'asc' }, take: 100 }),
-      this.prisma.topFamilyMember.findMany({ where: { deletedAt: null, needsReview: true, topEvent: scopedTopRelation }, include: { topFamily: true, topParticipant: { include: { legendary: true } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
+      this.prisma.topFamily.findMany({ where: { deletedAt: null, OR: [{ needsReview: true }, { representativeLegendaryId: null }], topEvent: scopedTopRelation }, include: { topEvent: true, representative: LEGENDARY_RELATION }, orderBy: { name: 'asc' }, take: 100 }),
+      this.prisma.topFamilyMember.findMany({ where: { deletedAt: null, needsReview: true, topEvent: scopedTopRelation }, include: { topFamily: true, topParticipant: { include: { legendary: LEGENDARY_RELATION } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
     ]);
     return [
       ...legendarios.map((item: any) => ({ tipo: 'Legendário', id: item.id, nome: item.fullName, contexto: item.city ?? '', motivo: 'Marcado para revisar', observacao: item.notes ?? '' })),

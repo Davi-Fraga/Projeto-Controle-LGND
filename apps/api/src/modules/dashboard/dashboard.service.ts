@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { LegendaryStatus, TopEventStatus, TopPreRegistrationStatus } from '@central-da-manada/shared';
 import { PrismaService } from '../../database/prisma.service';
 import { AccessPolicyService } from '../../common/access/access-policy.service';
+import { LEGENDARY_RELATION } from '../../common/access/legendary-relation.select';
 import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 
 const EMPTY_UUID = '00000000-0000-0000-0000-000000000000';
@@ -105,7 +106,7 @@ export class DashboardService {
   }
 
   private async findHighlightedTop(topScopeWhere: any = {}) {
-    const include = { representative: true, deputyRepresentative: true, _count: { select: { participants: true, servants: true, teams: true, families: true } } };
+    const include = { representative: LEGENDARY_RELATION, deputyRepresentative: LEGENDARY_RELATION, _count: { select: { participants: true, servants: true, teams: true, families: true } } };
     const top = await this.prisma.topEvent.findFirst({
       where: {
         deletedAt: null,

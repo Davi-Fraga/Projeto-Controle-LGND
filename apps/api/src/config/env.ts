@@ -7,6 +7,10 @@ export const getEnv = (key: string, defaultValue?: string): string => {
 export const REDIS_CONFIG = {
   host: getEnv('REDIS_HOST', 'localhost'),
   port: parseInt(getEnv('REDIS_PORT', '6379'), 10),
+  // Em produção o Redis exige AUTH (`--requirepass`, docker-compose.prod.yml).
+  // `undefined` quando ausente: o ioredis só manda AUTH se houver senha, então o
+  // dev local (Redis sem senha, porta presa em 127.0.0.1) continua conectando.
+  password: getEnv('REDIS_PASSWORD') || undefined,
 };
 
 export const getRequiredEnv = (key: string): string => {

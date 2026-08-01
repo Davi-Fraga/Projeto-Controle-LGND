@@ -126,9 +126,18 @@ export class ChurchesService {
     return this.withEffectiveSpiritualLeader(church);
   }
 
-  async remove(id: string, actorUserId?: string) {
-    const church = await this.prisma.church.findFirst({ where: { id, deletedAt: null } });
+  async remove(id: string, user: AuthenticatedUser) {
+    // Mesma barreira de escopo de `findOne`/`update`: excluir não pode ser o único
+    // caminho que enxerga igreja fora do escopo (a permissão é admin-only pelo
+    // catálogo, mas catálogo é declaração, não enforcement).
+    const scope = await this.accessPolicy.resolveScope(user);
+    const where: any = { id, deletedAt: null };
+    if (!scope.isAdmin) {
+      where.AND = [this.accessPolicy.buildChurchWhere(scope)];
+    }
+    const church = await this.prisma.church.findFirst({ where });
     if (!church) throw new NotFoundException('Church not found.');
+    const actorUserId = user.sub;
 
     // Barreira no backend: só exclui igreja vazia; nunca remove Legendários em cascata.
     const linked = await this.prisma.legendary.count({ where: { churchId: id, deletedAt: null } });

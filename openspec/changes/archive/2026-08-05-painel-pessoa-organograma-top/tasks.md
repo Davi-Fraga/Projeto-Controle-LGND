@@ -122,7 +122,10 @@ Cada item registra o que foi visto. O que não puder ser exercitado por falta de
   1. **Sem teste de navegador no repositório.** O defeito da Fase 1 (`pointer-events: none`) é invisível para Vitest/JSDOM. O guarda atual assere a configuração do `<ReactFlow>` e pega a regressão mais provável, mas só um teste de navegador provaria que o clique alcança o cartão. Introduzir essa infraestrutura é decisão maior que esta correção.
   2. **Banco local sem hierarquia de gestor de cidade** (`cityLeaderId` nulo em 100% dos legendários) e **TOP local sem famílias nem participantes.** Isso deixa fora do alcance de qualquer smoke: drag-and-drop de pessoas, "Carregar mais" e duas das três visões do TOP. Um seed de desenvolvimento com hierarquia resolveria de uma vez.
   3. **Os dois montadores de organograma continuam duplicados** (`OrgChartService` e `TopsService.getOrgChart`). Foi essa divergência que produziu a Fase 2; o invariante da task 5.2 reduz o custo de ela voltar, mas não a elimina.
-- [ ] 8.3 Pedir aval do Davi antes de qualquer ação de git (branch, commit, PR) — regra crítica do projeto
+- [x] 8.3 Pedir aval do Davi antes de qualquer ação de git (branch, commit, PR) — regra crítica do projeto
+  - Aval dado em 05/08/2026. Branch `fix/organograma-clique-e-refid-top` → PR **#48** → merge `89075bb`.
+  - **Deployado em produção em 05/08/2026 ~14:31–14:36 UTC.** Health `ok/up/up`, site 200, 0 erros nos logs, backup `backup_20260805-142948.sql` (1.526.363 bytes) validado antes, rollback em `pre-89075bb`. Zero migrations pendentes — rollback binário seguro nesta release.
+  - Imagem servida contém o fix: `refId` 8× em `dist/modules/tops/tops.service.js` (era 0) e `nodesFocusable` em 2 chunks do web.
 
 ## 9. Fase 3 — recarregar o dado não descarta a navegação
 
@@ -145,4 +148,4 @@ Achado durante os smokes da Fase 1 e corrigido a pedido do Davi. Defeito pré-ex
 - [x] 9.6 Smoke de não-regressão: trocar de visão continua resetando
   - Trocar de cidade fechou o painel e reabriu no overview de Morrinhos; trocar de escopo voltou para "Selecione uma equipe…"
 - [x] 9.7 Verificação: `pnpm --filter web test` 178/178 · `pnpm --filter api test` 574/574 · `pnpm lint` na raiz exit 0
-- [ ] 8.4 Após mesclado e validado, arquivar a change (`openspec-archive-change`), sincronizando os deltas em `openspec/specs/organogram-navigation/` e `openspec/specs/organogram-person-panel/`
+- [x] 8.4 Após mesclado e validado, arquivar a change (`openspec-archive-change`), sincronizando os deltas em `openspec/specs/organogram-navigation/` e `openspec/specs/organogram-person-panel/`

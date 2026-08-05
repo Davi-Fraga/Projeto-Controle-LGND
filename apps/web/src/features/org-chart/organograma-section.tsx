@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { OrgChartNode } from '@central-da-manada/shared';
 import { teamDisplayName } from '@central-da-manada/shared';
 import { Network } from 'lucide-react';
@@ -67,6 +67,12 @@ export function OrganogramaSection({ canEditPerson, canReorder, canStructureChan
     if (!visibleScopes.some((s) => s.value === scope)) setScope(visibleScopes[0].value);
   }, [visibleScopes, scope]);
 
+  // Identidade da VISÃO (não do dado). Trocar de visão zera a tela; recarregar os
+  // dados da mesma visão não — senão a árvore desmonta no meio de uma ação do usuário
+  // e leva junto o que ele estava fazendo (foco, painel aberto, opção de desfazer).
+  const viewKey = `${scope}|${teamId}|${citiesMode}|${city}`;
+  const lastViewKey = useRef<string | null>(null);
+
   // Fetch the tree for global scopes.
   useEffect(() => {
     if (scope === 'tops') return;
@@ -79,7 +85,14 @@ export function OrganogramaSection({ canEditPerson, canReorder, canStructureChan
       return;
     }
     let active = true;
-    setLoading(true);
+    const isViewChange = lastViewKey.current !== viewKey;
+    lastViewKey.current = viewKey;
+    // Só a troca de visão limpa a tela e mostra o "Carregando". O refresh disparado por
+    // uma ação (mover pessoa) mantém a árvore atual no ar até o dado novo chegar.
+    if (isViewChange) {
+      setRoot(null);
+      setLoading(true);
+    }
     setError(null);
     const request =
       scope === 'equipes'
@@ -100,6 +113,7 @@ export function OrganogramaSection({ canEditPerson, canReorder, canStructureChan
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, teamId, citiesMode, city, reloadKey]);
 
   const showTeamPicker = scope === 'equipes';

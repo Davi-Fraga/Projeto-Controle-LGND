@@ -428,6 +428,84 @@ describe('TopsService org-chart', () => {
     expect(root.count).toBe(3);
   });
 
+  // Invariante, não caso de exemplo: o defeito real foi um builder inteiro montar a
+  // árvore sem `refId`, e nenhum teste de exemplo pegou. Aqui percorre-se a árvore
+  // completa das três visões — um ramo novo esquecido cai neste teste.
+  describe('toda pessoa da árvore é identificável (refId)', () => {
+    const coletar = (node: any, acc: any[] = []) => {
+      acc.push(node);
+      node.children.forEach((c: any) => coletar(c, acc));
+      return acc;
+    };
+    const pessoas = (root: any) => coletar(root).filter((n) => n.kind === 'person' || n.kind === 'leader');
+    const estruturais = (root: any) => coletar(root).filter((n) => ['root', 'group', 'city'].includes(n.kind));
+
+    function popularTudo() {
+      prisma.topTeam.findMany.mockResolvedValue([
+        { id: 'tt1', teamId: 'team-a', team: { name: 'Equipe A' }, coordinatorLegendaryId: 'lg-coord', coordinator: { fullName: 'Coord' }, deputyCoordinatorLegendaryId: 'lg-vice', deputyCoordinator: { fullName: 'Vice' } },
+      ]);
+      prisma.topServant.findMany.mockResolvedValue([
+        { id: 's1', teamId: 'team-a', legendaryId: 'lg-s1', legendary: { fullName: 'Servo 1' }, role: 'Cozinha' },
+        { id: 's2', teamId: null, legendaryId: 'lg-s2', legendary: { fullName: 'Servo Solto' } },
+      ]);
+      prisma.topFamily.findMany.mockResolvedValue([
+        {
+          id: 'f1',
+          name: 'Familia Leao',
+          representativeLegendaryId: 'lg-rep',
+          representative: { fullName: 'Chefe' },
+          deputyRepresentativeLegendaryId: 'lg-virep',
+          deputyRepresentative: { fullName: 'Vice-chefe' },
+          members: [{ id: 'm1', topParticipant: { legendaryId: 'lg-m1', legendary: { fullName: 'Membro 1' } } }],
+        },
+      ]);
+      prisma.topParticipant.findMany.mockResolvedValue([
+        { id: 'p1', legendaryId: 'lg-p1', legendary: { fullName: 'A', city: 'Goiânia' } },
+        { id: 'p2', legendaryId: 'lg-p2', legendary: { fullName: 'B', city: null } },
+      ]);
+    }
+
+    it.each(['teams', 'families', 'cities'] as const)('visão "%s": todo nó person/leader traz refId', async (view) => {
+      popularTudo();
+
+      const root = await service.getOrgChart('top-1', view);
+      const nos = pessoas(root);
+
+      expect(nos.length).toBeGreaterThan(0);
+      const semRefId = nos.filter((n) => !n.refId).map((n) => `${n.kind}:${n.id}`);
+      expect(semRefId).toEqual([]);
+    });
+
+    it.each(['teams', 'families', 'cities'] as const)('visão "%s": nó estrutural não traz refId', async (view) => {
+      popularTudo();
+
+      const root = await service.getOrgChart('top-1', view);
+
+      expect(estruturais(root).filter((n) => n.refId)).toEqual([]);
+    });
+
+    it('registro sem Legendário vinculado vira nó sem refId, sem quebrar', async () => {
+      prisma.topServant.findMany.mockResolvedValueOnce([{ id: 's-orfao', teamId: null, legendaryId: null, legendary: null }]);
+
+      const root = await service.getOrgChart('top-1', 'teams');
+      const orfao = pessoas(root).find((n) => n.id === 'servant:s-orfao')!;
+
+      expect(orfao.label).toBe('Sem nome');
+      expect(orfao.refId).toBeUndefined();
+    });
+
+    it('o refId é o id do Legendário, não o id do vínculo — é ele que o painel consulta', async () => {
+      popularTudo();
+
+      const root = await service.getOrgChart('top-1', 'teams');
+      const servo = pessoas(root).find((n) => n.id === 'servant:s1')!;
+      const coord = pessoas(root).find((n) => n.id === 'leader:tt1')!;
+
+      expect(servo.refId).toBe('lg-s1');
+      expect(coord.refId).toBe('lg-coord');
+    });
+  });
+
   it('returns the same OrgChartNode shape across the three views (contract)', async () => {
     const assertShape = (node: any) => {
       expect(typeof node.id).toBe('string');

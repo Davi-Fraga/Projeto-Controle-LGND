@@ -98,15 +98,16 @@ export class TopsService {
       const branchLeaderId = topTeam.coordinatorLegendaryId ?? undefined;
       const teamNode = orgNode(`team:${topTeam.id}`, 'group', teamDisplayName(topTeam.team?.name ?? 'Equipe'), { subtitle: 'Equipe', leaderId: branchLeaderId });
       const teamServants = servants.filter((s: any) => s.teamId === topTeam.teamId);
-      const servantNodes = teamServants.map((s: any) => orgNode(`servant:${s.id}`, 'person', s.legendary?.fullName ?? 'Sem nome', { subtitle: s.role ?? undefined }));
+      // `refId` = id do Legendário: é o que o painel de detalhe usa para buscar a pessoa.
+      const servantNodes = teamServants.map((s: any) => orgNode(`servant:${s.id}`, 'person', s.legendary?.fullName ?? 'Sem nome', { subtitle: s.role ?? undefined, refId: s.legendaryId ?? undefined }));
       if (topTeam.coordinatorLegendaryId) {
         // Coordinator is the leader node that holds the members.
-        const coordNode = orgNode(`leader:${topTeam.id}`, 'leader', topTeam.coordinator?.fullName ?? 'Coordenador', { subtitle: 'Coordenador', leaderId: branchLeaderId });
+        const coordNode = orgNode(`leader:${topTeam.id}`, 'leader', topTeam.coordinator?.fullName ?? 'Coordenador', { subtitle: 'Coordenador', leaderId: branchLeaderId, refId: topTeam.coordinatorLegendaryId ?? undefined });
         coordNode.children.push(...servantNodes);
         teamNode.children.push(coordNode);
         // Deputy is a sibling leader node without members.
         if (topTeam.deputyCoordinatorLegendaryId) {
-          teamNode.children.push(orgNode(`deputy:${topTeam.id}`, 'leader', topTeam.deputyCoordinator?.fullName ?? 'Vice-coordenador', { subtitle: 'Vice-coordenador', leaderId: branchLeaderId }));
+          teamNode.children.push(orgNode(`deputy:${topTeam.id}`, 'leader', topTeam.deputyCoordinator?.fullName ?? 'Vice-coordenador', { subtitle: 'Vice-coordenador', leaderId: branchLeaderId, refId: topTeam.deputyCoordinatorLegendaryId ?? undefined }));
         }
       } else {
         // No coordinator: members hang directly under the team group.
@@ -118,7 +119,7 @@ export class TopsService {
     if (orphanServants.length) {
       const noTeam = orgNode('team:none', 'group', 'Sem equipe');
       for (const servant of orphanServants) {
-        noTeam.children.push(orgNode(`servant:${servant.id}`, 'person', servant.legendary?.fullName ?? 'Sem nome', { subtitle: servant.role ?? undefined }));
+        noTeam.children.push(orgNode(`servant:${servant.id}`, 'person', servant.legendary?.fullName ?? 'Sem nome', { subtitle: servant.role ?? undefined, refId: servant.legendaryId ?? undefined }));
       }
       coordination.children.push(noTeam);
     }
@@ -138,13 +139,13 @@ export class TopsService {
       // The whole family branch shares the representative's color.
       const branchLeaderId = family.representativeLegendaryId ?? undefined;
       const familyNode = orgNode(`family:${family.id}`, 'group', family.name, { subtitle: 'Família', leaderId: branchLeaderId });
-      const memberNodes = family.members.map((m: any) => orgNode(`familyMember:${m.id}`, 'person', m.topParticipant?.legendary?.fullName ?? 'Sem nome'));
+      const memberNodes = family.members.map((m: any) => orgNode(`familyMember:${m.id}`, 'person', m.topParticipant?.legendary?.fullName ?? 'Sem nome', { refId: m.topParticipant?.legendaryId ?? undefined }));
       if (family.representativeLegendaryId) {
-        const repNode = orgNode(`leader:${family.id}`, 'leader', family.representative?.fullName ?? 'Representante', { subtitle: 'Chefe de família', leaderId: branchLeaderId });
+        const repNode = orgNode(`leader:${family.id}`, 'leader', family.representative?.fullName ?? 'Representante', { subtitle: 'Chefe de família', leaderId: branchLeaderId, refId: family.representativeLegendaryId ?? undefined });
         repNode.children.push(...memberNodes);
         familyNode.children.push(repNode);
         if (family.deputyRepresentativeLegendaryId) {
-          familyNode.children.push(orgNode(`deputy:${family.id}`, 'leader', family.deputyRepresentative?.fullName ?? 'Vice-representante', { subtitle: 'Vice-representante', leaderId: branchLeaderId }));
+          familyNode.children.push(orgNode(`deputy:${family.id}`, 'leader', family.deputyRepresentative?.fullName ?? 'Vice-representante', { subtitle: 'Vice-representante', leaderId: branchLeaderId, refId: family.deputyRepresentativeLegendaryId ?? undefined }));
         }
       } else {
         familyNode.children.push(...memberNodes);
@@ -166,7 +167,7 @@ export class TopsService {
     let noCity: OrgChartNode | null = null;
     for (const participant of participants) {
       const rawCity = participant.legendary?.city?.trim();
-      const personNode = orgNode(`participant:${participant.id}`, 'person', participant.legendary?.fullName ?? 'Sem nome');
+      const personNode = orgNode(`participant:${participant.id}`, 'person', participant.legendary?.fullName ?? 'Sem nome', { refId: participant.legendaryId ?? undefined });
       if (!rawCity) {
         noCity ??= orgNode('city:none', 'group', 'Sem cidade');
         noCity.children.push(personNode);

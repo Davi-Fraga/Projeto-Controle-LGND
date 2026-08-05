@@ -55,14 +55,19 @@ function OrgChartCanvas({ root, canEditPerson, canReorder, canStructureChange, c
   const fitToId = useRef<string | null>(null);
   const { fitView } = useReactFlow();
 
-  // Reset para o overview sempre que a árvore (view) muda.
+  // Reset para o overview quando muda a ÁRVORE, não quando o dado dela é recarregado.
+  // Um refetch (ex.: depois de mover alguém) produz um `root` novo com a mesma raiz —
+  // resetar aí descarta a navegação do usuário e fecha o painel junto com a opção de
+  // desfazer que acabou de aparecer nele.
+  const rootRef = useRef(root);
+  rootRef.current = root;
   useEffect(() => {
-    setCollapsed(collapsedByDefault(root, DEFAULT_OPEN_DEPTH));
+    setCollapsed(collapsedByDefault(rootRef.current, DEFAULT_OPEN_DEPTH));
     setExpandedCaps(new Set());
     setFocusedId(null);
     setQuery('');
     setNotFound(false);
-  }, [root]);
+  }, [root.id]);
 
   function expandCap(moreNodeId: string) {
     setExpandedCaps((prev) => new Set(prev).add(loadMoreParentId(moreNodeId)));
@@ -323,9 +328,16 @@ function OrgChartCanvas({ root, canEditPerson, canReorder, canStructureChange, c
         fitViewOptions={{ padding: 0.12, minZoom: 0.85, maxZoom: 1.1 }}
         minZoom={0.2}
         maxZoom={2}
+        // Arrastar o nó pelo canvas e criar aresta continuam desligados — não fazem
+        // sentido aqui. Já `elementsSelectable` NÃO pode ser desligado: o React Flow
+        // aplica `pointer-events: none` no wrapper do nó quando seleção, arraste e
+        // handlers de nó estão todos ausentes (`hasPointerEvents` em NodeWrapper), e
+        // aí NENHUM clique chega aos cartões — os onClick daqui de dentro ficam mudos.
         nodesDraggable={false}
         nodesConnectable={false}
-        elementsSelectable={false}
+        // O wrapper do nó ganharia `tabindex="0"` sem executar ação nenhuma; quem é
+        // acionável são os controles dentro do cartão. Fora da ordem de tabulação.
+        nodesFocusable={false}
         proOptions={{ hideAttribution: true }}
       >
         <Background color="#1c1c22" gap={26} size={1} />

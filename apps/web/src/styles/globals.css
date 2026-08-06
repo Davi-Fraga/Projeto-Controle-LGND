@@ -3,71 +3,183 @@
 @tailwind utilities;
 
 :root {
-  --background: 240 10% 4.5%; /* #0B0B0B */
-  --foreground: 240 5% 96%; /* #F4F4F5 */
-  --border: 240 6% 16%; /* #27272A */
-  --primary: 24.6 95% 53.1%; /* #F97316 */
-  --primary-foreground: 0 0% 100%;
+  color-scheme: dark;
+
+  /* Canvas and surfaces */
+  --canvas: 240 7% 6%; /* #0E0E10 */
+  --surface-subtle: 240 10% 4%; /* #0B0B0B */
+  --surface: 240 6% 7%; /* #111113 */
+  --surface-raised: 240 4% 10%; /* #18181B */
+  --surface-hover: 240 5% 13%; /* #202024 */
+
+  /* Text */
+  --text-strong: 240 5% 96%; /* #F4F4F5 */
+  --text: 240 5% 84%; /* #D4D4D8 */
+  --text-muted: 240 4% 65%; /* #A1A1AA */
+  --text-disabled: 240 4% 46%; /* #71717A */
+
+  /* Borders and brand */
+  --line: 240 6% 16%; /* #27272A */
+  --line-strong: 240 5% 26%; /* #3F3F46 */
+  --accent: 24.6 95% 53.1%; /* #F97316 */
+  --accent-hover: 20.5 90% 48%; /* #EA580C */
+  --accent-pressed: 17.5 88% 40%; /* #C2410C */
+  --accent-foreground: 0 0% 100%;
+  --focus: 30.7 97% 58%; /* #FB923C */
+
+  /* Feedback */
+  --feedback-success: 142 71% 45%; /* #22C55E */
+  --feedback-warning: 38 92% 50%; /* #F59E0B */
+  --feedback-danger: 350 89% 60%; /* #F43F5E */
+  --feedback-info: 240 5% 65%; /* #A1A1AA */
+
+  /* Compatibility aliases used by existing Tailwind classes */
+  --background: var(--canvas);
+  --foreground: var(--text-strong);
+  --border: var(--line);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-foreground);
+
+  /* Short type and spacing scales */
+  --type-page-title: clamp(1.5rem, 1.35rem + 0.5vw, 1.875rem);
+  --type-section-title: 1rem;
+  --type-body: 0.875rem;
+  --type-helper: 0.75rem;
+  --type-label: 0.75rem;
+  --space-page: clamp(1rem, 0.75rem + 1.25vw, 2rem);
+  --space-section: clamp(1.25rem, 1rem + 1vw, 2rem);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  background-color: hsl(var(--canvas));
+}
+
 body {
   margin: 0;
-  background-color: #0E0E10;
-  color: hsl(var(--foreground));
+  background-color: hsl(var(--canvas));
+  color: hsl(var(--text-strong));
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-size: var(--type-body);
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom Scrollbar for premium design */
+::selection {
+  background-color: hsl(var(--accent) / 0.3);
+  color: hsl(var(--text-strong));
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid hsl(var(--focus));
+  outline-offset: 2px;
+}
+
+:where(button, input, select, textarea):disabled {
+  cursor: not-allowed;
+}
+
+.type-page-title {
+  color: hsl(var(--text-strong));
+  font-size: var(--type-page-title);
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.type-section-title {
+  color: hsl(var(--text-strong));
+  font-size: var(--type-section-title);
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: 0.025em;
+}
+
+.type-body {
+  color: hsl(var(--text));
+  font-size: var(--type-body);
+  line-height: 1.5;
+}
+
+.type-helper {
+  color: hsl(var(--text-muted));
+  font-size: var(--type-helper);
+  line-height: 1.5;
+}
+
+.type-label {
+  color: hsl(var(--text-muted));
+  font-size: var(--type-label);
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Compact scrollbar that follows the semantic palette. */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
-  background: #0B0B0B;
-}
-::-webkit-scrollbar-thumb {
-  background: #27272A;
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #F97316;
+  background: hsl(var(--surface-subtle));
 }
 
-/* Input and Select styling for Dark Mode */
+::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: hsl(var(--line));
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--accent));
+}
+
+/* Legacy-compatible field control. New forms compose this through Field. */
 .input {
   min-height: 2.75rem;
   width: 100%;
+  border: 1px solid hsl(var(--line));
   border-radius: 0.5rem;
-  border: 1px solid #27272A;
-  background-color: #18181B;
-  color: #F4F4F5;
-  padding-left: 0.875rem;
-  padding-right: 0.875rem;
-  font-size: 0.875rem;
-  font-weight: 500;
   outline: none;
-  transition: all 0.2s ease;
+  background-color: hsl(var(--surface-raised));
+  color: hsl(var(--text-strong));
+  padding-inline: 0.875rem;
+  font-size: var(--type-body);
+  font-weight: 500;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.input:hover:not(:disabled) {
+  border-color: hsl(var(--line-strong));
 }
 
 .input:focus {
-  border-color: #F97316;
-  background-color: #1B1B1F;
-  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.15);
+  border-color: hsl(var(--accent));
+  background-color: hsl(var(--surface-hover));
+}
+
+.input:focus-visible {
+  box-shadow: 0 0 0 3px hsl(var(--focus) / 0.2);
+}
+
+.input[aria-invalid='true'] {
+  border-color: hsl(var(--feedback-danger));
 }
 
 .input::placeholder {
-  color: #71717A;
+  color: hsl(var(--text-disabled));
 }
 
 .input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  background-color: hsl(var(--surface));
+  color: hsl(var(--text-disabled));
+  opacity: 0.72;
 }
 
 select.input {
@@ -79,11 +191,30 @@ select.input {
   padding-right: 2.25rem;
 }
 
-/* Custom premium card style */
+/* Kept for compatibility while pages move to Surface. */
 .card-premium {
-  border: 1px solid #27272A;
-  background-color: #111113;
+  border: 1px solid hsl(var(--line));
   border-radius: 0.75rem;
+  background-color: hsl(var(--surface));
   padding: 1.5rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 6px -1px hsl(0 0% 0% / 0.3), 0 2px 4px -1px hsl(0 0% 0% / 0.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .motion-displacement:active {
+    transform: none !important;
+  }
 }

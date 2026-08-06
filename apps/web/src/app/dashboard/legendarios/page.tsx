@@ -19,6 +19,8 @@ import type { Church, Expertise, Legendary, Profession } from '@/features/legend
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ActionMenu } from '@/components/ui/ActionMenu';
+import { EmptyState, ErrorState } from '@/components/ui/AsyncState';
+import { FilterPanel } from '@/components/ui/FilterPanel';
 import { TeamFilter } from '@/features/teams/team-filter';
 import { Search, MapPin, Eye, Edit2, UserMinus, X } from 'lucide-react';
 
@@ -63,8 +65,17 @@ function LegendariosContent() {
   }));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Incrementa para refazer a busca sem mexer em filtros — é o "tentar de novo" do erro.
+  const [reloadKey, setReloadKey] = useState(0);
   // Guarda anti-race: só a resposta da requisição mais recente é aplicada.
   const requestIdRef = useRef(0);
+
+  // Vazio COM busca/filtro é um resultado, não ausência de cadastro. Os dois estados
+  // pedem saídas diferentes: limpar o que filtrou, ou cadastrar o primeiro.
+  const hasActiveSearch = debouncedSearch.trim().length > 0;
+  const hasActiveFilters = Object.values(filters).some((value) => value !== '');
+  const isFilteredEmpty = hasActiveSearch || hasActiveFilters;
+  const activeFilterCount = Object.values(filters).filter((value) => value !== '').length;
 
   // Custom dialog state
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
@@ -122,7 +133,16 @@ function LegendariosContent() {
         if (requestId !== requestIdRef.current) return;
         setLoading(false);
       });
-  }, [authLoading, debouncedSearch, filters, page]);
+  }, [authLoading, debouncedSearch, filters, page, reloadKey]);
+
+  function limparBuscaEFiltros() {
+    setSearchQuery('');
+    setFilters({
+      status: '', city: '', churchId: '', teamId: '', professionId: '',
+      expertiseId: '', socialActionInterest: '', isFromRotaDoCerrado: '', needsReview: '',
+    });
+    setPage(1);
+  }
 
   function updateFilter(key: keyof typeof filters, value: string) {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -190,14 +210,35 @@ function LegendariosContent() {
         )}
       </div>
 
-      {/* Filters Panel */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
-        <div className="flex items-center gap-2 mb-3 border-b border-zinc-800/60 pb-2">
-          <Search className="h-4 w-4 text-orange-500" />
-          <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">Filtros de Busca</span>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-          <input className="input sm:col-span-2" placeholder="Buscar por nome, telefone, LGND ou cidade" value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setPage(1); }} />
+      <FilterPanel
+        activeCount={activeFilterCount}
+        onClear={limparBuscaEFiltros}
+        search={
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" aria-hidden="true" />
+            <input
+              className="input pl-9"
+              aria-label="Buscar Legendários"
+              placeholder="Buscar por nome, telefone, LGND ou cidade"
+              value={searchQuery}
+              onChange={(event) => { setSearchQuery(event.target.value); setPage(1); }}
+            />
+          </div>
+        }
+        activeSummary={filters.churchId ? (
+          <span className="inline-flex min-h-8 items-center gap-2 rounded-md border border-accent/30 bg-accent/10 px-3 text-xs font-semibold text-accent">
+            Igreja: {activeChurchLabel}
+            <button
+              type="button"
+              aria-label="Limpar filtro de igreja"
+              className="inline-flex h-6 w-6 items-center justify-center rounded text-accent transition-colors hover:bg-accent/20 hover:text-content-strong"
+              onClick={() => updateChurchFilter('')}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </span>
+        ) : null}
+      >
           <input className="input" placeholder="Cidade" value={filters.city} onChange={(event) => updateFilter('city', event.target.value)} />
           
           <select className="input" value={filters.status} onChange={(event) => updateFilter('status', event.target.value)}>
@@ -259,26 +300,15 @@ function LegendariosContent() {
             <option value="true">Precisa de revisão</option>
             <option value="false">Sem pendência</option>
           </select>
-        </div>
-        {filters.churchId ? (
-          <div className="mt-3 inline-flex min-h-8 items-center gap-2 rounded-md border border-orange-500/30 bg-orange-500/10 px-3 text-xs font-semibold text-orange-300">
-            <span>Igreja: {activeChurchLabel}</span>
-            <button
-              type="button"
-              aria-label="Limpar filtro de igreja"
-              className="inline-flex h-6 w-6 items-center justify-center rounded text-orange-300 transition-colors hover:bg-orange-500/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
-              onClick={() => updateChurchFilter('')}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ) : null}
-      </div>
+      </FilterPanel>
 
       {error && (
-        <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-semibold text-rose-400">
-          {error}
-        </div>
+        <ErrorState
+          title="Não foi possível carregar Legendários"
+          description="A lista não pôde ser buscada agora. Tente de novo; se persistir, verifique sua conexão."
+          action={{ label: 'Tentar de novo', onClick: () => setReloadKey((k) => k + 1) }}
+          compact
+        />
       )}
 
       {/* Table Section */}
@@ -306,8 +336,26 @@ function LegendariosContent() {
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-10 text-center font-medium text-zinc-500">
-                    Nenhum Legendário encontrado.
+                  <td colSpan={5} className="p-0">
+                    {isFilteredEmpty ? (
+                      <EmptyState
+                        title="Nenhum Legendário para esta busca"
+                        description="Nenhum cadastro combina com o texto e os filtros aplicados. Ajuste os critérios ou limpe tudo para ver a lista completa."
+                        action={{ label: 'Limpar busca e filtros', onClick: limparBuscaEFiltros }}
+                        compact
+                      />
+                    ) : (
+                      <EmptyState
+                        title="Nenhum Legendário cadastrado"
+                        description="Assim que o primeiro Legendário for cadastrado, ele aparece aqui com telefone, cidade e situação."
+                        action={
+                          hasPermission(user, 'legendarios.create')
+                            ? { label: 'Cadastrar Legendário', onClick: () => router.push('/dashboard/legendarios/novo') }
+                            : undefined
+                        }
+                        compact
+                      />
+                    )}
                   </td>
                 </tr>
               ) : (

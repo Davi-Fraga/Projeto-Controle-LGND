@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, ReactNode, useEffect, useState } from 'react';
+import { FormEvent, ReactNode, useEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/Button';
 import { useRouter } from 'next/navigation';
 import { cleanPhone, LegendaryStatus, maskPhoneInput } from '@central-da-manada/shared';
 import { getTopOptions, getTopFamilyOptions } from '@/features/tops/api';
@@ -83,6 +84,8 @@ export function LegendarioForm({ legendario, returnTo }: Props) {
   const [firstTopFamilyOptions, setFirstTopFamilyOptions] = useState<OptionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Trava síncrona de envio — ver comentário em handleSubmit.
+  const submittingRef = useRef(false);
   const [showChurchForm, setShowChurchForm] = useState(false);
   const [churchForm, setChurchForm] = useState({ name: '', city: '', notes: '' });
 
@@ -146,12 +149,18 @@ export function LegendarioForm({ legendario, returnTo }: Props) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // Guarda de reentrância: desabilitar o botão não basta. O Enter no formulário e o
+    // clique repetido rápido reentram aqui antes do re-render, e o cadastro sairia
+    // duplicado. A trava é síncrona porque `loading` só vale no próximo render.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
     setError(null);
 
     if (payload.firstTopIsExternal) {
       if (!payload.firstTopExternalText?.trim()) {
         setError('Informe a rota/TOP de origem para o TOP externo.');
+        submittingRef.current = false;
         setLoading(false);
         return;
       }
@@ -159,11 +168,13 @@ export function LegendarioForm({ legendario, returnTo }: Props) {
       if (!legendario) {
         if (!payload.firstTopEventId) {
           setError('Primeiro TOP que subiu é obrigatório.');
+          submittingRef.current = false;
           setLoading(false);
           return;
         }
         if (!payload.firstTopFamilyId) {
           setError('Família é obrigatória.');
+          submittingRef.current = false;
           setLoading(false);
           return;
         }
@@ -198,14 +209,16 @@ export function LegendarioForm({ legendario, returnTo }: Props) {
     } catch {
       setError('Não foi possível salvar o Legendário. Verifique os dados informados.');
     } finally {
+      // Sem isto o formulário trava para sempre depois do primeiro envio.
+      submittingRef.current = false;
       setLoading(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} aria-busy={loading} className="space-y-6">
       {error ? (
-        <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-xs font-semibold text-rose-400">
+        <div role="alert" className="rounded-lg border border-feedback-danger/25 bg-feedback-danger/10 px-4 py-3 text-xs font-semibold text-feedback-danger">
           {error}
         </div>
       ) : null}
@@ -422,21 +435,20 @@ export function LegendarioForm({ legendario, returnTo }: Props) {
         </Field>
       </section>
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="submit"
-          disabled={loading}
-          className="flex h-10 items-center justify-center rounded-lg bg-orange-600 px-6 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-orange-500 disabled:opacity-50 shadow-lg shadow-orange-950/20"
-        >
-          {loading ? 'Salvando...' : 'Salvar Cadastro'}
-        </button>
-        <button
-          type="button"
-          onClick={() => returnTo ? router.push(returnTo) : router.back()}
-          className="flex h-10 items-center justify-center rounded-lg border border-zinc-800 bg-transparent px-6 text-xs font-bold uppercase tracking-wider text-zinc-400 transition-all hover:bg-zinc-900 hover:text-zinc-200"
-        >
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" variant="primary" disabled={loading} aria-disabled={loading}>
+          {loading ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+          ) : null}
+          {loading ? 'Salvando…' : 'Salvar Cadastro'}
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => returnTo ? router.push(returnTo) : router.back()}>
           Cancelar
-        </button>
+        </Button>
+        {/* Progresso audível: o texto do botão muda, mas leitor de tela precisa de região viva. */}
+        <span role="status" aria-live="polite" className="sr-only">
+          {loading ? 'Salvando o cadastro, aguarde.' : ''}
+        </span>
       </div>
     </form>
   );

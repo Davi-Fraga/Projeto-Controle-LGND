@@ -1,38 +1,51 @@
 ## 1. Baseline e critérios visuais
 
-- [ ] 1.1 Inventariar cores, tamanhos tipográficos, espaçamentos, bordas, sombras e estados interativos usados no frontend
-- [ ] 1.2 Selecionar dashboard e controle de acessos como referências iniciais de tela comum e tela densa
-- [ ] 1.3 Registrar screenshots baseline em 1600x900 e 390x844 para os estados definidos nas specs
-- [ ] 1.4 Documentar a escala visual proposta e o mapa de valores atuais para tokens semânticos
+- [x] 1.1 Inventariar cores, tamanhos tipográficos, espaçamentos, bordas, sombras e estados interativos usados no frontend
+- [x] 1.2 Selecionar dashboard e controle de acessos como referências iniciais de tela comum e tela densa
+- [x] 1.3 Registrar screenshots baseline em 1600x900 e 390x844 para os estados definidos nas specs
+- [x] 1.4 Documentar a escala visual proposta e o mapa de valores atuais para tokens semânticos
 
 ## 2. Fundações e componentes compartilhados
 
-- [ ] 2.1 Definir tokens CSS de canvas, superfícies, texto, bordas, destaque, foco e feedback em `globals.css`
-- [ ] 2.2 Padronizar escala tipográfica e espaçamento responsivo sem aumentar indiscriminadamente a densidade das tabelas
-- [ ] 2.3 Criar ou consolidar componentes compartilhados de botão, campo, superfície e cabeçalho de página usando os tokens
-- [ ] 2.4 Padronizar estados hover, focus-visible, active, selected e disabled nos componentes compartilhados
-- [ ] 2.5 Adicionar suporte a `prefers-reduced-motion` para pulsos, spinners decorativos e transições de deslocamento
-- [ ] 2.6 Adicionar testes focados dos contratos visuais e semânticos dos componentes compartilhados
+- [x] 2.1 Definir tokens CSS de canvas, superfícies, texto, bordas, destaque, foco e feedback em `globals.css`
+- [x] 2.2 Padronizar escala tipográfica e espaçamento responsivo sem aumentar indiscriminadamente a densidade das tabelas
+- [x] 2.3 Criar ou consolidar componentes compartilhados de botão, campo, superfície e cabeçalho de página usando os tokens
+- [x] 2.4 Padronizar estados hover, focus-visible, active, selected e disabled nos componentes compartilhados
+- [x] 2.5 Adicionar suporte a `prefers-reduced-motion` para pulsos, spinners decorativos e transições de deslocamento
+- [x] 2.6 Adicionar testes focados dos contratos visuais e semânticos dos componentes compartilhados
 
 ## 3. Shell e navegação acessível
 
-- [ ] 3.1 Garantir nome acessível, `aria-expanded`, `aria-controls` e alvo mobile adequado no toggle da navegação
-- [ ] 3.2 Garantir abertura e fechamento do menu mobile pelo toggle e pelo backdrop sem interceptação indevida
-- [ ] 3.3 Aplicar foco visível consistente à sidebar, header, menus de ação e navegação por teclado
-- [ ] 3.4 Validar que manifesto, `screenAccess` e destinos permission-driven permanecem inalterados
-- [ ] 3.5 Cobrir shell desktop/mobile com testes de interação e QA de viewport
+- [x] 3.1 Garantir nome acessível, `aria-expanded`, `aria-controls` e alvo mobile adequado no toggle da navegação
+- [x] 3.2 Garantir abertura e fechamento do menu mobile pelo toggle e pelo backdrop sem interceptação indevida
+- [x] 3.3 Aplicar foco visível consistente à sidebar, header, menus de ação e navegação por teclado
+- [x] 3.4 Validar que manifesto, `screenAccess` e destinos permission-driven permanecem inalterados
+- [x] 3.5 Cobrir shell desktop/mobile com testes de interação e QA de viewport
 
 ## 4. Estados de feedback
 
-- [ ] 4.1 Criar componentes ou padrões compartilhados para loading estrutural, vazio, erro e sucesso
-- [ ] 4.2 Migrar validação de sessão e dashboard para estados de carregamento estáveis e acessíveis
-- [ ] 4.3 Migrar uma lista representativa para vazio orientado, busca sem resultados e recuperação de erro
-- [ ] 4.4 Padronizar progresso e prevenção de envio duplicado em um formulário representativo
-- [ ] 4.5 Adicionar testes dos estados assíncronos e de recuperação sem expor mensagens técnicas ou dados sensíveis
+- [x] 4.1 Criar componentes ou padrões compartilhados para loading estrutural, vazio, erro e sucesso
+- [x] 4.2 Migrar validação de sessão e dashboard para estados de carregamento estáveis e acessíveis
+- [x] 4.3 Migrar uma lista representativa para vazio orientado, busca sem resultados e recuperação de erro
+  - Lista escolhida: **Legendários** (a mais usada). Três estados distintos, antes fundidos num
+    único "Nenhum Legendário encontrado.": lista vazia (orienta a cadastrar, e a ação só aparece
+    com `legendarios.create`), busca sem resultado (oferece limpar busca e filtros) e erro
+    (oferece "Tentar de novo", que refaz a busca via `reloadKey`).
+  - 6 testes novos, incluindo um que garante que a mensagem de erro **não vaza detalhe técnico**
+    (`ECONNREFUSED`, IP, stack). `page.test.tsx` 14/14.
+- [x] 4.4 Padronizar progresso e prevenção de envio duplicado em um formulário representativo
+  - Formulário escolhido: **Legendário**. `disabled` no botão não impedia envio duplicado — o
+    Enter e o clique repetido reentram no handler antes do re-render. Trava síncrona por `ref`,
+    liberada em todas as saídas (3 validações + `finally`).
+  - Progresso deixou de ser só o texto do botão: `aria-busy` no form e região viva `role="status"`.
+    Erro virou `role="alert"`. Botões migrados para o `Button` compartilhado.
+  - 4 testes novos. **Provados vermelhos**: sem a trava, 3 envios geram **3 gravações**; sem a
+    liberação, o formulário trava após o primeiro envio (2 testes falham).
+- [x] 4.5 Adicionar testes dos estados assíncronos e de recuperação sem expor mensagens técnicas ou dados sensíveis
 
 ## 5. Densidade e responsividade
 
-- [ ] 5.1 Refinar hierarquia de cards e ações do dashboard reduzindo bordas sem função semântica
+- [x] 5.1 Refinar hierarquia de cards e ações do dashboard reduzindo bordas sem função semântica
 - [ ] 5.2 Criar padrão mobile para filtros extensos com busca e ação principal sempre acessíveis
 - [ ] 5.3 Criar padrão responsivo para tabelas largas preservando identificação e ações dos registros
 - [ ] 5.4 Migrar legendários, igrejas e equipes como primeira onda de listas e formulários
@@ -45,5 +58,31 @@
 - [ ] 6.2 Executar QA Playwright funcional em desktop e mobile, incluindo teclado, toque e ciclos reversíveis
 - [ ] 6.3 Executar QA visual separado nos estados inicial, denso, carregando, vazio, erro, modal/menu aberto e pós-interação
 - [ ] 6.4 Verificar ausência de overflow não intencional, clipping, contraste fraco, foco oculto e alvos pequenos
-- [ ] 6.5 Publicar guia curto de tokens, tipografia, superfícies, ações e critérios para novos componentes
+- [x] 6.5 Publicar guia curto de tokens, tipografia, superfícies, ações e critérios para novos componentes
 - [ ] 6.6 Revisar valores crus remanescentes e registrar exceções justificadas de mapa, organograma e gráficos
+
+## 7. Organização das abas em grupos
+
+Pedido do Davi em 06/08/2026: a navegação tinha 12 itens numa lista plana e a ordem era arbitrária
+(Igrejas em 11º sendo cadastro-base como Legendários, em 2º; Mapa no meio dos cadastros).
+
+Agrupamento aprovado: **Painel** solto no topo · **Manada** (Legendários, Líderes Espirituais,
+Igrejas) · **Estrutura** (Equipes, Organograma) · **Atividades** (TOPs, Ações Sociais, Comunicação)
+· **Análise** (Mapa, Relatórios) · **Administração** (Usuários).
+
+- [x] 7.1 Declarar `NavGroupId`, `NAV_GROUPS` e o campo `group` no manifesto compartilhado
+- [x] 7.2 Atribuir grupo a cada aba sem reordenar o `PRIMARY_NAV` — a ordem dele governa `firstAllowedRoute` e não pode mudar por motivo estético
+- [x] 7.3 Criar `groupedPrimaryNav`, omitindo grupo sem item visível
+- [x] 7.4 Renderizar as seções na `Sidebar` com `role="group"` e rótulo, mantendo o drawer mobile
+- [x] 7.5 Invariante em teste: achatar as seções devolve exatamente `visiblePrimaryNav` — agrupar não pode virar filtro
+- [x] 7.6 Testes: grupo vazio não vira cabeçalho órfão · Administração só para admin · Painel na seção sem rótulo · ordem segue `NAV_GROUPS` · todo grupo declarado existe em `NAV_GROUPS`
+- [x] 7.7 Verificação: `nav-manifest.spec` 27/27 · `Sidebar.test` 10/10 · web **197/197** · api **581/581** · `pnpm lint` raiz exit 0
+- [ ] 7.8 Conferência visual no navegador (desktop e mobile) — pendente de sessão autenticada
+
+**Decisão registrada:** grupos **não** são recolhíveis. Com no máximo 12 itens tudo cabe na tela, e
+recolher exigiria persistir estado entre sessões sem ganho real. Reavaliar se a lista crescer.
+
+**Armadilha encontrada nos testes:** os helpers de usuário da API e do web divergem — o da API deriva
+`screenAccess` só das permissions `.read` informadas, o do web declara todas as telas. Por isso o
+Organograma (regra `anyOf` legada) aparece com `legendarios.read` num e não no outro. Os dois
+comportamentos estão certos; escrevi a expectativa errada duas vezes antes de entender.

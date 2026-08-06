@@ -1,4 +1,4 @@
-import { PRIMARY_NAV, isPrimaryNavVisible, visiblePrimaryNav, firstAllowedRoute, navItemForHref, canOpenRoute } from '@central-da-manada/shared';
+import { PRIMARY_NAV, NAV_GROUPS, isPrimaryNavVisible, visiblePrimaryNav, groupedPrimaryNav, firstAllowedRoute, navItemForHref, canOpenRoute } from '@central-da-manada/shared';
 import { getScreen } from './screen-catalog';
 
 // Paridade manifesto de navegação ↔ SCREEN_CATALOG (change alinhar-abas-controle-acessos).
@@ -155,5 +155,74 @@ describe('nav-manifest — rota de destino de link cruzado', () => {
 
   it('sem usuário, nenhum link cruzado aparece', () => {
     expect(canOpenRoute(null, '/dashboard/legendarios/abc')).toBe(false);
+  });
+});
+
+// Agrupamento visual das abas (change refinar-design-system-e-acessibilidade-visual).
+// O risco desta feature é o agrupamento virar filtro sem ninguém perceber — por isso o
+// invariante central é "achatar as seções devolve exatamente visiblePrimaryNav".
+describe('nav-manifest — agrupamento visual', () => {
+  const u = (permissions: string[], roles: string[] = ['MEMBER']) => ({
+    permissions,
+    roles,
+    screenAccess: permissions
+      .filter((permission) => permission.endsWith('.read'))
+      .map((permission) => ({
+        screenId: permission.replace('.read', ''),
+        level: 'VIEW' as const,
+        state: 'AVAILABLE' as const,
+        usable: true,
+      })),
+  });
+
+  const admin = u(
+    PRIMARY_NAV.filter((i) => !i.adminOnly).flatMap((i) => (i.rule.kind === 'permissions' ? i.rule.keys : [])),
+    ['COORDINATION_ADMIN'],
+  );
+
+  const achatar = (user: Parameters<typeof groupedPrimaryNav>[0]) =>
+    groupedPrimaryNav(user).flatMap((section) => section.items.map((i) => i.screenId));
+
+  it('agrupar não esconde nem inventa aba: achatar devolve exatamente visiblePrimaryNav', () => {
+    for (const user of [admin, u(['legendarios.read']), u(['tops.read', 'map.read']), u([]), null]) {
+      expect(achatar(user).sort()).toEqual(visiblePrimaryNav(user).map((i) => i.screenId).sort());
+    }
+  });
+
+  it('todo item do manifesto declara grupo, exceto o Painel (que fica solto no topo)', () => {
+    const semGrupo = PRIMARY_NAV.filter((i) => !i.group).map((i) => i.screenId);
+    expect(semGrupo).toEqual(['dashboard']);
+  });
+
+  it('grupo sem item visível não vira seção — nada de cabeçalho órfão', () => {
+    // Só Legendários é visível aqui: o Organograma satisfaz a regra `anyOf` legada por
+    // `legendarios.read`, mas este helper só declara `screenAccess` das permissions `.read`
+    // informadas — sem entrada usável para `org-chart`, a visibilidade é fail-closed.
+    const secoes = groupedPrimaryNav(u(['legendarios.read']));
+    expect(secoes.every((s) => s.items.length > 0)).toBe(true);
+    expect(secoes.map((s) => s.id)).toEqual(['manada']);
+  });
+
+  it('Administração só existe para o admin', () => {
+    expect(groupedPrimaryNav(admin).map((s) => s.id)).toContain('administracao');
+    expect(groupedPrimaryNav(u(['legendarios.read'])).map((s) => s.id)).not.toContain('administracao');
+  });
+
+  it('o Painel fica numa seção sem rótulo, sempre antes dos grupos', () => {
+    const secoes = groupedPrimaryNav(admin);
+    expect(secoes[0].id).toBeNull();
+    expect(secoes[0].label).toBeNull();
+    expect(secoes[0].items.map((i) => i.screenId)).toEqual(['dashboard']);
+  });
+
+  it('a ordem das seções segue NAV_GROUPS', () => {
+    const ids = groupedPrimaryNav(admin).map((s) => s.id).filter((id): id is NonNullable<typeof id> => id !== null);
+    expect(ids).toEqual(NAV_GROUPS.map((g) => g.id));
+  });
+
+  it('todo grupo declarado no manifesto existe em NAV_GROUPS', () => {
+    const declarados = new Set(PRIMARY_NAV.map((i) => i.group).filter(Boolean));
+    const conhecidos = new Set(NAV_GROUPS.map((g) => g.id));
+    for (const grupo of declarados) expect(conhecidos.has(grupo!)).toBe(true);
   });
 });

@@ -189,3 +189,76 @@ describe('LegendarioForm — profissão em texto livre', () => {
     expect(sentPayload()).not.toHaveProperty('professionId');
   });
 });
+
+// Progresso e envio duplicado (change refinar-design-system, task 4.4).
+// `disabled` no botão NÃO basta: o Enter e o clique repetido reentram no handler antes do
+// re-render, e o cadastro sairia duplicado. A trava tem que ser síncrona.
+describe('LegendarioForm — progresso e envio duplicado', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getChurches).mockResolvedValue({ data: [] });
+    vi.mocked(getProfessions).mockResolvedValue({ data: [] });
+    vi.mocked(getExpertises).mockResolvedValue({ data: [] });
+  });
+
+  function renderEdicao() {
+    render(<LegendarioForm legendario={legendario()} />);
+    return screen.getByRole('button', { name: /salvar cadastro/i }).closest('form') as HTMLFormElement;
+  }
+
+  it('dois envios seguidos gravam UMA vez só', async () => {
+    let liberar: (v: unknown) => void = () => {};
+    vi.mocked(updateLegendario).mockImplementation(
+      () => new Promise((resolve) => { liberar = resolve; }) as never,
+    );
+
+    const form = renderEdicao();
+    fireEvent.submit(form);
+    fireEvent.submit(form); // reentrada imediata, antes de qualquer re-render
+    fireEvent.submit(form);
+
+    await waitFor(() => expect(updateLegendario).toHaveBeenCalledTimes(1));
+
+    liberar({ data: { id: 'legendary-1' } });
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
+  });
+
+  it('depois de terminar, o formulário aceita um novo envio (a trava é liberada)', async () => {
+    vi.mocked(updateLegendario).mockResolvedValue({ data: { id: 'legendary-1' } } as never);
+
+    const form = renderEdicao();
+    fireEvent.submit(form);
+    await waitFor(() => expect(updateLegendario).toHaveBeenCalledTimes(1));
+
+    fireEvent.submit(form);
+    await waitFor(() => expect(updateLegendario).toHaveBeenCalledTimes(2));
+  });
+
+  it('falha no envio libera a trava para o usuário tentar de novo', async () => {
+    vi.mocked(updateLegendario).mockRejectedValueOnce(new Error('falhou'));
+
+    const form = renderEdicao();
+    fireEvent.submit(form);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não foi possível salvar/i);
+
+    vi.mocked(updateLegendario).mockResolvedValue({ data: { id: 'legendary-1' } } as never);
+    fireEvent.submit(form);
+    await waitFor(() => expect(updateLegendario).toHaveBeenCalledTimes(2));
+  });
+
+  it('comunica o progresso enquanto salva, para além do texto do botão', async () => {
+    let liberar: (v: unknown) => void = () => {};
+    vi.mocked(updateLegendario).mockImplementation(
+      () => new Promise((resolve) => { liberar = resolve; }) as never,
+    );
+
+    const form = renderEdicao();
+    fireEvent.submit(form);
+
+    await waitFor(() => expect(form).toHaveAttribute('aria-busy', 'true'));
+    expect(screen.getByRole('status')).toHaveTextContent(/salvando o cadastro/i);
+
+    liberar({ data: { id: 'legendary-1' } });
+    await waitFor(() => expect(form).toHaveAttribute('aria-busy', 'false'));
+  });
+});

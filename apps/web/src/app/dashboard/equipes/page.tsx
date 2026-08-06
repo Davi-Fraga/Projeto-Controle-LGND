@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { TeamStatus } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
@@ -12,6 +13,8 @@ import type { Team } from '@/features/teams/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ActionMenu } from '@/components/ui/ActionMenu';
+import { DataTable } from '@/components/ui/DataTable';
+import { EmptyState } from '@/components/ui/AsyncState';
 import { Search, Eye, Edit2, ShieldAlert, Shield } from 'lucide-react';
 import { formatTeamName } from '@/lib/teams';
 
@@ -23,6 +26,7 @@ export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 500);
   const [status, setStatus] = useState('');
@@ -123,75 +127,67 @@ export default function TeamsPage() {
         </div>
       )}
 
-      {/* Table Section */}
-      <div className="w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#111113] shadow-lg">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-sm text-zinc-300">
-            <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-950/80 text-xs font-bold tracking-wider text-zinc-400 uppercase">
-                <th className="px-6 py-4">Nome da Equipe</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Coordenador</th>
-                <th className="px-6 py-4">Subcoordenador</th>
-                <th className="px-6 py-4">Membros Ativos</th>
-                <th className="px-6 py-4 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-850">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-500">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Carregando Equipes...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : teams.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center font-medium text-zinc-500">
-                    Nenhuma equipe encontrada.
-                  </td>
-                </tr>
-              ) : (
-                teams.map((team) => (
-                  <tr key={team.id} className="hover:bg-zinc-900/40 transition-colors">
-                    <td className="px-6 py-4.5 font-bold text-white">
-                      <div className="flex items-center gap-2">
-                        <Shield className="h-4 w-4 text-orange-500" />
-                        <span>{formatTeamName(team.name)}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4.5">
-                      <StatusBadge status={team.status} />
-                    </td>
-                    <td className="px-6 py-4.5 text-zinc-300 font-semibold">
-                      {team.coordinator?.fullName ?? '-'}
-                    </td>
-                    <td className="px-6 py-4.5 text-zinc-300 font-medium">
-                      {team.deputyCoordinator?.fullName ?? '-'}
-                    </td>
-                    <td className="px-6 py-4.5 text-zinc-300 font-bold">
-                      {team.activeMembersCount}
-                    </td>
-                    <td className="px-6 py-4.5">
-                      <div className="flex justify-end">
-                        <ActionMenu
-                          items={[
-                            { label: 'Ver', href: `/dashboard/equipes/${team.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
-                            ...(canEdit ? [{ label: 'Editar', href: `/dashboard/equipes/${team.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
-                            ...(canRemove ? [{ label: 'Inativar', onClick: () => setDeactivatingId(team.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true }] : []),
-                          ]}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        caption="Lista de equipes"
+        items={teams}
+        loading={loading}
+        currentPage={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        emptyMessage={
+          debouncedSearch.trim() ? (
+            <EmptyState
+              title="Nenhuma equipe para esta busca"
+              description="Nenhuma equipe combina com o texto buscado. Ajuste o termo ou limpe a busca para ver a lista completa."
+              action={{ label: 'Limpar busca', onClick: () => setSearchQuery('') }}
+              compact
+            />
+          ) : (
+            <EmptyState
+              title="Nenhuma equipe cadastrada"
+              description="Assim que a primeira equipe for criada, ela aparece aqui com coordenação e número de membros ativos."
+              action={
+                hasPermission(user, 'teams.create')
+                  ? { label: 'Nova Equipe', onClick: () => router.push('/dashboard/equipes/nova') }
+                  : undefined
+              }
+              compact
+            />
+          )
+        }
+        columns={[
+          {
+            header: 'Nome da Equipe',
+            role: 'title',
+            accessor: (team) => (
+              <span className="flex items-center gap-2 font-bold text-content-strong">
+                <Shield className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+                {formatTeamName(team.name)}
+              </span>
+            ),
+          },
+          { header: 'Status', accessor: (team) => <StatusBadge status={team.status} /> },
+          { header: 'Coordenador', accessor: (team) => team.coordinator?.fullName ?? '-' },
+          { header: 'Subcoordenador', accessor: (team) => team.deputyCoordinator?.fullName ?? '-' },
+          { header: 'Membros Ativos', accessor: (team) => team.activeMembersCount },
+          {
+            header: 'Ações',
+            role: 'actions',
+            className: 'text-right',
+            accessor: (team) => (
+              <div className="flex justify-end">
+                <ActionMenu
+                  items={[
+                    { label: 'Ver', href: `/dashboard/equipes/${team.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
+                    ...(canEdit ? [{ label: 'Editar', href: `/dashboard/equipes/${team.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
+                    ...(canRemove ? [{ label: 'Inativar', onClick: () => setDeactivatingId(team.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true }] : []),
+                  ]}
+                />
+              </div>
+            ),
+          },
+        ]}
+      />
 
       {/* Pagination */}
       {!loading && totalPages > 1 && (

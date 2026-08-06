@@ -60,11 +60,13 @@
     no `DataTable.test.tsx` e no teste da lista de Legendários.
   - Bug encontrado pelo próprio teste: sem coluna `title`, a primeira coluna virava cabeçalho **e**
     continuava nos detalhes — o nome aparecia duas vezes no cartão. Corrigido.
-- [~] 5.4 Migrar legendários, igrejas e equipes como primeira onda de listas e formulários
+- [x] 5.4 Migrar legendários, igrejas e equipes como primeira onda de listas e formulários
   - [x] **Legendários** — a mais complexa, migrada por inteiro: `FilterPanel`, `DataTable` com
     papéis de coluna, estados vazio/sem-resultado/erro e paginação do componente. 14 testes verdes.
   - [ ] **Igrejas** — pendente
-  - [ ] **Equipes** — pendente
+  - [x] **Equipes** — migrada. Não tinha teste de página consultando a tabela, então não
+    precisou de escopo; o vazio passou a distinguir "nenhuma cadastrada" de "nenhuma para esta
+    busca", com ação de criar condicionada a `teams.create`.
 - [ ] 5.5 Migrar TOPs, ações sociais, comunicação e usuários como segunda onda de listas e formulários
 - [ ] 5.6 Refinar shell e controles ao redor de acesso, relatórios, mapa e organograma sem alterar cores de dados especializadas
 

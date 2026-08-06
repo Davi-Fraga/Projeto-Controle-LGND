@@ -46,9 +46,25 @@
 ## 5. Densidade e responsividade
 
 - [x] 5.1 Refinar hierarquia de cards e ações do dashboard reduzindo bordas sem função semântica
-- [ ] 5.2 Criar padrão mobile para filtros extensos com busca e ação principal sempre acessíveis
-- [ ] 5.3 Criar padrão responsivo para tabelas largas preservando identificação e ações dos registros
-- [ ] 5.4 Migrar legendários, igrejas e equipes como primeira onda de listas e formulários
+- [x] 5.2 Criar padrão mobile para filtros extensos com busca e ação principal sempre acessíveis
+  - `components/ui/FilterPanel.tsx`: secundários recolhem no mobile; busca, contador de ativos,
+    resumo dos filtros aplicados e a saída para limpar **nunca** somem. Aplicado em Legendários
+    (9 filtros). 5 testes.
+- [x] 5.3 Criar padrão responsivo para tabelas largas preservando identificação e ações dos registros
+  - `DataTable` passou a renderizar duas composições: tabela a partir de `md`, cartões no mobile.
+    Cada coluna declara papel — `title` (identidade, vira cabeçalho do cartão), `actions` (topo
+    direito, nunca some) e o resto vira par rótulo/valor.
+  - **Custo assumido:** o dado fica duas vezes no DOM. No navegador só uma composição aparece
+    (`display:none` também tira da árvore de acessibilidade), mas o JSDOM não aplica CSS — **toda
+    tela migrada precisa escopar as consultas dos testes** a uma das composições. Está documentado
+    no `DataTable.test.tsx` e no teste da lista de Legendários.
+  - Bug encontrado pelo próprio teste: sem coluna `title`, a primeira coluna virava cabeçalho **e**
+    continuava nos detalhes — o nome aparecia duas vezes no cartão. Corrigido.
+- [~] 5.4 Migrar legendários, igrejas e equipes como primeira onda de listas e formulários
+  - [x] **Legendários** — a mais complexa, migrada por inteiro: `FilterPanel`, `DataTable` com
+    papéis de coluna, estados vazio/sem-resultado/erro e paginação do componente. 14 testes verdes.
+  - [ ] **Igrejas** — pendente
+  - [ ] **Equipes** — pendente
 - [ ] 5.5 Migrar TOPs, ações sociais, comunicação e usuários como segunda onda de listas e formulários
 - [ ] 5.6 Refinar shell e controles ao redor de acesso, relatórios, mapa e organograma sem alterar cores de dados especializadas
 

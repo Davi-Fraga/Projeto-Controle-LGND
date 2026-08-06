@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LegendariosPage from './page';
 
@@ -61,6 +61,16 @@ vi.mock('@/features/teams/team-filter', () => ({
   TeamFilter: () => null,
 }));
 
+/**
+ * A lista usa `DataTable`, que renderiza DUAS composições do mesmo dado (tabela para
+ * desktop, cartões para mobile). No navegador só uma aparece — a outra é `display:none`,
+ * portanto fora da árvore de acessibilidade. O JSDOM não aplica CSS, então as consultas
+ * precisam ser escopadas; solto, `getByText` encontra as duas e falha.
+ */
+const naTabela = () => within(screen.getByTestId('datatable-desktop'));
+const acharNaTabela = async (texto: string | RegExp) =>
+  waitFor(() => naTabela().getByText(texto));
+
 const emptyResponse = {
   data: [],
   meta: { page: 1, perPage: 10, total: 0, totalPages: 1 },
@@ -122,7 +132,7 @@ describe('LegendariosPage church deep-link', () => {
 
     render(<LegendariosPage />);
 
-    expect(await screen.findByText('(64) 99248-5187')).toBeInTheDocument();
+    expect(await acharNaTabela('(64) 99248-5187')).toBeInTheDocument();
   });
 
   it('updates the URL when selecting a church and removes the filter when clearing it', async () => {
@@ -216,8 +226,8 @@ describe('LegendariosPage — vazio, sem resultado e erro', () => {
     mocks.permissions = ['legendarios.create'];
     render(<LegendariosPage />);
 
-    expect(await screen.findByText('Nenhum Legendário cadastrado')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Cadastrar Legendário' }));
+    expect(await acharNaTabela('Nenhum Legendário cadastrado')).toBeInTheDocument();
+    fireEvent.click(naTabela().getByRole('button', { name: 'Cadastrar Legendário' }));
     expect(mocks.push).toHaveBeenCalledWith('/dashboard/legendarios/novo');
   });
 
@@ -225,29 +235,29 @@ describe('LegendariosPage — vazio, sem resultado e erro', () => {
     mocks.permissions = [];
     render(<LegendariosPage />);
 
-    expect(await screen.findByText('Nenhum Legendário cadastrado')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Cadastrar Legendário' })).toBeNull();
+    expect(await acharNaTabela('Nenhum Legendário cadastrado')).toBeInTheDocument();
+    expect(naTabela().queryByRole('button', { name: 'Cadastrar Legendário' })).toBeNull();
   });
 
   it('busca sem resultado é tratada como resultado, não como ausência de cadastro', async () => {
     render(<LegendariosPage />);
-    await screen.findByText('Nenhum Legendário cadastrado');
+    await acharNaTabela('Nenhum Legendário cadastrado');
 
     fireEvent.change(screen.getByPlaceholderText(/buscar/i), { target: { value: 'zzzz' } });
 
-    expect(await screen.findByText('Nenhum Legendário para esta busca')).toBeInTheDocument();
-    expect(screen.queryByText('Nenhum Legendário cadastrado')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Limpar busca e filtros' })).toBeInTheDocument();
+    expect(await acharNaTabela('Nenhum Legendário para esta busca')).toBeInTheDocument();
+    expect(naTabela().queryByText('Nenhum Legendário cadastrado')).toBeNull();
+    expect(naTabela().getByRole('button', { name: 'Limpar busca e filtros' })).toBeInTheDocument();
   });
 
   it('limpar a busca devolve o estado de lista vazia', async () => {
     render(<LegendariosPage />);
     fireEvent.change(screen.getByPlaceholderText(/buscar/i), { target: { value: 'zzzz' } });
-    await screen.findByText('Nenhum Legendário para esta busca');
+    await acharNaTabela('Nenhum Legendário para esta busca');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Limpar busca e filtros' }));
+    fireEvent.click(naTabela().getByRole('button', { name: 'Limpar busca e filtros' }));
 
-    expect(await screen.findByText('Nenhum Legendário cadastrado')).toBeInTheDocument();
+    expect(await acharNaTabela('Nenhum Legendário cadastrado')).toBeInTheDocument();
   });
 
   it('erro oferece recuperação e a nova tentativa refaz a busca', async () => {

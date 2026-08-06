@@ -19,6 +19,7 @@ import type { Church, Expertise, Legendary, Profession } from '@/features/legend
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ActionMenu } from '@/components/ui/ActionMenu';
+import { DataTable } from '@/components/ui/DataTable';
 import { EmptyState, ErrorState } from '@/components/ui/AsyncState';
 import { FilterPanel } from '@/components/ui/FilterPanel';
 import { TeamFilter } from '@/features/teams/team-filter';
@@ -311,121 +312,86 @@ function LegendariosContent() {
         />
       )}
 
-      {/* Table Section */}
-      <div className="w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#111113] shadow-lg">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-sm text-zinc-300">
-            <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-950/80 text-xs font-bold tracking-wider text-zinc-400 uppercase">
-                <th className="px-6 py-4">Nome</th>
-                <th className="px-6 py-4">Telefone</th>
-                <th className="px-6 py-4">Cidade</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-850">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-zinc-500">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Carregando Legendários...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : items.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-0">
-                    {isFilteredEmpty ? (
-                      <EmptyState
-                        title="Nenhum Legendário para esta busca"
-                        description="Nenhum cadastro combina com o texto e os filtros aplicados. Ajuste os critérios ou limpe tudo para ver a lista completa."
-                        action={{ label: 'Limpar busca e filtros', onClick: limparBuscaEFiltros }}
-                        compact
-                      />
-                    ) : (
-                      <EmptyState
-                        title="Nenhum Legendário cadastrado"
-                        description="Assim que o primeiro Legendário for cadastrado, ele aparece aqui com telefone, cidade e situação."
-                        action={
-                          hasPermission(user, 'legendarios.create')
-                            ? { label: 'Cadastrar Legendário', onClick: () => router.push('/dashboard/legendarios/novo') }
-                            : undefined
-                        }
-                        compact
-                      />
-                    )}
-                  </td>
-                </tr>
-              ) : (
-                items.map((item) => (
-                  <tr key={item.id} className="hover:bg-zinc-900/40 transition-colors">
-                    <td className="px-6 py-4.5">
-                      <div>
-                        <p className="font-bold text-white leading-snug">{item.fullName}</p>
-                        <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider mt-0.5">
-                          {item.lgndNumber ? `LGND ${item.lgndNumber}` : 'Sem LGND'}
-                        </p>
-                        {item.needsReview ? <span className="mt-1 inline-flex rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">Revisar</span> : null}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4.5 text-zinc-300 font-medium">{formatPhone(item.phone) || '-'}</td>
-                    <td className="px-6 py-4.5 text-zinc-300 font-medium">
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5 text-zinc-500" />
-                        <span>{item.city || '-'}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4.5">
-                      <StatusBadge status={item.status} />
-                    </td>
-                    <td className="px-6 py-4.5">
-                      <div className="flex justify-end">
-                        <ActionMenu
-                          items={[
-                            // "Ver" não precisa de gate: estar nesta lista já exige `legendarios.read`.
-                            { label: 'Ver', href: `/dashboard/legendarios/${item.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
-                            ...(canEdit
-                              ? [{ label: 'Editar', href: `/dashboard/legendarios/${item.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }]
-                              : []),
-                            ...(canDeactivate
-                              ? [{ label: 'Inativar', onClick: () => setDeactivatingId(item.id), icon: <UserMinus className="h-3.5 w-3.5" />, destructive: true }]
-                              : []),
-                          ]}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Pagination */}
-      {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-zinc-850 pt-4">
-          <button
-            className="flex h-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-white disabled:opacity-40 disabled:hover:bg-zinc-900/50 disabled:hover:text-zinc-300"
-            disabled={page <= 1}
-            onClick={() => setPage((current) => current - 1)}
-          >
-            Anterior
-          </button>
-          <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
-            Página <span className="text-zinc-300">{page}</span> de <span className="text-zinc-300">{totalPages}</span>
-          </span>
-          <button
-            className="flex h-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-white disabled:opacity-40 disabled:hover:bg-zinc-900/50 disabled:hover:text-zinc-300"
-            disabled={page >= totalPages}
-            onClick={() => setPage((current) => current + 1)}
-          >
-            Próxima
-          </button>
-        </div>
-      )}
+      <DataTable
+        caption="Lista de Legendários"
+        items={items}
+        loading={loading}
+        currentPage={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        emptyMessage={
+          isFilteredEmpty ? (
+            <EmptyState
+              title="Nenhum Legendário para esta busca"
+              description="Nenhum cadastro combina com o texto e os filtros aplicados. Ajuste os critérios ou limpe tudo para ver a lista completa."
+              action={{ label: 'Limpar busca e filtros', onClick: limparBuscaEFiltros }}
+              compact
+            />
+          ) : (
+            <EmptyState
+              title="Nenhum Legendário cadastrado"
+              description="Assim que o primeiro Legendário for cadastrado, ele aparece aqui com telefone, cidade e situação."
+              action={
+                hasPermission(user, 'legendarios.create')
+                  ? { label: 'Cadastrar Legendário', onClick: () => router.push('/dashboard/legendarios/novo') }
+                  : undefined
+              }
+              compact
+            />
+          )
+        }
+        columns={[
+          {
+            header: 'Nome',
+            role: 'title',
+            accessor: (item) => (
+              <div>
+                <p className="font-bold leading-snug text-content-strong">{item.fullName}</p>
+                <p className="mt-0.5 text-xs font-bold uppercase tracking-wider text-content-muted">
+                  {item.lgndNumber ? `LGND ${item.lgndNumber}` : 'Sem LGND'}
+                </p>
+                {item.needsReview ? (
+                  <span className="mt-1 inline-flex rounded border border-feedback-warning/30 bg-feedback-warning/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-feedback-warning">
+                    Revisar
+                  </span>
+                ) : null}
+              </div>
+            ),
+          },
+          { header: 'Telefone', accessor: (item) => formatPhone(item.phone) || '-' },
+          {
+            header: 'Cidade',
+            accessor: (item) => (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5 text-content-muted" aria-hidden="true" />
+                {item.city || '-'}
+              </span>
+            ),
+          },
+          { header: 'Status', accessor: (item) => <StatusBadge status={item.status} /> },
+          {
+            header: 'Ações',
+            role: 'actions',
+            className: 'text-right',
+            accessor: (item) => (
+              <div className="flex justify-end">
+                <ActionMenu
+                  items={[
+                    // "Ver" não precisa de gate: estar nesta lista já exige `legendarios.read`.
+                    { label: 'Ver', href: `/dashboard/legendarios/${item.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
+                    ...(canEdit
+                      ? [{ label: 'Editar', href: `/dashboard/legendarios/${item.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }]
+                      : []),
+                    ...(canDeactivate
+                      ? [{ label: 'Inativar', onClick: () => setDeactivatingId(item.id), icon: <UserMinus className="h-3.5 w-3.5" />, destructive: true }]
+                      : []),
+                  ]}
+                />
+              </div>
+            ),
+          },
+        ]}
+      />
 
       {/* Confirm Deactivation Dialog */}
       <ConfirmDialog

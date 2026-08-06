@@ -63,7 +63,9 @@
 - [~] 5.4 Migrar legendários, igrejas e equipes como primeira onda de listas e formulários
   - [x] **Legendários** — a mais complexa, migrada por inteiro: `FilterPanel`, `DataTable` com
     papéis de coluna, estados vazio/sem-resultado/erro e paginação do componente. 14 testes verdes.
-  - [ ] **Igrejas** — pendente
+  - [x] **Igrejas** — migrada. Único ajuste além do escopo dos testes: o vazio passou a
+    distinguir "nenhuma cadastrada" de "nenhuma para esta busca", e o erro ganhou recuperação
+    reaproveitando o `refreshKey` que a tela já tinha.
   - [ ] **Equipes** — pendente
 - [ ] 5.5 Migrar TOPs, ações sociais, comunicação e usuários como segunda onda de listas e formulários
 - [ ] 5.6 Refinar shell e controles ao redor de acesso, relatórios, mapa e organograma sem alterar cores de dados especializadas

@@ -63,7 +63,9 @@
 - [x] 5.4 Migrar legendários, igrejas e equipes como primeira onda de listas e formulários
   - [x] **Legendários** — a mais complexa, migrada por inteiro: `FilterPanel`, `DataTable` com
     papéis de coluna, estados vazio/sem-resultado/erro e paginação do componente. 14 testes verdes.
-  - [ ] **Igrejas** — pendente
+  - [x] **Igrejas** — migrada. Único ajuste além do escopo dos testes: o vazio passou a
+    distinguir "nenhuma cadastrada" de "nenhuma para esta busca", e o erro ganhou recuperação
+    reaproveitando o `refreshKey` que a tela já tinha.
   - [x] **Equipes** — migrada. Não tinha teste de página consultando a tabela, então não
     precisou de escopo; o vazio passou a distinguir "nenhuma cadastrada" de "nenhuma para esta
     busca", com ação de criar condicionada a `teams.create`.

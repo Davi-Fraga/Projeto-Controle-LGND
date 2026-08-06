@@ -11,6 +11,8 @@ import { useCan, useCanOpenRoute } from '@/hooks/use-can';
 import { deleteChurch, getChurchCities, getChurchesPage } from '@/features/churches/api';
 import type { Church } from '@/features/churches/api';
 import { ActionMenu } from '@/components/ui/ActionMenu';
+import { DataTable } from '@/components/ui/DataTable';
+import { EmptyState, ErrorState } from '@/components/ui/AsyncState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ChurchDetailModal } from '@/features/churches/church-detail-modal';
 import { ApiError } from '@/lib/api';
@@ -179,47 +181,81 @@ export default function IgrejasPage() {
 
       {error && <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-semibold text-rose-400">{error}</div>}
 
-      <div className="w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#111113] shadow-lg">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-sm text-zinc-300">
-            <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-950/80 text-xs font-bold tracking-wider text-zinc-400 uppercase">
-                <th className="px-6 py-4">Igreja</th><th className="px-6 py-4">Cidade</th><th className="px-6 py-4">Líder Espiritual</th><th className="px-6 py-4">Telefone</th><th className="px-6 py-4">Coordenadas</th><th className="px-6 py-4 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-850">
-              {loading ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-zinc-500"><div className="flex flex-col items-center justify-center gap-2"><div className="h-5 w-5 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" /><span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Carregando...</span></div></td></tr>
-              ) : loadError ? (
-                <tr><td colSpan={6} className="px-6 py-10 text-center font-semibold text-rose-400">{loadError}</td></tr>
-              ) : churches.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-10 text-center font-medium text-zinc-500">{hasActiveFilters ? 'Nenhuma igreja encontrada com os filtros atuais.' : 'Nenhuma igreja cadastrada.'}</td></tr>
-              ) : churches.map((church) => (
-                <tr key={church.id} className="transition-colors hover:bg-zinc-900/40">
-                  <td className="px-6 py-4 font-bold text-white"><div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-orange-500" /><span>{church.name}</span></div></td>
-                  <td className="px-6 py-4 text-zinc-300">{church.city || '—'}</td>
-                  <td className="px-6 py-4 text-zinc-300">{church.spiritualLeaderName ? <span className="flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-zinc-500" />{church.spiritualLeaderName}</span> : '—'}</td>
-                  <td className="px-6 py-4 text-zinc-300">{church.spiritualLeaderPhone ? <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-zinc-500" />{formatPhone(church.spiritualLeaderPhone)}</span> : '—'}</td>
-                  <td className="px-6 py-4">{church.latitude != null && church.longitude != null ? <span className="inline-flex items-center gap-1 text-emerald-400"><MapPin className="h-3.5 w-3.5" /> Sim</span> : <span className="text-zinc-600">—</span>}</td>
-                  <td className="px-6 py-4"><div className="flex justify-end"><ActionMenu items={[
-                    { label: 'Ver', onClick: () => setViewingId(church.id), icon: <Eye className="h-3.5 w-3.5" /> },
-                    ...(canEdit ? [{ label: 'Editar', href: `/dashboard/igrejas/${church.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
-                    ...(canRemove ? [{ label: 'Excluir', onClick: () => setDeletingChurch(church), icon: <Trash2 className="h-3.5 w-3.5" />, destructive: true }] : []),
-                  ]} /></div></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {!loading && !loadError && totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-zinc-850 pt-4">
-          <button className="flex h-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-white disabled:opacity-40" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Anterior</button>
-          <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">Página <span className="text-zinc-300">{page}</span> de <span className="text-zinc-300">{totalPages}</span></span>
-          <button className="flex h-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-white disabled:opacity-40" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>Próxima</button>
-        </div>
-      )}
+      <DataTable
+        caption="Lista de igrejas"
+        items={churches}
+        loading={loading}
+        currentPage={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        emptyMessage={
+          loadError ? (
+            <ErrorState
+              title="Não foi possível carregar as igrejas"
+              description="A lista não pôde ser buscada agora. Tente de novo; se persistir, verifique sua conexão."
+              action={{ label: 'Tentar de novo', onClick: () => setRefreshKey((k) => k + 1) }}
+              compact
+            />
+          ) : hasActiveFilters ? (
+            <EmptyState
+              title="Nenhuma igreja para esta busca"
+              description="Nenhuma igreja combina com os filtros aplicados. Ajuste os critérios para ver mais resultados."
+              compact
+            />
+          ) : (
+            <EmptyState
+              title="Nenhuma igreja cadastrada"
+              description="Assim que a primeira igreja for cadastrada, ela aparece aqui com cidade, líder espiritual e contato."
+              compact
+            />
+          )
+        }
+        columns={[
+          {
+            header: 'Igreja',
+            role: 'title',
+            accessor: (church) => (
+              <span className="flex items-center gap-2 font-bold text-content-strong">
+                <Building2 className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+                {church.name}
+              </span>
+            ),
+          },
+          { header: 'Cidade', accessor: (church) => church.city || '—' },
+          {
+            header: 'Líder Espiritual',
+            accessor: (church) => church.spiritualLeaderName
+              ? <span className="flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-content-muted" aria-hidden="true" />{church.spiritualLeaderName}</span>
+              : '—',
+          },
+          {
+            header: 'Telefone',
+            accessor: (church) => church.spiritualLeaderPhone
+              ? <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-content-muted" aria-hidden="true" />{formatPhone(church.spiritualLeaderPhone)}</span>
+              : '—',
+          },
+          {
+            header: 'Coordenadas',
+            accessor: (church) => church.latitude != null && church.longitude != null
+              ? <span className="inline-flex items-center gap-1 text-feedback-success"><MapPin className="h-3.5 w-3.5" aria-hidden="true" /> Sim</span>
+              : <span className="text-content-disabled">—</span>,
+          },
+          {
+            header: 'Ações',
+            role: 'actions',
+            className: 'text-right',
+            accessor: (church) => (
+              <div className="flex justify-end">
+                <ActionMenu items={[
+                  { label: 'Ver', onClick: () => setViewingId(church.id), icon: <Eye className="h-3.5 w-3.5" /> },
+                  ...(canEdit ? [{ label: 'Editar', href: `/dashboard/igrejas/${church.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
+                  ...(canRemove ? [{ label: 'Excluir', onClick: () => setDeletingChurch(church), icon: <Trash2 className="h-3.5 w-3.5" />, destructive: true }] : []),
+                ]} />
+              </div>
+            ),
+          },
+        ]}
+      />
 
       <ChurchDetailModal churchId={viewingId} canOpenLegendaryScreen={canOpen('/dashboard/legendarios')} onClose={() => setViewingId(null)} />
       <ConfirmDialog isOpen={deletingChurch !== null} title="Excluir Igreja" description={`Tem certeza que deseja excluir "${deletingChurch?.name ?? ''}"? Só é possível excluir igrejas sem Legendários vinculados.`} confirmLabel={deleteBusy ? 'Excluindo...' : 'Excluir'} cancelLabel="Cancelar" onConfirm={handleConfirmDelete} onCancel={() => setDeletingChurch(null)} variant="danger" />

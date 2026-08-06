@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import IgrejasPage from './page';
 
@@ -35,6 +35,14 @@ function pageResponse(data: ReturnType<typeof church>[], options?: { page?: numb
   };
 }
 
+/**
+ * A lista usa `DataTable`, que renderiza duas composições do mesmo dado (tabela para
+ * desktop, cartões para mobile). No navegador só uma aparece — a outra é `display:none`,
+ * portanto fora da árvore de acessibilidade. O JSDOM não aplica CSS, então as consultas
+ * precisam ser escopadas: solto, `getByText` encontra as duas.
+ */
+const naTabela = () => within(screen.getByTestId('datatable-desktop'));
+
 describe('IgrejasPage', () => {
   beforeEach(() => {
     mocks.getChurchesPage.mockReset();
@@ -50,9 +58,9 @@ describe('IgrejasPage', () => {
     ]));
     render(<IgrejasPage />);
 
-    expect(await screen.findByText('Igreja Central')).toBeInTheDocument();
-    expect(screen.getByText('Igreja da Paz')).toBeInTheDocument();
-    expect(screen.getByText('(64) 99248-5187')).toBeInTheDocument();
+    expect(await naTabela().findByText('Igreja Central')).toBeInTheDocument();
+    expect(naTabela().getByText('Igreja da Paz')).toBeInTheDocument();
+    expect(naTabela().getByText('(64) 99248-5187')).toBeInTheDocument();
     expect(mocks.getChurchesPage).toHaveBeenCalledWith({
       page: 1, perPage: 10, search: undefined, city: undefined,
       hasCoordinates: undefined, hasLegendarios: undefined,
@@ -63,7 +71,7 @@ describe('IgrejasPage', () => {
   it('envia a busca ao backend com debounce e volta para a primeira página', async () => {
     mocks.getChurchesPage.mockResolvedValue(pageResponse([church('c1', 'Igreja Central')]));
     render(<IgrejasPage />);
-    await screen.findByText('Igreja Central');
+    await naTabela().findByText('Igreja Central');
 
     fireEvent.change(screen.getByLabelText('Buscar igrejas'), { target: { value: 'central' } });
 
@@ -75,7 +83,7 @@ describe('IgrejasPage', () => {
   it('combina cidade, coordenadas e vínculo de legendários na consulta', async () => {
     mocks.getChurchesPage.mockResolvedValue(pageResponse([]));
     render(<IgrejasPage />);
-    await screen.findByText('Nenhuma igreja cadastrada.');
+    await naTabela().findByText('Nenhuma igreja cadastrada');
 
     fireEvent.change(screen.getByLabelText('Filtrar por cidade'), { target: { value: 'Goiânia' } });
     fireEvent.change(screen.getByLabelText('Filtrar por coordenadas'), { target: { value: 'false' } });
@@ -84,7 +92,8 @@ describe('IgrejasPage', () => {
     await waitFor(() => expect(mocks.getChurchesPage).toHaveBeenCalledWith(expect.objectContaining({
       page: 1, city: 'Goiânia', hasCoordinates: false, hasLegendarios: true,
     })));
-    expect(await screen.findByText('Nenhuma igreja encontrada com os filtros atuais.')).toBeInTheDocument();
+    // Vazio COM filtro é resultado, não ausência de cadastro (task 4.3/5.4).
+    expect(await naTabela().findByText('Nenhuma igreja para esta busca')).toBeInTheDocument();
   });
 
   it('pagina mantendo os filtros no backend', async () => {
@@ -93,11 +102,11 @@ describe('IgrejasPage', () => {
       { page, total: 12, totalPages: 2 },
     )));
     render(<IgrejasPage />);
-    await screen.findByText('Igreja 1');
+    await naTabela().findByText('Igreja 1');
 
     fireEvent.click(screen.getByRole('button', { name: 'Próxima' }));
 
-    expect(await screen.findByText('Igreja 2')).toBeInTheDocument();
+    expect(await naTabela().findByText('Igreja 2')).toBeInTheDocument();
     expect(mocks.getChurchesPage).toHaveBeenCalledWith(expect.objectContaining({ page: 2 }));
   });
 
@@ -110,22 +119,22 @@ describe('IgrejasPage', () => {
       return Promise.resolve(pageResponse([church('initial', 'Igreja Inicial')]));
     });
     render(<IgrejasPage />);
-    await screen.findByText('Igreja Inicial');
+    await naTabela().findByText('Igreja Inicial');
 
     fireEvent.change(screen.getByLabelText('Buscar igrejas'), { target: { value: 'antiga' } });
     await waitFor(() => expect(mocks.getChurchesPage).toHaveBeenCalledWith(expect.objectContaining({ search: 'antiga' })));
     fireEvent.change(screen.getByLabelText('Buscar igrejas'), { target: { value: 'nova' } });
-    expect(await screen.findByText('Igreja Nova')).toBeInTheDocument();
+    expect(await naTabela().findByText('Igreja Nova')).toBeInTheDocument();
 
     await act(async () => { resolveOld(pageResponse([church('old', 'Igreja Antiga')])); await oldRequest; });
-    expect(screen.queryByText('Igreja Antiga')).toBeNull();
-    expect(screen.getByText('Igreja Nova')).toBeInTheDocument();
+    expect(naTabela().queryByText('Igreja Antiga')).toBeNull();
+    expect(naTabela().getByText('Igreja Nova')).toBeInTheDocument();
   });
 
   it('mostra estado de erro sem tratar a falha como lista vazia', async () => {
     mocks.getChurchesPage.mockRejectedValue(new Error('boom'));
     render(<IgrejasPage />);
-    expect(await screen.findByText(/Não foi possível carregar as igrejas/)).toBeInTheDocument();
-    expect(screen.queryByText('Nenhuma igreja cadastrada.')).toBeNull();
+    expect(await naTabela().findByText(/Não foi possível carregar as igrejas/)).toBeInTheDocument();
+    expect(naTabela().queryByText('Nenhuma igreja cadastrada')).toBeNull();
   });
 });

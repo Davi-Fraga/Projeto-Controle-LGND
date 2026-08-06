@@ -5,6 +5,7 @@ import LegendariosPage from './page';
 const mocks = vi.hoisted(() => ({
   search: '',
   replace: vi.fn(),
+  push: vi.fn(),
   getChurches: vi.fn(),
   getExpertises: vi.fn(),
   getLegendarios: vi.fn(),
@@ -16,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: mocks.replace }),
+  useRouter: () => ({ replace: mocks.replace, push: mocks.push }),
   useSearchParams: () => new URLSearchParams(mocks.search),
 }));
 
@@ -194,5 +195,78 @@ describe('LegendariosPage — ações por permission', () => {
     await renderWith('legendarios.read', 'legendarios.update');
 
     expect(mocks.actionLabels).toContain('Editar');
+  });
+});
+
+// Estados assíncronos da lista (change refinar-design-system, task 4.3).
+// A distinção que importa: "não há cadastro" e "sua busca não achou nada" são situações
+// diferentes e pedem saídas diferentes — misturar as duas deixa o usuário sem próximo passo.
+describe('LegendariosPage — vazio, sem resultado e erro', () => {
+  beforeEach(() => {
+    mocks.search = '';
+    mocks.permissions = [];
+    mocks.push.mockReset();
+    mocks.getLegendarios.mockReset().mockResolvedValue(emptyResponse);
+    mocks.getChurches.mockReset().mockResolvedValue({ data: [] });
+    mocks.getProfessions.mockReset().mockResolvedValue({ data: [] });
+    mocks.getExpertises.mockReset().mockResolvedValue({ data: [] });
+  });
+
+  it('lista vazia sem busca orienta a cadastrar o primeiro', async () => {
+    mocks.permissions = ['legendarios.create'];
+    render(<LegendariosPage />);
+
+    expect(await screen.findByText('Nenhum Legendário cadastrado')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cadastrar Legendário' }));
+    expect(mocks.push).toHaveBeenCalledWith('/dashboard/legendarios/novo');
+  });
+
+  it('sem permissão de criar, o vazio não oferece uma ação que a API recusaria', async () => {
+    mocks.permissions = [];
+    render(<LegendariosPage />);
+
+    expect(await screen.findByText('Nenhum Legendário cadastrado')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cadastrar Legendário' })).toBeNull();
+  });
+
+  it('busca sem resultado é tratada como resultado, não como ausência de cadastro', async () => {
+    render(<LegendariosPage />);
+    await screen.findByText('Nenhum Legendário cadastrado');
+
+    fireEvent.change(screen.getByPlaceholderText(/buscar/i), { target: { value: 'zzzz' } });
+
+    expect(await screen.findByText('Nenhum Legendário para esta busca')).toBeInTheDocument();
+    expect(screen.queryByText('Nenhum Legendário cadastrado')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Limpar busca e filtros' })).toBeInTheDocument();
+  });
+
+  it('limpar a busca devolve o estado de lista vazia', async () => {
+    render(<LegendariosPage />);
+    fireEvent.change(screen.getByPlaceholderText(/buscar/i), { target: { value: 'zzzz' } });
+    await screen.findByText('Nenhum Legendário para esta busca');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar busca e filtros' }));
+
+    expect(await screen.findByText('Nenhum Legendário cadastrado')).toBeInTheDocument();
+  });
+
+  it('erro oferece recuperação e a nova tentativa refaz a busca', async () => {
+    mocks.getLegendarios.mockReset().mockRejectedValueOnce(new Error('falhou')).mockResolvedValue(emptyResponse);
+    render(<LegendariosPage />);
+
+    expect(await screen.findByText('Não foi possível carregar Legendários')).toBeInTheDocument();
+    const chamadasAntes = mocks.getLegendarios.mock.calls.length;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+
+    await waitFor(() => expect(mocks.getLegendarios.mock.calls.length).toBeGreaterThan(chamadasAntes));
+  });
+
+  it('a mensagem de erro não vaza detalhe técnico', async () => {
+    mocks.getLegendarios.mockReset().mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:3333'));
+    render(<LegendariosPage />);
+
+    await screen.findByText('Não foi possível carregar Legendários');
+    expect(screen.queryByText(/ECONNREFUSED|127\.0\.0\.1|stack/i)).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from './Sidebar';
 
@@ -24,7 +24,7 @@ const user = (permissions: string[], roles: string[] = ['MEMBER']) => ({
 describe('Sidebar (navegação permission-driven via manifesto)', () => {
   beforeEach(() => mocks.getCurrentUser.mockReset());
 
-  it('Igrejas aparece por churches.read (permission, não papel); TOPs e Usuários não', async () => {
+  it('Igrejas aparece por churches.read, enquanto TOPs e Usuários não', async () => {
     mocks.getCurrentUser.mockResolvedValue(user(['churches.read']));
     render(<Sidebar />);
     expect(await screen.findByText('Igrejas')).toBeInTheDocument();
@@ -32,7 +32,7 @@ describe('Sidebar (navegação permission-driven via manifesto)', () => {
     expect(screen.queryByText('Usuários')).toBeNull();
   });
 
-  it('Ações Sociais aparece com social-actions.read (não com tops.read)', async () => {
+  it('Ações Sociais aparece com social-actions.read e não com tops.read', async () => {
     mocks.getCurrentUser.mockResolvedValue(user(['social-actions.read']));
     render(<Sidebar />);
     expect(await screen.findByText('Ações Sociais')).toBeInTheDocument();
@@ -49,7 +49,6 @@ describe('Sidebar (navegação permission-driven via manifesto)', () => {
   it('Usuários não aparece a não-admin mesmo com users.* residual', async () => {
     mocks.getCurrentUser.mockResolvedValue(user(['legendarios.read', 'users.read', 'users.update']));
     render(<Sidebar />);
-    // Legendários confirma que o usuário carregou; Usuários deve continuar ausente.
     expect(await screen.findByText('Legendários')).toBeInTheDocument();
     expect(screen.queryByText('Usuários')).toBeNull();
   });
@@ -58,6 +57,14 @@ describe('Sidebar (navegação permission-driven via manifesto)', () => {
     mocks.getCurrentUser.mockResolvedValue(user(['dashboard.read'], ['COORDINATION_ADMIN']));
     render(<Sidebar />);
     expect(await screen.findByText('Usuários')).toBeInTheDocument();
+  });
+
+  it('identifica a navegação e comunica a rota atual', async () => {
+    mocks.getCurrentUser.mockResolvedValue(user(['dashboard.read']));
+    render(<Sidebar />);
+
+    expect(await screen.findByRole('navigation', { name: 'Navegação principal' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Painel' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('expõe o estado do menu mobile e permite fechar pelo mesmo controle', async () => {
@@ -69,12 +76,42 @@ describe('Sidebar (navegação permission-driven via manifesto)', () => {
     expect(openButton).toHaveAttribute('aria-expanded', 'false');
 
     fireEvent.click(openButton);
-    const closeButton = screen.getByRole('button', { name: 'Fechar menu' });
-    expect(closeButton).toHaveAttribute('aria-expanded', 'true');
+    const closeButtons = screen.getAllByRole('button', { name: 'Fechar menu' });
+    expect(closeButtons[0]).toHaveAttribute('aria-expanded', 'true');
 
-    fireEvent.click(closeButton);
+    fireEvent.click(closeButtons[0]);
     expect(screen.getByRole('button', { name: 'Abrir menu' })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId('sidebar-backdrop')).toBeNull();
+  });
+
+  it('agrupa as abas em seções rotuladas, com o Painel solto no topo', async () => {
+    mocks.getCurrentUser.mockResolvedValue(user(['dashboard.read', 'legendarios.read', 'tops.read'], ['COORDINATION_ADMIN']));
+    render(<Sidebar />);
+
+    expect(await screen.findByRole('group', { name: 'Manada' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Atividades' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Administração' })).toBeInTheDocument();
+
+    // Painel não pertence a grupo nenhum: fica na seção sem rótulo.
+    expect(within(screen.getByRole('group', { name: 'Manada' })).queryByText('Painel')).toBeNull();
+    expect(within(screen.getByRole('group', { name: 'Manada' })).getByText('Legendários')).toBeInTheDocument();
+  });
+
+  it('não renderiza cabeçalho de grupo sem nenhuma aba visível', async () => {
+    mocks.getCurrentUser.mockResolvedValue(user(['legendarios.read']));
+    render(<Sidebar />);
+
+    expect(await screen.findByRole('group', { name: 'Manada' })).toBeInTheDocument();
+    // Estrutura APARECE aqui: o Organograma usa regra `anyOf` legada e legendarios.read basta
+    // para abri-lo. Ele é o único item visível do grupo.
+    const estrutura = screen.getByRole('group', { name: 'Estrutura' });
+    expect(within(estrutura).getByText('Organograma')).toBeInTheDocument();
+    expect(within(estrutura).queryByText('Equipes')).toBeNull();
+
+    // Estes não têm nenhum item visível — o rótulo não pode sobrar sozinho.
+    expect(screen.queryByRole('group', { name: 'Atividades' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Análise' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Administração' })).toBeNull();
   });
 
   it('permite fechar o menu mobile pelo backdrop', async () => {
@@ -82,7 +119,9 @@ describe('Sidebar (navegação permission-driven via manifesto)', () => {
     render(<Sidebar />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Abrir menu' }));
-    fireEvent.click(screen.getByTestId('sidebar-backdrop'));
+    const backdrop = screen.getByTestId('sidebar-backdrop');
+    expect(backdrop).toHaveAttribute('aria-label', 'Fechar menu');
+    fireEvent.click(backdrop);
 
     expect(screen.getByRole('button', { name: 'Abrir menu' })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId('sidebar-backdrop')).toBeNull();

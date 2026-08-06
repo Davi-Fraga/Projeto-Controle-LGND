@@ -58,3 +58,38 @@ Botões apenas com ícone, toggles, menus, diálogos e controles customizados SH
 #### Scenario: Menu contextual
 - **WHEN** um menu contextual é aberto
 - **THEN** o acionador comunica seu estado e os itens do menu permanecem navegáveis e identificáveis por teclado
+
+### Requirement: Navegação primária organizada em grupos
+
+A navegação primária SHALL agrupar as abas por afinidade de domínio, com rótulo por grupo, em vez de apresentar uma lista plana. O agrupamento SHALL ser declarado no manifesto compartilhado de navegação, que permanece a fonte única das abas.
+
+O agrupamento é **apresentação, nunca fronteira de permissão**: o conjunto de abas exibidas SHALL ser exatamente o mesmo que a avaliação item a item das regras de entrada produziria. Um grupo NÃO SHALL ampliar nem restringir o que o usuário enxerga.
+
+Um grupo sem nenhuma aba visível para o usuário NÃO SHALL renderizar — nem o cabeçalho. A ordem de exibição dos grupos SHALL ser determinística e independente da ordem interna do manifesto, que continua governando a preferência de primeira rota permitida.
+
+Cada grupo SHALL ser identificável por tecnologias assistivas e a navegação SHALL permanecer utilizável por teclado e no drawer mobile.
+
+#### Scenario: Abas agrupadas por afinidade
+
+- **WHEN** um usuário com acesso amplo abre a navegação
+- **THEN** as abas aparecem distribuídas em grupos rotulados por afinidade de domínio, e não como lista plana única
+
+#### Scenario: Agrupar não altera o que é visível
+
+- **WHEN** a navegação agrupada é montada para qualquer usuário
+- **THEN** o conjunto de abas exibidas é idêntico ao que a avaliação individual das regras de entrada produz — nenhuma aba é escondida nem acrescentada pelo agrupamento
+
+#### Scenario: Grupo vazio não deixa cabeçalho órfão
+
+- **WHEN** nenhum item de um grupo é visível para o usuário
+- **THEN** aquele grupo não aparece, incluindo seu rótulo
+
+#### Scenario: Item sem grupo fica em evidência
+
+- **WHEN** uma aba não declara grupo
+- **THEN** ela aparece antes dos grupos rotulados, numa seção sem cabeçalho
+
+#### Scenario: Grupos são anunciados
+
+- **WHEN** um usuário de leitor de tela percorre a navegação
+- **THEN** cada grupo é anunciado com seu rótulo e os itens permanecem alcançáveis por teclado, inclusive no drawer mobile

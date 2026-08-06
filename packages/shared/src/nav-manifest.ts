@@ -40,32 +40,53 @@ export type NavEntryRule =
   | ({ kind: 'permissions' } & PermissionRule)
   | { kind: 'admin-role'; role: string };
 
+/**
+ * Grupo visual da navegação. É APENAS agrupamento de interface — nunca fronteira de
+ * permission. A visibilidade continua item a item por `isPrimaryNavVisible`; o grupo só
+ * decide onde o item aparece e sob qual rótulo.
+ */
+export type NavGroupId = 'manada' | 'estrutura' | 'atividades' | 'analise' | 'administracao';
+
+// Ordem VISUAL dos grupos na barra lateral (independente da ordem do PRIMARY_NAV, que
+// governa a preferência de "primeira rota permitida" e não deve mudar por motivo estético).
+export const NAV_GROUPS: { id: NavGroupId; label: string }[] = [
+  { id: 'manada', label: 'Manada' },
+  { id: 'estrutura', label: 'Estrutura' },
+  { id: 'atividades', label: 'Atividades' },
+  { id: 'analise', label: 'Análise' },
+  { id: 'administracao', label: 'Administração' },
+];
+
 export type PrimaryNavItem = {
   // Igual ao id da tela no SCREEN_CATALOG (exceto exceções administrativas, ex.: 'users').
   screenId: string;
   href: string;
   label: string;
   rule: NavEntryRule;
+  // Grupo visual. Ausente = item solto no topo, fora de qualquer grupo (ex.: Painel).
+  group?: NavGroupId;
   // true = exceção administrativa (fora do catálogo concedível).
   adminOnly?: boolean;
 };
 
 // Ordem determinística (também define a preferência de "primeira rota permitida").
+// ⚠️ NÃO reordenar por motivo visual: a ordem daqui decide para onde cai quem não tem
+// acesso ao Painel. A ordem que o usuário vê vem de NAV_GROUPS + `group`.
 export const PRIMARY_NAV: PrimaryNavItem[] = [
   { screenId: 'dashboard', href: '/dashboard', label: 'Painel', rule: { kind: 'permissions', mode: 'allOf', keys: ['dashboard.read'] } },
-  { screenId: 'legendarios', href: '/dashboard/legendarios', label: 'Legendários', rule: { kind: 'permissions', mode: 'allOf', keys: ['legendarios.read'] } },
-  { screenId: 'teams', href: '/dashboard/equipes', label: 'Equipes', rule: { kind: 'permissions', mode: 'allOf', keys: ['teams.read'] } },
-  { screenId: 'spiritual-leaders', href: '/dashboard/lideres-espirituais', label: 'Líderes Espirituais', rule: { kind: 'permissions', mode: 'allOf', keys: ['spiritual-leaders.read'] } },
-  { screenId: 'map', href: '/dashboard/mapa', label: 'Mapa', rule: { kind: 'permissions', mode: 'allOf', keys: ['map.read'] } },
-  { screenId: 'tops', href: '/dashboard/tops', label: 'TOPs', rule: { kind: 'permissions', mode: 'allOf', keys: ['tops.read'] } },
+  { screenId: 'legendarios', href: '/dashboard/legendarios', label: 'Legendários', group: 'manada', rule: { kind: 'permissions', mode: 'allOf', keys: ['legendarios.read'] } },
+  { screenId: 'teams', href: '/dashboard/equipes', label: 'Equipes', group: 'estrutura', rule: { kind: 'permissions', mode: 'allOf', keys: ['teams.read'] } },
+  { screenId: 'spiritual-leaders', href: '/dashboard/lideres-espirituais', label: 'Líderes Espirituais', group: 'manada', rule: { kind: 'permissions', mode: 'allOf', keys: ['spiritual-leaders.read'] } },
+  { screenId: 'map', href: '/dashboard/mapa', label: 'Mapa', group: 'analise', rule: { kind: 'permissions', mode: 'allOf', keys: ['map.read'] } },
+  { screenId: 'tops', href: '/dashboard/tops', label: 'TOPs', group: 'atividades', rule: { kind: 'permissions', mode: 'allOf', keys: ['tops.read'] } },
   // org-chart: conjunto VIEW LEGADO (anyOf) até a Fase 4 do change do organograma migrar p/ organogram.read.
-  { screenId: 'org-chart', href: '/dashboard/organograma', label: 'Organograma', rule: { kind: 'permissions', mode: 'anyOf', keys: ['teams.read', 'legendarios.read', 'tops.read'] } },
-  { screenId: 'social-actions', href: '/dashboard/acoes-sociais', label: 'Ações Sociais', rule: { kind: 'permissions', mode: 'allOf', keys: ['social-actions.read'] } },
-  { screenId: 'communications', href: '/dashboard/comunicacao', label: 'Comunicação', rule: { kind: 'permissions', mode: 'allOf', keys: ['communications.read'] } },
-  { screenId: 'reports', href: '/dashboard/relatorios', label: 'Relatórios', rule: { kind: 'permissions', mode: 'allOf', keys: ['reports.read'] } },
-  { screenId: 'churches', href: '/dashboard/igrejas', label: 'Igrejas', rule: { kind: 'permissions', mode: 'allOf', keys: ['churches.read'] } },
+  { screenId: 'org-chart', href: '/dashboard/organograma', label: 'Organograma', group: 'estrutura', rule: { kind: 'permissions', mode: 'anyOf', keys: ['teams.read', 'legendarios.read', 'tops.read'] } },
+  { screenId: 'social-actions', href: '/dashboard/acoes-sociais', label: 'Ações Sociais', group: 'atividades', rule: { kind: 'permissions', mode: 'allOf', keys: ['social-actions.read'] } },
+  { screenId: 'communications', href: '/dashboard/comunicacao', label: 'Comunicação', group: 'atividades', rule: { kind: 'permissions', mode: 'allOf', keys: ['communications.read'] } },
+  { screenId: 'reports', href: '/dashboard/relatorios', label: 'Relatórios', group: 'analise', rule: { kind: 'permissions', mode: 'allOf', keys: ['reports.read'] } },
+  { screenId: 'churches', href: '/dashboard/igrejas', label: 'Igrejas', group: 'manada', rule: { kind: 'permissions', mode: 'allOf', keys: ['churches.read'] } },
   // Exceção administrativa: fora do catálogo concedível; `users.*` residual NÃO destrava.
-  { screenId: 'users', href: '/dashboard/usuarios', label: 'Usuários', rule: { kind: 'admin-role', role: 'COORDINATION_ADMIN' }, adminOnly: true },
+  { screenId: 'users', href: '/dashboard/usuarios', label: 'Usuários', group: 'administracao', rule: { kind: 'admin-role', role: 'COORDINATION_ADMIN' }, adminOnly: true },
 ];
 
 export type NavUser = { permissions?: string[] | null; roles?: string[] | null } | null | undefined;
@@ -86,6 +107,35 @@ export function isPrimaryNavVisible(user: NavUser, item: PrimaryNavItem): boolea
 
 export function visiblePrimaryNav(user: NavUser): PrimaryNavItem[] {
   return PRIMARY_NAV.filter((item) => isPrimaryNavVisible(user, item));
+}
+
+/** Seção da navegação. `id`/`label` nulos = itens soltos, sem cabeçalho (ex.: Painel). */
+export type NavSection = { id: NavGroupId | null; label: string | null; items: PrimaryNavItem[] };
+
+/**
+ * Mesma lista de `visiblePrimaryNav`, organizada em seções para exibição.
+ *
+ * Duas garantias que os testes travam:
+ *   1. NADA some — o achatamento das seções é exatamente `visiblePrimaryNav`. Agrupar é
+ *      apresentação, nunca filtro; um grupo não pode virar fronteira de permission.
+ *   2. Grupo sem item visível NÃO produz seção — nada de cabeçalho órfão.
+ *
+ * Dentro de cada grupo a ordem segue a do PRIMARY_NAV, para não existir uma segunda
+ * fonte de ordenação divergindo da primeira.
+ */
+export function groupedPrimaryNav(user: NavUser): NavSection[] {
+  const visible = visiblePrimaryNav(user);
+  const sections: NavSection[] = [];
+
+  const ungrouped = visible.filter((item) => !item.group);
+  if (ungrouped.length > 0) sections.push({ id: null, label: null, items: ungrouped });
+
+  for (const group of NAV_GROUPS) {
+    const items = visible.filter((item) => item.group === group.id);
+    if (items.length > 0) sections.push({ id: group.id, label: group.label, items });
+  }
+
+  return sections;
 }
 
 /**

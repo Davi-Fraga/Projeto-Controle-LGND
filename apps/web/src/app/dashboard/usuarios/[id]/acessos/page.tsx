@@ -23,7 +23,7 @@ export default function ControleAcessosPage() {
       .finally(() => setLoading(false));
   }, [authLoading, params.id, router]);
 
-  if (authLoading || loading) return <main className="p-6 text-sm text-zinc-600">Carregando...</main>;
+  if (authLoading || loading) return <main className="p-6 text-sm text-content-disabled">Carregando...</main>;
   if (!user) return null;
 
   return (
@@ -31,13 +31,13 @@ export default function ControleAcessosPage() {
       <div>
         <Link
           href="/dashboard/usuarios"
-          className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-400 hover:text-zinc-200 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-content-muted hover:text-content-strong transition-colors"
         >
           ← Voltar para listagem
         </Link>
-        <h1 className="mt-3 text-2xl font-black tracking-wide text-white uppercase">Controle de Acessos</h1>
-        <p className="text-sm text-zinc-400">
-          Ajuste fino de permissões e escopos de <span className="font-semibold text-zinc-200">{user.name}</span>. Conceder/revogar reflete sem o usuário relogar.
+        <h1 className="mt-3 text-2xl font-black tracking-wide text-content-strong uppercase">Controle de Acessos</h1>
+        <p className="text-sm text-content-muted">
+          Ajuste fino de permissões e escopos de <span className="font-semibold text-content-strong">{user.name}</span>. Conceder/revogar reflete sem o usuário relogar.
         </p>
       </div>
 

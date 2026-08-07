@@ -22,7 +22,9 @@ describe('TeamFilter', () => {
       <TeamFilter value="" onChange={onChange} />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Todas as equipes' }));
+    // O gatilho é nomeado pela FUNÇÃO do campo ("Equipe"), não pelo valor exibido — antes
+    // um leitor de tela anunciava "Todas as equipes, botão" sem dizer de que campo se tratava.
+    fireEvent.click(screen.getByRole('button', { name: 'Equipe' }));
     fireEvent.change(screen.getByPlaceholderText('Buscar equipe...'), {
       target: { value: 'mid' },
     });
@@ -34,7 +36,9 @@ describe('TeamFilter', () => {
     rerender(
       <TeamFilter value="team-1" selectedLabel="Equipe Midia" onChange={onChange} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Equipe Midia' }));
+    // O gatilho segue sendo "Equipe" mesmo com valor selecionado; "Todas as equipes" agora
+    // designa só a opção de limpar, dentro do popup.
+    fireEvent.click(screen.getByRole('button', { name: 'Equipe' }));
     fireEvent.click(screen.getByRole('button', { name: 'Todas as equipes' }));
     expect(onChange).toHaveBeenLastCalledWith('', 'Todas as equipes');
   });

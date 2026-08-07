@@ -49,6 +49,17 @@ export function Sidebar() {
     getCurrentUser().then(setUser).catch(() => {});
   }, []);
 
+  // Escape fecha o drawer. Ouvido no documento porque o foco pode estar em qualquer item da
+  // navegação — ou fora dela, se o menu foi aberto por toque.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    function aoTeclar(evento: KeyboardEvent) {
+      if (evento.key === 'Escape') setIsOpen(false);
+    }
+    document.addEventListener('keydown', aoTeclar);
+    return () => document.removeEventListener('keydown', aoTeclar);
+  }, [isOpen]);
+
   // Fonte única de navegação: manifesto compartilhado por permissions efetivas
   // (change alinhar-abas). Sem gates paralelos por papel nas telas concedíveis; Usuários
   // continua exceção admin (declarada no manifesto). A autorização real é sempre no backend.
@@ -143,11 +154,14 @@ export function Sidebar() {
         </div>
       </aside>
 
+      {/* Véu, não um segundo controle: como botão nomeado ele duplicava o nome acessível do
+          toggle na lista de botões de um leitor de tela. Fica `aria-hidden` e segue clicável
+          no mouse e no toque; para o teclado sobram o toggle e o Escape. */}
       {isOpen ? (
         <button
           type="button"
           data-testid="sidebar-backdrop"
-          aria-label="Fechar menu"
+          aria-hidden="true"
           tabIndex={-1}
           onClick={() => setIsOpen(false)}
           className="fixed inset-0 z-30 cursor-default bg-black/70 backdrop-blur-sm md:hidden"

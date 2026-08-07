@@ -211,6 +211,7 @@ export function LegendarioServiceSection({ legendarioId, servants, permissions, 
           <div className="block space-y-1 sm:col-span-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">TOP</span>
             <AsyncCombobox
+              label="TOP"
               value={topId}
               selectedLabel={topLabel}
               onChange={(value, label) => { setTopId(value); setTopLabel(value ? label : ''); }}

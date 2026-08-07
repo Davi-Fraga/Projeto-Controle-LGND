@@ -61,7 +61,7 @@ export function SocialActionForm({ value, saving, onChange, onSubmit }: Props) {
           </label>
           <label className="block space-y-2">
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Responsável</span>
-            <LegendarioCombobox value={value.responsibleLegendaryId ?? ''} onChange={(id) => patch({ responsibleLegendaryId: id })} clearable={false} noneLabel="Selecione o responsável" />
+            <LegendarioCombobox label="Responsável" value={value.responsibleLegendaryId ?? ''} onChange={(id) => patch({ responsibleLegendaryId: id })} clearable={false} noneLabel="Selecione o responsável" />
           </label>
         </div>
 

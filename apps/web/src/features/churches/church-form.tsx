@@ -145,7 +145,7 @@ export function ChurchForm({ church }: Props) {
         </div>
         <label className="md:col-span-2 block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Legendário vinculado</span>
-          <LegendarioCombobox
+          <LegendarioCombobox label="Legendário vinculado"
             value={form.spiritualLeaderLegendaryId}
             initialLabel={church?.spiritualLeaderLegendary?.fullName}
             onChange={(value) => setField('spiritualLeaderLegendaryId', value)}

@@ -179,6 +179,7 @@ export default function SocialActionsPage() {
             accessor: (item) => (
               <div className="flex justify-end">
                 <ActionMenu
+                  label={`Ações de ${item.title}`}
                   items={[
                     { label: 'Ver', href: `/dashboard/acoes-sociais/${item.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
                     ...(canEdit ? [{ label: 'Editar', href: `/dashboard/acoes-sociais/${item.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),

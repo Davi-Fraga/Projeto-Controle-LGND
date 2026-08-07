@@ -114,4 +114,33 @@ describe('AsyncCombobox', () => {
     expect(screen.queryByRole('combobox')).toBeNull();
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  /**
+   * Sem `label`, o nome acessível do gatilho vinha do conteúdo — ou seja, do VALOR
+   * selecionado. Um leitor de tela anunciava "Todas as equipes, botão", sem dizer que
+   * aquilo era o filtro de Equipe. O nome descrevia o estado, não a função do campo.
+   */
+  it('o gatilho anuncia a função do campo, não o valor selecionado', () => {
+    const fetchOptions = vi.fn().mockResolvedValue([]);
+    render(
+      <AsyncCombobox
+        label="Equipe"
+        value=""
+        selectedLabel="Todas as equipes"
+        onChange={vi.fn()}
+        fetchOptions={fetchOptions}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Equipe' })).toBeInTheDocument();
+  });
+
+  it('sem `label`, o gatilho segue nomeado pelo conteúdo — nada quebra em quem não passa a prop', () => {
+    const fetchOptions = vi.fn().mockResolvedValue([]);
+    render(
+      <AsyncCombobox value="" noneLabel="Todas as equipes" onChange={vi.fn()} fetchOptions={fetchOptions} />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Todas as equipes' })).toBeInTheDocument();
+  });
 });

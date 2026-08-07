@@ -173,7 +173,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
         </div>
         <div className="md:col-span-1 block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Representante</span>
-          <LegendarioCombobox value={form.representativeLegendaryId} onChange={(value) => setForm({ ...form, representativeLegendaryId: value })} initialLabel={form.representativeLabel || undefined} noneLabel="Não informado" />
+          <LegendarioCombobox label="Representante" value={form.representativeLegendaryId} onChange={(value) => setForm({ ...form, representativeLegendaryId: value })} initialLabel={form.representativeLabel || undefined} noneLabel="Não informado" />
         </div>
         <div className="md:col-span-1 block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Função rep.</span>
@@ -181,7 +181,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
         </div>
         <div className="md:col-span-1 block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Sub-representante</span>
-          <LegendarioCombobox value={form.deputyRepresentativeLegendaryId} onChange={(value) => setForm({ ...form, deputyRepresentativeLegendaryId: value })} initialLabel={form.deputyRepresentativeLabel || undefined} noneLabel="Não informado" />
+          <LegendarioCombobox label="Sub-representante" value={form.deputyRepresentativeLegendaryId} onChange={(value) => setForm({ ...form, deputyRepresentativeLegendaryId: value })} initialLabel={form.deputyRepresentativeLabel || undefined} noneLabel="Não informado" />
         </div>
         <div className="md:col-span-1 block space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Função sub</span>
@@ -250,6 +250,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
               </div>
               {(permissions.update || permissions.delete) ? (
                 <ActionMenu
+                  label={`Ações da família ${family.name}`}
                   items={[
                     ...(permissions.update ? [{ label: 'Editar', onClick: () => editFamily(family), icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
                     ...(permissions.delete ? [{ label: 'Inativar', onClick: () => void deactivateFamily(family.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true as const }] : []),

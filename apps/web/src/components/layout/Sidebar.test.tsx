@@ -120,10 +120,37 @@ describe('Sidebar (navegação permission-driven via manifesto)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Abrir menu' }));
     const backdrop = screen.getByTestId('sidebar-backdrop');
-    expect(backdrop).toHaveAttribute('aria-label', 'Fechar menu');
     fireEvent.click(backdrop);
 
     expect(screen.getByRole('button', { name: 'Abrir menu' })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId('sidebar-backdrop')).toBeNull();
+  });
+
+  it('Escape fecha o menu mobile', async () => {
+    mocks.getCurrentUser.mockResolvedValue(user(['dashboard.read']));
+    render(<Sidebar />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menu' }));
+    expect(screen.getAllByRole('button', { name: 'Fechar menu' })[0]).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.getByRole('button', { name: 'Abrir menu' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('sidebar-backdrop')).toBeNull();
+  });
+
+  /**
+   * O backdrop é véu, não um segundo controle: como `<button aria-label="Fechar menu">` ele
+   * duplicava o nome acessível do toggle na lista de botões de um leitor de tela. Fica
+   * `aria-hidden` — segue clicável no mouse/toque, e para o teclado sobram o toggle e o Escape.
+   */
+  it('o backdrop não duplica o nome acessível do toggle', async () => {
+    mocks.getCurrentUser.mockResolvedValue(user(['dashboard.read']));
+    render(<Sidebar />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menu' }));
+
+    expect(screen.getByTestId('sidebar-backdrop')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getAllByRole('button', { name: 'Fechar menu' })).toHaveLength(1);
   });
 });

@@ -166,6 +166,7 @@ export default function SocialActionDetailPage() {
           {canAddParticipant && (
           <div className="grid gap-3 md:grid-cols-4 bg-zinc-900/20 border border-zinc-800/40 rounded-xl p-4">
             <LegendarioCombobox
+              label="Legendário a adicionar"
               value={newParticipant.legendaryId}
               onChange={(id) => setNewParticipant((current) => ({ ...current, legendaryId: id }))}
               fetchOptions={fetchCandidates}

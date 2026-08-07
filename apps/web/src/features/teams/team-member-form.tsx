@@ -84,7 +84,7 @@ export function TeamMemberForm({ teamId, member, onSaved, onCancel }: Props) {
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-2">
           <span className="block text-xs font-bold uppercase tracking-wider text-zinc-400">Legendário</span>
-          <LegendarioCombobox
+          <LegendarioCombobox label="Legendário"
             value={payload.legendaryId ?? ''}
             onChange={(value) => setField('legendaryId', value)}
             fetchOptions={fetchCandidates}

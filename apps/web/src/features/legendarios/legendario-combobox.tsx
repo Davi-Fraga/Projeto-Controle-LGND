@@ -55,6 +55,8 @@ type Props = {
   fetchOptions?: (search: string, limit: number) => Promise<ComboboxOption[]>;
   placeholder?: string;
   noneLabel?: string;
+  /** Nome acessível do gatilho — a função do campo ("Representante"), não o valor. */
+  label?: string;
   clearable?: boolean;
   disabled?: boolean;
   limit?: number;
@@ -67,6 +69,7 @@ export function LegendarioCombobox({
   fetchOptions,
   placeholder = 'Buscar por nome, cidade ou LGND...',
   noneLabel = 'Nenhum',
+  label,
   clearable = true,
   disabled = false,
   limit = 20,
@@ -123,6 +126,7 @@ export function LegendarioCombobox({
       fetchOptions={(search) => (fetchOptions ?? fetchLegendarioOptions)(search, limit)}
       placeholder={placeholder}
       noneLabel={noneLabel}
+      label={label}
       clearable={clearable}
       disabled={disabled}
     />

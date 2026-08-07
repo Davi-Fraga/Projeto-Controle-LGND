@@ -146,7 +146,7 @@ export function CommunicationForm({ value, saving, onChange, onSubmit }: Props) 
           {needsLegendary && (
             <label className="block space-y-2 animate-in fade-in duration-200">
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Selecione o Legendário</span>
-              <LegendarioCombobox value={value.targetId ?? ''} onChange={(id) => patch({ targetId: id })} clearable={false} noneLabel="Selecione o legendário" />
+              <LegendarioCombobox label="Selecione o Legendário" value={value.targetId ?? ''} onChange={(id) => patch({ targetId: id })} clearable={false} noneLabel="Selecione o legendário" />
             </label>
           )}
         </div>

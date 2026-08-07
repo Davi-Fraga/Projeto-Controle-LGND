@@ -173,6 +173,9 @@ export default function UsuariosPage() {
             accessor: (item) => (
               <div className="flex justify-end">
                 <ActionMenu
+                  // Nome sozinho não desambigua aqui: contas homônimas existem de fato
+                  // (dois "SL Smoke" no banco local). O e-mail é a chave única e já está na linha.
+                  label={`Ações de ${item.name} (${item.email})`}
                   items={[
                     { label: 'Editar', href: `/dashboard/usuarios/${item.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> },
                     { label: 'Controle de Acessos', href: `/dashboard/usuarios/${item.id}/acessos`, icon: <ShieldCheck className="h-3.5 w-3.5" /> },

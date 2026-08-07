@@ -90,25 +90,25 @@ export function TopForm({ top }: { top?: TopEvent }) {
           </select>
         </Field>
         <Field label="Representante da Manada">
-          <LegendarioCombobox value={payload.representativeLegendaryId ?? ''} onChange={(v) => setField('representativeLegendaryId', v)} initialLabel={top?.representative?.fullName} noneLabel="Não definido" />
+          <LegendarioCombobox label="Representante da Manada" value={payload.representativeLegendaryId ?? ''} onChange={(v) => setField('representativeLegendaryId', v)} initialLabel={top?.representative?.fullName} noneLabel="Não definido" />
         </Field>
         <Field label="Sub-representante da Manada">
-          <LegendarioCombobox value={payload.deputyRepresentativeLegendaryId ?? ''} onChange={(v) => setField('deputyRepresentativeLegendaryId', v)} initialLabel={top?.deputyRepresentative?.fullName} noneLabel="Não definido" />
+          <LegendarioCombobox label="Sub-representante da Manada" value={payload.deputyRepresentativeLegendaryId ?? ''} onChange={(v) => setField('deputyRepresentativeLegendaryId', v)} initialLabel={top?.deputyRepresentative?.fullName} noneLabel="Não definido" />
         </Field>
         <Field label="Coordenador Geral">
-          <LegendarioCombobox value={payload.generalCoordinatorLegendaryId ?? ''} onChange={(v) => setField('generalCoordinatorLegendaryId', v)} initialLabel={top?.generalCoordinator?.fullName} noneLabel="Não definido" />
+          <LegendarioCombobox label="Coordenador Geral" value={payload.generalCoordinatorLegendaryId ?? ''} onChange={(v) => setField('generalCoordinatorLegendaryId', v)} initialLabel={top?.generalCoordinator?.fullName} noneLabel="Não definido" />
         </Field>
         <div className="md:col-span-2 mt-2 border-t border-zinc-800 pt-4">
           <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Coordenação das Famílias</h2>
         </div>
         <Field label="Coordenador das Famílias">
-          <LegendarioCombobox value={payload.familyCoordinatorLegendaryId ?? ''} onChange={(v) => setField('familyCoordinatorLegendaryId', v)} initialLabel={top?.familyCoordinator?.fullName} noneLabel="Não definido" />
+          <LegendarioCombobox label="Coordenador das Famílias" value={payload.familyCoordinatorLegendaryId ?? ''} onChange={(v) => setField('familyCoordinatorLegendaryId', v)} initialLabel={top?.familyCoordinator?.fullName} noneLabel="Não definido" />
         </Field>
         <Field label="Subcoordenador das Famílias">
-          <LegendarioCombobox value={payload.familyDeputyCoordinatorLegendaryId ?? ''} onChange={(v) => setField('familyDeputyCoordinatorLegendaryId', v)} initialLabel={top?.familyDeputyCoordinator?.fullName} noneLabel="Não definido" />
+          <LegendarioCombobox label="Subcoordenador das Famílias" value={payload.familyDeputyCoordinatorLegendaryId ?? ''} onChange={(v) => setField('familyDeputyCoordinatorLegendaryId', v)} initialLabel={top?.familyDeputyCoordinator?.fullName} noneLabel="Não definido" />
         </Field>
         <Field label="Coordenador Geral das Famílias">
-          <LegendarioCombobox value={payload.familyGeneralCoordinatorLegendaryId ?? ''} onChange={(v) => setField('familyGeneralCoordinatorLegendaryId', v)} initialLabel={top?.familyGeneralCoordinator?.fullName} noneLabel="Não definido" />
+          <LegendarioCombobox label="Coordenador Geral das Famílias" value={payload.familyGeneralCoordinatorLegendaryId ?? ''} onChange={(v) => setField('familyGeneralCoordinatorLegendaryId', v)} initialLabel={top?.familyGeneralCoordinator?.fullName} noneLabel="Não definido" />
         </Field>
         <label className="flex min-h-11 items-center gap-3 self-end rounded-lg border border-zinc-800 bg-zinc-900/20 px-4 py-2.5 text-xs font-semibold text-zinc-300">
           <input type="checkbox" checked={Boolean(payload.needsReview)} onChange={(e) => setField('needsReview', e.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-orange-600 focus:ring-orange-500/20 focus:ring-offset-zinc-950" />

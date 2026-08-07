@@ -77,6 +77,7 @@ export function TopTeamForm({
             um `<select>` truncaria a lista em silêncio.
           */}
           <AsyncCombobox
+            label="Equipe"
             value={payload.teamId ?? ''}
             selectedLabel={item?.team?.name}
             onChange={(value) => setPayload({ ...payload, teamId: value })}
@@ -93,11 +94,11 @@ export function TopTeamForm({
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Coordenador da Equipe</span>
-          <LegendarioCombobox value={payload.coordinatorLegendaryId ?? ''} onChange={(v) => setPayload({ ...payload, coordinatorLegendaryId: v })} initialLabel={item?.coordinator?.fullName} noneLabel="Não definido" />
+          <LegendarioCombobox label="Coordenador da Equipe" value={payload.coordinatorLegendaryId ?? ''} onChange={(v) => setPayload({ ...payload, coordinatorLegendaryId: v })} initialLabel={item?.coordinator?.fullName} noneLabel="Não definido" />
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Subcoordenador da Equipe</span>
-          <LegendarioCombobox value={payload.deputyCoordinatorLegendaryId ?? ''} onChange={(v) => setPayload({ ...payload, deputyCoordinatorLegendaryId: v })} initialLabel={item?.deputyCoordinator?.fullName} noneLabel="Não definido" />
+          <LegendarioCombobox label="Subcoordenador da Equipe" value={payload.deputyCoordinatorLegendaryId ?? ''} onChange={(v) => setPayload({ ...payload, deputyCoordinatorLegendaryId: v })} initialLabel={item?.deputyCoordinator?.fullName} noneLabel="Não definido" />
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Observações</span>

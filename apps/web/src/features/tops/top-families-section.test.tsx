@@ -112,7 +112,8 @@ describe('TopFamiliesSection', () => {
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'fam1' } });
 
     // Abre o combobox de participante e escolhe a opção retornada pela busca no backend.
-    fireEvent.click(screen.getByRole('button', { name: 'Buscar participante' }));
+    // Gatilho nomeado pela função do campo ("Participante"), não pelo valor exibido.
+    fireEvent.click(screen.getByRole('button', { name: 'Participante' }));
     fireEvent.change(screen.getByPlaceholderText(/Buscar participante/i), { target: { value: 'joao' } });
     await waitFor(() => expect(api.getTopParticipantOptions).toHaveBeenCalled());
     fireEvent.click(await screen.findByText('João'));

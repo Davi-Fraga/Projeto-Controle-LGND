@@ -35,6 +35,12 @@ type Props = {
   fetchOptions: (search: string) => Promise<ComboboxOption[]>;
   placeholder?: string;
   noneLabel?: string;
+  /**
+   * Nome acessível do gatilho — a FUNÇÃO do campo ("Equipe"), não o valor. Sem isto o nome
+   * vem do conteúdo, que é o valor selecionado: um leitor de tela anuncia "Todas as equipes,
+   * botão" e não diz de que campo se trata. Use o mesmo texto do rótulo visível.
+   */
+  label?: string;
   /** Quando `true` (padrão), oferece a opção de limpar ("Nenhum"). Campos obrigatórios passam `false`. */
   clearable?: boolean;
   disabled?: boolean;
@@ -47,6 +53,7 @@ export function AsyncCombobox({
   fetchOptions,
   placeholder = 'Digite para buscar...',
   noneLabel = 'Nenhum',
+  label,
   clearable = true,
   disabled = false,
 }: Props) {
@@ -166,6 +173,7 @@ export function AsyncCombobox({
         className="input flex w-full items-center justify-between gap-2 text-left disabled:opacity-50"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={label}
       >
         <span className={clsx('truncate', !value && 'text-zinc-500')}>{triggerText}</span>
         <ChevronsUpDown className="h-4 w-4 shrink-0 text-zinc-500" />

@@ -67,7 +67,7 @@ export function TopServantForm({
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-5">
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Legendário</span>
-          <LegendarioCombobox value={payload.legendaryId ?? ''} onChange={(v) => setPayload({ ...payload, legendaryId: v })} fetchOptions={fetchCandidates} initialLabel={item?.legendary?.fullName} clearable={false} noneLabel="Selecione..." />
+          <LegendarioCombobox label="Legendário" value={payload.legendaryId ?? ''} onChange={(v) => setPayload({ ...payload, legendaryId: v })} fetchOptions={fetchCandidates} initialLabel={item?.legendary?.fullName} clearable={false} noneLabel="Selecione..." />
         </label>
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Equipe de Serviço</span>

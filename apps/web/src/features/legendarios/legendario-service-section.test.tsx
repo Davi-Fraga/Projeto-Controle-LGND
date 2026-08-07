@@ -64,7 +64,9 @@ describe('LegendarioServiceSection', () => {
     render(<LegendarioServiceSection legendarioId="leg-1" servants={[]} permissions={allPerms} onChanged={onChanged} />);
 
     // Abre o combobox de TOP e escolhe a opção retornada pela busca.
-    fireEvent.click(screen.getByRole('button', { name: 'Buscar TOP' }));
+    // O gatilho passou a ser nomeado pela FUNÇÃO do campo ("TOP") e não mais pelo valor
+    // exibido ("Buscar TOP"), que descrevia o estado e não dizia de que campo se tratava.
+    fireEvent.click(screen.getByRole('button', { name: 'TOP' }));
     fireEvent.change(screen.getByPlaceholderText(/Buscar TOP/i), { target: { value: 'nova' } });
     await waitFor(() => expect(topsApi.getTopOptions).toHaveBeenCalled());
     fireEvent.click(await screen.findByText('TOP #9 - Nova Rota'));

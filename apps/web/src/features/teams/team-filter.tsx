@@ -12,6 +12,7 @@ type Props = {
 export function TeamFilter({ value, selectedLabel, onChange }: Props) {
   return (
     <AsyncCombobox
+      label="Equipe"
       value={value}
       selectedLabel={selectedLabel}
       onChange={onChange}

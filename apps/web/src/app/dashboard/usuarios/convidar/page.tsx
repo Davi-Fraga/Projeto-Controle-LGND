@@ -97,7 +97,7 @@ export default function ConvidarUsuarioPage() {
             </label>
             <label className="block space-y-2">
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Legendário vinculado (opcional)</span>
-              <LegendarioCombobox
+              <LegendarioCombobox label="Legendário vinculado (opcional)"
                 value={legendaryId}
                 onChange={(value) => setLegendaryId(value)}
               />

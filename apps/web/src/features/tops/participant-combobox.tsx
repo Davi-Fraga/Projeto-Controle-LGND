@@ -40,6 +40,7 @@ type Props = {
 export function ParticipantCombobox({ topId, value, selectedLabel, onChange, disabled = false }: Props) {
   return (
     <AsyncCombobox
+      label="Participante"
       value={value}
       selectedLabel={selectedLabel}
       onChange={onChange}

@@ -81,7 +81,7 @@ export function UserForm({ user }: Props) {
         </label>
         <label className="block space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Legendário vinculado</span>
-          <LegendarioCombobox
+          <LegendarioCombobox label="Legendário vinculado"
             value={legendaryId}
             onChange={(value) => setLegendaryId(value)}
           />

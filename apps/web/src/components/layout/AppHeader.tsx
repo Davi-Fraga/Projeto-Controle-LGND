@@ -64,10 +64,12 @@ export function AppHeader() {
 
         <div className="h-6 w-px bg-line" aria-hidden="true" />
 
+        {/* `size="md"` e não "sm": o sm é min-h-9 (36px) e no mobile este botão fica só com o
+            ícone, resultando num alvo de 42x36 — abaixo dos 44px que a task 6.4 fixou. */}
         <Button
           onClick={handleLogout}
           variant="ghost"
-          size="sm"
+          size="md"
           className="border-line"
           title="Sair do sistema"
         >

@@ -140,55 +140,65 @@ body {
   background: hsl(var(--accent));
 }
 
-/* Legacy-compatible field control. New forms compose this through Field. */
-.input {
-  min-height: 2.75rem;
-  width: 100%;
-  border: 1px solid hsl(var(--line));
-  border-radius: 0.5rem;
-  outline: none;
-  background-color: hsl(var(--surface-raised));
-  color: hsl(var(--text-strong));
-  padding-inline: 0.875rem;
-  font-size: var(--type-body);
-  font-weight: 500;
-  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
-}
+/* Legacy-compatible field control. New forms compose this through Field.
+ *
+ * Precisa ficar em `@layer components`: solto, este bloco é emitido DEPOIS de
+ * `@tailwind utilities` e, com a mesma especificidade (0,1,0), vence por ordem de origem.
+ * Era por isso que `className="input pl-9"` não deslocava o texto e a lupa ficava por cima
+ * do placeholder na busca de Legendários — e por que Igrejas e Líderes Espirituais
+ * precisaram de `style={{ paddingLeft }}` inline para escapar. Dentro da camada, o
+ * utilitário volta a ter a última palavra, que é o contrato esperado do Tailwind.
+ */
+@layer components {
+  .input {
+    min-height: 2.75rem;
+    width: 100%;
+    border: 1px solid hsl(var(--line));
+    border-radius: 0.5rem;
+    outline: none;
+    background-color: hsl(var(--surface-raised));
+    color: hsl(var(--text-strong));
+    padding-inline: 0.875rem;
+    font-size: var(--type-body);
+    font-weight: 500;
+    transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  }
 
-.input:hover:not(:disabled) {
-  border-color: hsl(var(--line-strong));
-}
+  .input:hover:not(:disabled) {
+    border-color: hsl(var(--line-strong));
+  }
 
-.input:focus {
-  border-color: hsl(var(--accent));
-  background-color: hsl(var(--surface-hover));
-}
+  .input:focus {
+    border-color: hsl(var(--accent));
+    background-color: hsl(var(--surface-hover));
+  }
 
-.input:focus-visible {
-  box-shadow: 0 0 0 3px hsl(var(--focus) / 0.2);
-}
+  .input:focus-visible {
+    box-shadow: 0 0 0 3px hsl(var(--focus) / 0.2);
+  }
 
-.input[aria-invalid='true'] {
-  border-color: hsl(var(--feedback-danger));
-}
+  .input[aria-invalid='true'] {
+    border-color: hsl(var(--feedback-danger));
+  }
 
-.input::placeholder {
-  color: hsl(var(--text-disabled));
-}
+  .input::placeholder {
+    color: hsl(var(--text-disabled));
+  }
 
-.input:disabled {
-  background-color: hsl(var(--surface));
-  color: hsl(var(--text-disabled));
-  opacity: 0.72;
-}
+  .input:disabled {
+    background-color: hsl(var(--surface));
+    color: hsl(var(--text-disabled));
+    opacity: 0.72;
+  }
 
-select.input {
-  appearance: none;
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23A1A1AA' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
-  background-position: right 0.5rem center;
-  background-repeat: no-repeat;
-  background-size: 1.25rem;
-  padding-right: 2.25rem;
+  select.input {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23A1A1AA' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.25rem;
+    padding-right: 2.25rem;
+  }
 }
 
 /* Kept for compatibility while pages move to Surface. */

@@ -18,7 +18,22 @@ const securityHeaders = [
 // O output standalone depende de symlinks que o Windows bloqueia sem Modo
 // Desenvolvedor/admin. Builds Linux (CI/Docker) continuam gerando standalone;
 // no Windows, o build padrão ainda compila, valida tipos e gera as páginas.
-const standaloneOutput = process.platform === 'win32' ? undefined : 'standalone';
+//
+// O aviso abaixo existe porque o silêncio já enganou: no Windows este build sai com
+// exit 0 SEM produzir `.next/standalone`, que é o artefato que a imagem de produção
+// copia. Passar aqui não prova que o build de produção passa. Para provar de verdade,
+// rode `pnpm build:web:prod`, que constrói a mesma imagem que a VPS constrói.
+const ehWindows = process.platform === 'win32';
+const standaloneOutput = ehWindows ? undefined : 'standalone';
+
+if (ehWindows && process.env.NODE_ENV === 'production') {
+  console.warn(
+    '\n[next.config] AVISO: `output: standalone` desativado no Windows (symlink exige Modo ' +
+      'Desenvolvedor/admin).\n' +
+      '              Este build NÃO gera .next/standalone e NÃO prova o build de produção.\n' +
+      '              Para provar: pnpm build:web:prod\n',
+  );
+}
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,

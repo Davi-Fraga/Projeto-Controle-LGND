@@ -9,6 +9,7 @@
     "dev:api": "pnpm --filter @central-da-manada/api dev",
     "dev:web": "pnpm --filter @central-da-manada/web dev",
     "build": "pnpm -r build",
+    "build:web:prod": "docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=https://api.sistema.manadarotadocerrado.com.br -t cdm-web:build-proof .",
     "lint": "pnpm -r lint && tsc -p prisma/tsconfig.json",
     "test": "pnpm -r test",
     "db:generate": "pnpm prisma generate",

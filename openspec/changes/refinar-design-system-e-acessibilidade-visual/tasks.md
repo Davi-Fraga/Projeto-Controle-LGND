@@ -69,7 +69,14 @@
   - [x] **Equipes** — migrada. Não tinha teste de página consultando a tabela, então não
     precisou de escopo; o vazio passou a distinguir "nenhuma cadastrada" de "nenhuma para esta
     busca", com ação de criar condicionada a `teams.create`.
-- [ ] 5.5 Migrar TOPs, ações sociais, comunicação e usuários como segunda onda de listas e formulários
+- [x] 5.5 Migrar TOPs, ações sociais, comunicação e usuários como segunda onda de listas e formulários
+  - **TOPs** — a tabela mais larga (9 colunas). Primeira aplicação real do papel `hideOnMobile`:
+    o número do TOP sai do cartão como coluna e aparece embutido no título.
+  - **Ações Sociais** — direto no molde.
+  - **Comunicação** — a cadeia de 8 ternários que traduzia o público-alvo virou o mapa
+    `TARGET_LABELS`, fora do JSX.
+  - **Usuários** — o `map` usava `user` como nome do item, sombreando o `user` autenticado do
+    escopo externo; o acessor passou a usar `item`. Gates inalterados.
 - [ ] 5.6 Refinar shell e controles ao redor de acesso, relatórios, mapa e organograma sem alterar cores de dados especializadas
 
 ## 6. Validação e documentação

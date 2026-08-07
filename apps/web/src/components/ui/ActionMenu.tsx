@@ -64,13 +64,16 @@ export function ActionMenu({ items, label = 'Ações' }: { items: ActionMenuItem
 
   return (
     <div ref={ref} className="relative inline-flex justify-end">
+      {/* `aria-label` explícito: `title` sozinho é nome acessível só por fallback e não
+          ajuda no toque. O gatilho é 44x44 por ser alvo de dedo numa lista densa. */}
       <button
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={label}
         title={label}
         onClick={() => setOpen((current) => !current)}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/70 text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-line bg-surface-raised text-content transition-colors hover:bg-surface-hover hover:text-content-strong"
       >
         <MoreVertical className="h-4 w-4" />
       </button>

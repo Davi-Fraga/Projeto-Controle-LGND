@@ -151,6 +151,14 @@
 
   Nas telas de casca — Relatórios, Mapa e Controle de Acessos — não sobrou nenhuma cor crua.
 
+  **Correção posterior (07/08/2026) — a tabela acima estava incompleta.** O QA da 6.2 revelou que
+  o `components/ui/ConfirmDialog.tsx` tinha **19 valores crus** e não constava nem como migrado
+  nem como exceção: a varredura da 6.6 passou pelas telas e não pelos componentes compartilhados
+  que elas montam. Ele foi migrado para tokens (`surface`, `line`, `content-*`,
+  `feedback-{danger,warning,info}`), e agora a afirmação de "zero cores cruas" se sustenta.
+  O scrim segue `bg-black/75` **de propósito**, como o backdrop da `Sidebar` — scrim é véu, não
+  superfície da paleta.
+
 ## 7. Organização das abas em grupos
 
 Pedido do Davi em 06/08/2026: a navegação tinha 12 itens numa lista plana e a ordem era arbitrária

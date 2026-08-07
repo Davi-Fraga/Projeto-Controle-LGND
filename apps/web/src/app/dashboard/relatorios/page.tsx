@@ -73,8 +73,8 @@ export default function ReportsPage() {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Carregando...</span>
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          <span className="text-xs font-semibold uppercase tracking-wider text-content-muted">Carregando...</span>
         </div>
       </div>
     );
@@ -91,8 +91,8 @@ export default function ReportsPage() {
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-black tracking-wide text-white uppercase">Relatórios</h1>
-        <p className="text-sm text-zinc-400">Gere resumos consolidados e exporte listas de dados em formato CSV.</p>
+        <h1 className="text-2xl font-black tracking-wide text-content-strong uppercase">Relatórios</h1>
+        <p className="text-sm text-content-muted">Gere resumos consolidados e exporte listas de dados em formato CSV.</p>
       </div>
 
       {/* Grid of Available Reports */}
@@ -103,27 +103,27 @@ export default function ReportsPage() {
             type="button"
             className={`rounded-xl border p-4 text-left transition-all flex flex-col justify-between h-[100px] ${
               active === report.key
-                ? 'border-orange-500 bg-orange-500/10 text-orange-400'
-                : 'border-zinc-800 bg-zinc-900/20 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900/50 hover:text-zinc-200'
+                ? 'border-accent bg-accent/10 text-accent'
+                : 'border-line bg-surface text-content-muted hover:border-line-strong hover:bg-surface-raised hover:text-content-strong'
             }`}
             onClick={() => {
               setActive(report.key);
               setRows([]);
             }}
           >
-            <FileSpreadsheet className={`h-5 w-5 ${active === report.key ? 'text-orange-500' : 'text-zinc-500'}`} />
+            <FileSpreadsheet className={`h-5 w-5 ${active === report.key ? 'text-accent' : 'text-content-muted'}`} />
             <span className="text-xs font-bold uppercase tracking-wider leading-snug">{report.label}</span>
           </button>
         ))}
       </div>
 
       {/* Action / Parameter Section */}
-      <section className="rounded-xl border border-zinc-800 bg-[#111113] p-5 shadow-lg space-y-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end justify-between border-b border-zinc-800 pb-4">
+      <section className="rounded-xl border border-line bg-surface p-5 shadow-lg space-y-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end justify-between border-b border-line pb-4">
           <div className="flex-1 max-w-md">
             {active.startsWith('top') && (
               <label className="block space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">TOP</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-content-muted">TOP</span>
                 <input
                   className="input text-xs"
                   placeholder="Informe o TOP para filtrar..."
@@ -134,7 +134,7 @@ export default function ReportsPage() {
             )}
             {active === 'socialParticipants' && (
               <label className="block space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Ação Social</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-content-muted">Ação Social</span>
                 <input
                   className="input text-xs"
                   placeholder="Informe a ação social para filtrar..."
@@ -145,7 +145,7 @@ export default function ReportsPage() {
             )}
             {!active.startsWith('top') && active !== 'socialParticipants' && (
               <div>
-                <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+                <span className="text-xs font-bold uppercase tracking-widest text-content-muted">
                   Sem parâmetros necessários para este relatório
                 </span>
               </div>
@@ -155,14 +155,14 @@ export default function ReportsPage() {
           <div className="flex gap-3">
             <button
               onClick={() => load()}
-              className="flex h-11 items-center justify-center rounded-lg bg-orange-600 px-6 text-xs font-bold uppercase tracking-wider text-white hover:bg-orange-500"
+              className="flex h-11 items-center justify-center rounded-lg bg-accent px-6 text-xs font-bold uppercase tracking-wider text-content-strong hover:bg-accent"
             >
               Carregar Dados
             </button>
             {canExport && (
               <button
                 onClick={exportActive}
-                className="flex h-11 items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-5 text-xs font-bold uppercase tracking-wider text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                className="flex h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface-raised px-5 text-xs font-bold uppercase tracking-wider text-content hover:bg-surface-raised hover:text-content-strong"
               >
                 <Download className="h-4 w-4" />
                 Exportar CSV
@@ -172,25 +172,25 @@ export default function ReportsPage() {
         </div>
 
         {error && (
-          <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-4 text-sm font-semibold text-rose-400">
+          <div className="rounded-lg border border-feedback-danger/20 bg-feedback-danger/10 p-4 text-sm font-semibold text-feedback-danger">
             {error}
           </div>
         )}
 
         {/* Preview Table */}
-        <div className="w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#0B0B0C]">
+        <div className="w-full overflow-hidden rounded-xl border border-line bg-surface-subtle">
           <div className="overflow-x-auto max-h-[400px]">
             {loading ? (
-              <div className="px-6 py-12 text-center text-zinc-500">
+              <div className="px-6 py-12 text-center text-content-muted">
                 <div className="flex flex-col items-center justify-center gap-2">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Montando relatório...</span>
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-content-muted">Montando relatório...</span>
                 </div>
               </div>
             ) : rows.length ? (
-              <table className="w-full border-collapse text-left text-sm text-zinc-300">
-                <thead className="sticky top-0 bg-zinc-950 border-b border-zinc-800 z-10">
-                  <tr className="text-xs font-bold tracking-wider text-zinc-400 uppercase">
+              <table className="w-full border-collapse text-left text-sm text-content">
+                <thead className="sticky top-0 bg-surface-subtle border-b border-line z-10">
+                  <tr className="text-xs font-bold tracking-wider text-content-muted uppercase">
                     {columns.map((column) => (
                       <th key={column} className="px-5 py-3">
                         {column}
@@ -198,11 +198,11 @@ export default function ReportsPage() {
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-850">
+                <tbody className="divide-y divide-line">
                   {rows.map((row, index) => {
                     const flat = flatten(row);
                     return (
-                      <tr key={index} className="hover:bg-zinc-900/20 transition-colors">
+                      <tr key={index} className="hover:bg-surface transition-colors">
                         {columns.map((column) => (
                           <td key={column} className="px-5 py-3 font-semibold">
                             {String(flat[column] ?? '')}
@@ -214,7 +214,7 @@ export default function ReportsPage() {
                 </tbody>
               </table>
             ) : (
-              <p className="px-6 py-10 text-center text-zinc-500 font-semibold text-xs uppercase tracking-wider">
+              <p className="px-6 py-10 text-center text-content-muted font-semibold text-xs uppercase tracking-wider">
                 Nenhum dado carregado para visualização. Clique em "Carregar Dados" acima.
               </p>
             )}

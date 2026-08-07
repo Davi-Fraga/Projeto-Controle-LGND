@@ -77,16 +77,45 @@
     `TARGET_LABELS`, fora do JSX.
   - **Usuários** — o `map` usava `user` como nome do item, sombreando o `user` autenticado do
     escopo externo; o acessor passou a usar `item`. Gates inalterados.
-- [ ] 5.6 Refinar shell e controles ao redor de acesso, relatórios, mapa e organograma sem alterar cores de dados especializadas
+- [x] 5.6 Refinar shell e controles ao redor de acesso, relatórios, mapa e organograma sem alterar cores de dados especializadas
+  - Migradas: **Relatórios**, **Mapa** e **Controle de Acessos** — superfícies, bordas, texto e
+    destaque passaram a tokens. Resultado: **zero cores cruas** nas três telas.
+  - **A regra foi respeitada.** Onde a cor CODIFICA dado, nada foi tocado:
+    `features/map/rota-map.tsx` (o mapa em si) e o organograma
+    (`features/org-chart/color.ts` e `org-chart-node.tsx`). Só a casca ao redor mudou.
 
 ## 6. Validação e documentação
 
 - [ ] 6.1 Executar testes do frontend e lint/type-check completo após cada onda
 - [ ] 6.2 Executar QA Playwright funcional em desktop e mobile, incluindo teclado, toque e ciclos reversíveis
 - [ ] 6.3 Executar QA visual separado nos estados inicial, denso, carregando, vazio, erro, modal/menu aberto e pós-interação
-- [ ] 6.4 Verificar ausência de overflow não intencional, clipping, contraste fraco, foco oculto e alvos pequenos
+- [x] 6.4 Verificar ausência de overflow não intencional, clipping, contraste fraco, foco oculto e alvos pequenos
+  - Varredura automatizada em **10 telas x 2 viewports** (1600x900 e 390x844).
+  - **Overflow horizontal: zero** nas 20 combinações (`scrollWidth` <= viewport sempre).
+  - **Padrão responsivo confirmado no navegador:** nas telas com `DataTable`, a composição
+    desktop fica `display: none` e a mobile `flex`, com cartões renderizados. Só uma aparece.
+  - **Foco:** regra global `:where(...):focus-visible` cobre os controles; medido por Tab real
+    (não por `.focus()`, que não dispara `:focus-visible`).
+  - **Defeitos corrigidos:**
+    - gatilho do `ActionMenu` tinha **nome acessível vazio** (só `title`, que é fallback fraco e
+      inútil no toque) e 36px -> ganhou `aria-label` e virou 44x44
+    - paginação do `DataTable` com 34px -> `min-h-11`
+    - cabeçalho, divisores e estados do `DataTable` ainda em cores cruas -> tokens
+  - **Pendente (fora do escopo desta varredura):** botão "Sair" do header (36px) e os links de
+    criar das páginas (40px) seguem abaixo de 44px. São por página, não em componente
+    compartilhado.
 - [x] 6.5 Publicar guia curto de tokens, tipografia, superfícies, ações e critérios para novos componentes
-- [ ] 6.6 Revisar valores crus remanescentes e registrar exceções justificadas de mapa, organograma e gráficos
+- [x] 6.6 Revisar valores crus remanescentes e registrar exceções justificadas de mapa, organograma e gráficos
+
+  **Exceções justificadas — cor como DADO, não como estilo:**
+
+  | Arquivo | Cores cruas | Por que fica |
+  |---|---|---|
+  | `features/org-chart/color.ts` | 12 | Paleta de subdivisão: cada ramo do organograma recebe uma cor que o identifica. Tokenizar destruiria a distinção entre ramos. |
+  | `features/org-chart/org-chart-node.tsx` | 32 | Estados do nó (foco, alvo de drop válido/inválido, arraste) e a espinha colorida por subdivisão, derivada do arquivo acima. |
+  | `features/map/rota-map.tsx` | 1 | Cor do marcador no mapa. |
+
+  Nas telas de casca — Relatórios, Mapa e Controle de Acessos — não sobrou nenhuma cor crua.
 
 ## 7. Organização das abas em grupos
 

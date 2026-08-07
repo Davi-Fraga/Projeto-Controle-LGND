@@ -86,9 +86,43 @@
 
 ## 6. Validação e documentação
 
-- [ ] 6.1 Executar testes do frontend e lint/type-check completo após cada onda
-- [ ] 6.2 Executar QA Playwright funcional em desktop e mobile, incluindo teclado, toque e ciclos reversíveis
-- [ ] 6.3 Executar QA visual separado nos estados inicial, denso, carregando, vazio, erro, modal/menu aberto e pós-interação
+- [x] 6.1 Executar testes do frontend e lint/type-check completo após cada onda
+  - `npx vitest run --maxWorkers=1` → **224/224** (42 arquivos). O paralelo é instável nesta
+    máquina: os arquivos que falham mudam a cada rodada, sem relação com o que foi tocado.
+  - `pnpm lint` da raiz → verde em `packages/shared`, `apps/web`, `apps/api` e `prisma/`.
+    O `pnpm -r lint` **não** substitui: deixa `prisma/` sem type-check nenhum.
+- [x] 6.2 Executar QA Playwright funcional em desktop e mobile, incluindo teclado, toque e ciclos reversíveis
+  - **Passou:** foco visível em 180/180 paradas de Tab real (12 telas × 15); zero erro de console
+    nas 12 telas; toggle mobile 44x44 com `aria-controls` e `aria-label` que acompanha o estado;
+    drawer fecha pelo backdrop, pelo toggle e ao navegar, com ciclo estável em 3 repetições;
+    `FilterPanel` 44px reversível com a busca sempre visível no mobile.
+  - **Defeito corrigido — `ActionMenu` era inoperável por teclado.** Abria com Enter mas o foco
+    ficava no gatilho, seta não navegava, Escape não fechava, e como o menu vive num
+    `createPortal` no fim do `<body>` eram **12 Tabs** até o primeiro item. Faltava qualquer
+    handler de teclado: só existia `mousedown` para clique fora. Agora segue o padrão WAI-ARIA de
+    menu button — Enter/Espaço/ArrowDown abrem no primeiro item, ArrowUp no último, setas circulam,
+    Home/End, Escape fecha e devolve o foco ao gatilho, Tab fecha em vez de deixar o foco vazar.
+    Itens com `tabIndex={-1}` (foco roving), então não entram mais na ordem de tabulação da página.
+    7 testes novos, **provados vermelhos antes** da implementação, e confirmado no navegador.
+  - **Fica em aberto (decisão de escopo do Davi, não esquecimento):**
+    - `ConfirmDialog` não é um diálogo: sem `role`/`aria-modal`/`aria-labelledby`, o foco nunca
+      entra, Escape não fecha, 6 Tabs vazam para a navegação e o botão X não tem nome acessível.
+    - Botão "Sair" 42x36 no mobile (abaixo dos 44); 1 combobox sem nome acessível na tela de
+      Legendários; os 20 gatilhos de ação têm o nome idêntico "Ações", sem contexto da linha.
+    - Escape não fecha o drawer mobile. **Não é violação de spec** — a 3.2 pede toggle e backdrop,
+      e ambos funcionam —, mas é expectativa comum de drawer.
+- [x] 6.3 Executar QA visual separado nos estados inicial, denso, carregando, vazio, erro, modal/menu aberto e pós-interação
+  - 6 estados × 2 viewports (1600x900 e 390x844): **zero overflow horizontal** e **zero elemento
+    clipado** nas 12 combinações. Erro não vaza detalhe técnico e oferece recuperação.
+  - **Defeito corrigido — a lupa cobria o placeholder da busca de Legendários** (14px de
+    sobreposição). Causa raiz: `.input` estava solto no `globals.css`, **depois** de
+    `@tailwind utilities`; com a mesma especificidade (0,1,0), vencia por ordem de origem e
+    `className="input pl-9"` nunca surtia efeito. Igrejas e Líderes Espirituais escapavam com
+    `style={{ paddingLeft }}` inline — a gambiarra que denunciava o problema.
+    O bloco foi para `@layer components`, devolvendo a última palavra ao utilitário.
+  - **Efeito colateral medido e aceito:** utilitários que antes perdiam calados passaram a valer.
+    O único visível é em TOPs, onde os campos de data (`input text-xs w-1/2`) agora rendem os
+    12px que a classe sempre pediu; a altura segue 44px e nenhuma tela ganhou overflow.
 - [x] 6.4 Verificar ausência de overflow não intencional, clipping, contraste fraco, foco oculto e alvos pequenos
   - Varredura automatizada em **10 telas x 2 viewports** (1600x900 e 390x844).
   - **Overflow horizontal: zero** nas 20 combinações (`scrollWidth` <= viewport sempre).
@@ -133,7 +167,11 @@ Igrejas) · **Estrutura** (Equipes, Organograma) · **Atividades** (TOPs, Açõe
 - [x] 7.5 Invariante em teste: achatar as seções devolve exatamente `visiblePrimaryNav` — agrupar não pode virar filtro
 - [x] 7.6 Testes: grupo vazio não vira cabeçalho órfão · Administração só para admin · Painel na seção sem rótulo · ordem segue `NAV_GROUPS` · todo grupo declarado existe em `NAV_GROUPS`
 - [x] 7.7 Verificação: `nav-manifest.spec` 27/27 · `Sidebar.test` 10/10 · web **197/197** · api **581/581** · `pnpm lint` raiz exit 0
-- [ ] 7.8 Conferência visual no navegador (desktop e mobile) — pendente de sessão autenticada
+- [x] 7.8 Conferência visual no navegador (desktop e mobile) — feita em 07/08/2026 com sessão autenticada
+  - Desktop (1600x900) e drawer mobile (390x844) renderizam **o mesmo** agrupamento: 6 grupos,
+    12 itens, na ordem Painel · Manada · Estrutura · Atividades · Análise · Administração.
+  - Zero grupo órfão e o grupo do Painel não emite cabeçalho — a regra da 7.3 confere no DOM real,
+    não só no teste.
 
 **Decisão registrada:** grupos **não** são recolhíveis. Com no máximo 12 itens tudo cabe na tela, e
 recolher exigiria persistir estado entre sessões sem ganho real. Reavaliar se a lista crescer.

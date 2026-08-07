@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { TopEventStatus } from '@central-da-manada/shared';
 import { useRequireAuth } from '@/hooks/use-require-auth';
@@ -11,6 +12,8 @@ import { deactivateTop, getTops } from '@/features/tops/api';
 import type { TopEvent } from '@/features/tops/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DataTable } from '@/components/ui/DataTable';
+import { EmptyState } from '@/components/ui/AsyncState';
 import { ActionMenu } from '@/components/ui/ActionMenu';
 import { Search, MapPin, Eye, Edit2, ShieldAlert, Calendar } from 'lucide-react';
 
@@ -21,6 +24,7 @@ export default function TopsPage() {
   const canRemove = canDo('tops.delete');
   const [tops, setTops] = useState<TopEvent[]>([]);
   const [page, setPage] = useState(1);
+  const router = useRouter();
   const [totalPages, setTotalPages] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 500);
@@ -142,108 +146,84 @@ export default function TopsPage() {
         </div>
       )}
 
-      {/* Table Section */}
-      <div className="w-full overflow-hidden rounded-xl border border-zinc-800 bg-[#111113] shadow-lg">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-sm text-zinc-300">
-            <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-950/80 text-xs font-bold tracking-wider text-zinc-400 uppercase">
-                <th className="px-4 py-4">Nº</th>
-                <th className="px-6 py-4">Nome do TOP</th>
-                <th className="px-6 py-4">Cidade</th>
-                <th className="px-6 py-4">Período</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-4 py-4 text-center">Part.</th>
-                <th className="px-4 py-4 text-center">Servos</th>
-                <th className="px-4 py-4 text-center">Equipes</th>
-                <th className="px-6 py-4 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-850">
-              {loading ? (
-                <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-zinc-500">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Carregando TOPs...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : tops.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-6 py-10 text-center font-medium text-zinc-500">
-                    Nenhum TOP encontrado.
-                  </td>
-                </tr>
-              ) : (
-                tops.map((top) => (
-                  <tr key={top.id} className="hover:bg-zinc-900/40 transition-colors">
-                    <td className="px-4 py-4.5 font-bold text-orange-500">#{top.number}</td>
-                    <td className="px-6 py-4.5 font-bold text-white">
-                      {top.name}
-                      {top.needsReview || !top.familyCoordinatorLegendaryId ? <span className="ml-2 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-300">Revisar</span> : null}
-                    </td>
-                    <td className="px-6 py-4.5 text-zinc-300 font-semibold">
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5 text-zinc-500" />
-                        <span>{top.city}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4.5 text-xs text-zinc-400 font-semibold">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5 text-zinc-500" />
-                        <span>
-                          {new Date(top.startDate).toLocaleDateString('pt-BR')} - {new Date(top.endDate).toLocaleDateString('pt-BR')}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4.5">
-                      <StatusBadge status={top.status} />
-                    </td>
-                    <td className="px-4 py-4.5 text-center text-zinc-300 font-bold">{top.participantsCount}</td>
-                    <td className="px-4 py-4.5 text-center text-zinc-300 font-bold">{top.servantsCount}</td>
-                    <td className="px-4 py-4.5 text-center text-zinc-300 font-bold">{top.teamsCount}</td>
-                    <td className="px-6 py-4.5">
-                      <div className="flex justify-end">
-                        <ActionMenu
-                          items={[
-                            { label: 'Ver', href: `/dashboard/tops/${top.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
-                            ...(canEdit ? [{ label: 'Editar', href: `/dashboard/tops/${top.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
-                            ...(canRemove ? [{ label: 'Inativar', onClick: () => setDeactivatingId(top.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true }] : []),
-                          ]}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Pagination */}
-      {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-zinc-850 pt-4">
-          <button
-            className="flex h-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-white disabled:opacity-40 disabled:hover:bg-zinc-900/50 disabled:hover:text-zinc-300"
-            disabled={page <= 1}
-            onClick={() => setPage((current) => current - 1)}
-          >
-            Anterior
-          </button>
-          <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
-            Página <span className="text-zinc-300">{page}</span> de <span className="text-zinc-300">{totalPages}</span>
-          </span>
-          <button
-            className="flex h-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-zinc-800 hover:text-white disabled:opacity-40 disabled:hover:bg-zinc-900/50 disabled:hover:text-zinc-300"
-            disabled={page >= totalPages}
-            onClick={() => setPage((current) => current + 1)}
-          >
-            Próxima
-          </button>
-        </div>
-      )}
+      <DataTable
+        caption="Lista de eventos TOP"
+        items={tops}
+        loading={loading}
+        currentPage={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        emptyMessage={
+          <EmptyState
+            title="Nenhum TOP encontrado"
+            description="Assim que um evento TOP for cadastrado, ele aparece aqui com cidade, período e os totais de participantes, servos e equipes."
+            action={
+              hasPermission(user, 'tops.create')
+                ? { label: 'Novo TOP', onClick: () => router.push('/dashboard/tops/novo') }
+                : undefined
+            }
+            compact
+          />
+        }
+        columns={[
+          // O número entra no título do cartão; como coluna separada viraria mais um
+          // par rótulo/valor sem necessidade.
+          { header: 'Nº', role: 'hideOnMobile', className: 'px-4', accessor: (top) => <span className="font-bold text-accent">#{top.number}</span> },
+          {
+            header: 'Nome do TOP',
+            role: 'title',
+            accessor: (top) => (
+              <span className="font-bold text-content-strong">
+                <span className="text-accent md:hidden">#{top.number} </span>
+                {top.name}
+                {top.needsReview || !top.familyCoordinatorLegendaryId ? (
+                  <span className="ml-2 rounded border border-feedback-warning/30 bg-feedback-warning/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-feedback-warning">
+                    Revisar
+                  </span>
+                ) : null}
+              </span>
+            ),
+          },
+          {
+            header: 'Cidade',
+            accessor: (top) => (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5 text-content-muted" aria-hidden="true" />
+                {top.city}
+              </span>
+            ),
+          },
+          {
+            header: 'Período',
+            accessor: (top) => (
+              <span className="flex items-center gap-1 text-xs">
+                <Calendar className="h-3.5 w-3.5 text-content-muted" aria-hidden="true" />
+                {new Date(top.startDate).toLocaleDateString('pt-BR')} - {new Date(top.endDate).toLocaleDateString('pt-BR')}
+              </span>
+            ),
+          },
+          { header: 'Status', accessor: (top) => <StatusBadge status={top.status} /> },
+          { header: 'Part.', className: 'px-4 text-center', accessor: (top) => top.participantsCount },
+          { header: 'Servos', className: 'px-4 text-center', accessor: (top) => top.servantsCount },
+          { header: 'Equipes', className: 'px-4 text-center', accessor: (top) => top.teamsCount },
+          {
+            header: 'Ações',
+            role: 'actions',
+            className: 'text-right',
+            accessor: (top) => (
+              <div className="flex justify-end">
+                <ActionMenu
+                  items={[
+                    { label: 'Ver', href: `/dashboard/tops/${top.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
+                    ...(canEdit ? [{ label: 'Editar', href: `/dashboard/tops/${top.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
+                    ...(canRemove ? [{ label: 'Inativar', onClick: () => setDeactivatingId(top.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true }] : []),
+                  ]}
+                />
+              </div>
+            ),
+          },
+        ]}
+      />
 
       {/* Confirm Deactivation Dialog */}
       <ConfirmDialog

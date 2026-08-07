@@ -376,6 +376,9 @@ function LegendariosContent() {
             accessor: (item) => (
               <div className="flex justify-end">
                 <ActionMenu
+                  // Com o LGND junto porque homônimo existe de fato na base (há um nome
+                  // repetido entre os 242 atuais), e o número é o que a própria linha mostra.
+                  label={`Ações de ${item.fullName}${item.lgndNumber ? ` — LGND ${item.lgndNumber}` : ''}`}
                   items={[
                     // "Ver" não precisa de gate: estar nesta lista já exige `legendarios.read`.
                     { label: 'Ver', href: `/dashboard/legendarios/${item.id}`, icon: <Eye className="h-3.5 w-3.5" /> },

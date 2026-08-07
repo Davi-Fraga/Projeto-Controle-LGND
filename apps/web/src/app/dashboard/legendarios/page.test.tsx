@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   // verificar a autorização visual das ações da lista.
   permissions: [] as string[],
   actionLabels: [] as string[],
+  // Nome acessível do gatilho de cada linha. Acumula porque o `DataTable` renderiza duas
+  // composições (tabela e cartões), então cada registro aciona o mock duas vezes.
+  actionMenuNames: [] as string[],
 }));
 
 vi.mock('next/navigation', () => ({
@@ -51,8 +54,9 @@ vi.mock('@/components/ui/ConfirmDialog', () => ({
 }));
 
 vi.mock('@/components/ui/ActionMenu', () => ({
-  ActionMenu: ({ items }: { items: Array<{ label: string }> }) => {
+  ActionMenu: ({ items, label }: { items: Array<{ label: string }>; label?: string }) => {
     mocks.actionLabels = items.map((item) => item.label);
+    if (label) mocks.actionMenuNames.push(label);
     return null;
   },
 }));
@@ -165,6 +169,7 @@ describe('LegendariosPage — ações por permission', () => {
   beforeEach(() => {
     mocks.search = '';
     mocks.actionLabels = [];
+    mocks.actionMenuNames = [];
     mocks.getLegendarios.mockReset().mockResolvedValue({
       data: [{ id: 'l1', fullName: 'João', status: 'ACTIVE', expertises: [] }],
       meta: { page: 1, perPage: 10, total: 1, totalPages: 1 },
@@ -185,6 +190,45 @@ describe('LegendariosPage — ações por permission', () => {
     await renderWith('legendarios.read');
 
     expect(mocks.actionLabels).toEqual(['Ver']);
+  });
+
+  /**
+   * Medido no navegador: os 20 gatilhos da lista tinham o nome acessível idêntico "Ações".
+   * Quem navega por lista de botões num leitor de tela ouvia "Ações" vinte vezes, sem saber
+   * de qual registro.
+   */
+  it('cada gatilho de ações identifica o registro da linha', async () => {
+    mocks.actionMenuNames = [];
+    mocks.getLegendarios.mockReset().mockResolvedValue({
+      data: [
+        { id: 'l1', fullName: 'João', lgndNumber: '000001', status: 'ACTIVE', expertises: [] },
+        { id: 'l2', fullName: 'Maria', lgndNumber: '000002', status: 'ACTIVE', expertises: [] },
+      ],
+      meta: { total: 2, page: 1, perPage: 20, totalPages: 1 },
+    });
+    await renderWith('legendarios.read');
+
+    expect(new Set(mocks.actionMenuNames)).toEqual(
+      new Set(['Ações de João — LGND 000001', 'Ações de Maria — LGND 000002']),
+    );
+  });
+
+  /**
+   * Homônimo existe de fato na base (um nome repetido entre os 242 atuais). Sem o LGND, dois
+   * gatilhos ficariam com o mesmo nome acessível e o defeito voltaria em silêncio.
+   */
+  it('homônimos continuam distinguíveis pelo LGND', async () => {
+    mocks.actionMenuNames = [];
+    mocks.getLegendarios.mockReset().mockResolvedValue({
+      data: [
+        { id: 'l1', fullName: 'Iago de Oliveira David', lgndNumber: '000101', status: 'ACTIVE', expertises: [] },
+        { id: 'l2', fullName: 'Iago de Oliveira David', lgndNumber: '000202', status: 'ACTIVE', expertises: [] },
+      ],
+      meta: { total: 2, page: 1, perPage: 20, totalPages: 1 },
+    });
+    await renderWith('legendarios.read');
+
+    expect(new Set(mocks.actionMenuNames).size).toBe(2);
   });
 
   it('legendarios.delete acrescenta Inativar, mas não Editar', async () => {

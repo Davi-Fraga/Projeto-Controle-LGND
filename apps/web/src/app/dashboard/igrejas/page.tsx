@@ -246,7 +246,7 @@ export default function IgrejasPage() {
             className: 'text-right',
             accessor: (church) => (
               <div className="flex justify-end">
-                <ActionMenu items={[
+                <ActionMenu label={`Ações de ${church.name}`} items={[
                   { label: 'Ver', onClick: () => setViewingId(church.id), icon: <Eye className="h-3.5 w-3.5" /> },
                   ...(canEdit ? [{ label: 'Editar', href: `/dashboard/igrejas/${church.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
                   ...(canRemove ? [{ label: 'Excluir', onClick: () => setDeletingChurch(church), icon: <Trash2 className="h-3.5 w-3.5" />, destructive: true }] : []),

@@ -213,6 +213,7 @@ export default function TopsPage() {
             accessor: (top) => (
               <div className="flex justify-end">
                 <ActionMenu
+                  label={`Ações do TOP ${top.name}`}
                   items={[
                     { label: 'Ver', href: `/dashboard/tops/${top.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
                     ...(canEdit ? [{ label: 'Editar', href: `/dashboard/tops/${top.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),

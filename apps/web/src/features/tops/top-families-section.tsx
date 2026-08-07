@@ -250,6 +250,7 @@ export function TopFamiliesSection({ topId, permissions }: { topId: string; perm
               </div>
               {(permissions.update || permissions.delete) ? (
                 <ActionMenu
+                  label={`Ações da família ${family.name}`}
                   items={[
                     ...(permissions.update ? [{ label: 'Editar', onClick: () => editFamily(family), icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),
                     ...(permissions.delete ? [{ label: 'Inativar', onClick: () => void deactivateFamily(family.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true as const }] : []),

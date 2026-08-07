@@ -177,6 +177,7 @@ export default function TeamsPage() {
             accessor: (team) => (
               <div className="flex justify-end">
                 <ActionMenu
+                  label={`Ações de ${formatTeamName(team.name)}`}
                   items={[
                     { label: 'Ver', href: `/dashboard/equipes/${team.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
                     ...(canEdit ? [{ label: 'Editar', href: `/dashboard/equipes/${team.id}/editar`, icon: <Edit2 className="h-3.5 w-3.5" /> }] : []),

@@ -183,6 +183,7 @@ export default function CommunicationsPage() {
             accessor: (item) => (
               <div className="flex justify-end">
                 <ActionMenu
+                  label={`Ações de ${item.title}`}
                   items={[
                     { label: 'Ver', href: `/dashboard/comunicacao/${item.id}`, icon: <Eye className="h-3.5 w-3.5" /> },
                     ...(canRemove ? [{ label: 'Excluir', onClick: () => setDeletingId(item.id), icon: <ShieldAlert className="h-3.5 w-3.5" />, destructive: true }] : []),

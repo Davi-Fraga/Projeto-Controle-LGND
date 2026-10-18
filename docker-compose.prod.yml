@@ -22,11 +22,18 @@ services:
       - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+      # Sites de outros sistemas da VPS (ex.: Fazenda), importados no fim do
+      # Caddyfile. Fica fora do repo para o git pull não mexer. Pré-requisito
+      # criado uma vez no servidor — ver docs/deploy.md ("Proxy compartilhado").
+      - /srv/caddy-sites:/etc/caddy/sites:ro
     depends_on:
       - web
       - api
     networks:
       - cdm
+      # Rede externa onde os outros sistemas expõem seus containers ao Caddy.
+      # Só o caddy entra nela; api/web/postgres/redis seguem isolados na `cdm`.
+      - proxy
 
   web:
     build:
@@ -108,3 +115,6 @@ volumes:
 networks:
   cdm:
     driver: bridge
+  # Criada fora do compose (`docker network create proxy`); sem ela o `up` falha.
+  proxy:
+    external: true

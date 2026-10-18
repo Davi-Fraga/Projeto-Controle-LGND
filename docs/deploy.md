@@ -517,6 +517,48 @@ quebram e `$$` sem escape vira o PID do shell.
   Registro de dependência e restrição de uso — **não** é autorização para executar geocoding,
   script de backfill ou qualquer chamada em lote.
 
+## Proxy compartilhado (outros sistemas na VPS)
+
+A VPS também hospeda a plataforma da Fazenda (Junior Pantaleão), com pasta, compose, rede e
+banco próprios em `/srv/fazenda`. O único ponto de contato com a Central é o `cdm-caddy`, que
+atende 80/443 para os dois:
+
+- o `cdm-caddy` entra também na rede externa **`proxy`**, onde os containers da Fazenda ficam;
+  `api`, `web`, `postgres` e `redis` continuam só na `cdm`;
+- o Caddyfile termina com `import /etc/caddy/sites/*.caddy`, e `/etc/caddy/sites` é a pasta
+  **`/srv/caddy-sites`** do host, fora do repositório — o `git pull` não toca nela.
+
+### Pré-requisitos (uma vez, antes do primeiro deploy com o import)
+
+Sem eles o `docker compose up` falha (rede externa inexistente) e o deploy para. Exigem
+autorização como qualquer comando remoto:
+
+~~~bash
+docker network create proxy
+mkdir -p /srv/caddy-sites
+echo "# placeholder - nao remover" > /srv/caddy-sites/_vazio.caddy
+~~~
+
+O placeholder garante que o glob do import nunca fique vazio.
+
+### Regras para os arquivos em `/srv/caddy-sites`
+
+O reload recusa uma config inválida e mantém a atual, mas o **restart** não tem essa rede de
+proteção: se houver um `.caddy` inválido na pasta quando o `cdm-caddy` reiniciar (deploy da
+Central ou reboot da VPS), o Caddy não sobe e **a Central cai junto**. Por isso:
+
+1. Só blocos de site com domínio próprio do outro sistema — nada de bloco global `{ }`,
+   `:80`/`:443` genérico ou domínio da Central (site duplicado invalida a config inteira).
+2. Validar **antes** do reload e nunca deixar na pasta arquivo que não passou no validate:
+
+   ~~~bash
+   docker exec cdm-caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+   docker exec cdm-caddy caddy reload   --config /etc/caddy/Caddyfile --adapter caddyfile
+   ~~~
+3. Nada de `docker restart cdm-caddy` nem `docker compose` em `/home/deploy/central-da-manada`
+   por quem opera o outro sistema.
+4. Depois do reload, conferir o health da Central (ver "Validação pós-deploy").
+
 ## Rollback e recuperação
 
 Rollback deve ser planejado antes do deploy específico.
@@ -572,6 +614,8 @@ Se qualquer etapa falhar:
 | Imagem anterior desapareceu após o deploy | `docker image prune -f` removeu a imagem dangling do build anterior | Desde 29/07/2026 o `deploy.sh` cria `pre-<commit>` antes do build; se a tag não existir, reverter por código |
 | Disco enchendo sem motivo aparente | Build cache do Docker, que o deploy nunca limpa | `docker builder prune -f --filter until=72h` (ver "Build cache") |
 | Feature não aparece no navegador após deploy verde | JavaScript antigo em cache | Hard refresh (Ctrl+Shift+R) |
+| `network proxy declared as external, but could not be found` | Rede externa não criada na VPS | `docker network create proxy` (ver "Proxy compartilhado") |
+| `cdm-caddy` não sobe após deploy/reboot, Central fora do ar | `.caddy` inválido em `/srv/caddy-sites` | Ver logs do caddy, corrigir ou mover o arquivo para fora da pasta e subir de novo |
 | `/auth/me` responde 401 | Sessão expirada | Não é falha de deploy — relogar |
 | `Redis ECONNREFUSED` após reinício | `cdm-redis` ainda subindo | Aguardar o healthcheck do serviço |
 | Lint local verde mas contrato do `shared` quebrado | `api`/`web` resolvem o `shared` pelo `dist` | Usar `pnpm lint` da raiz; `pnpm -r lint` é parcial |
@@ -600,6 +644,7 @@ Cada item remete à sua seção; nenhum deles substitui a autorização individu
 - [ ] Mudança integrada à `main` e commit a implantar identificado
 - [ ] `.env.production` comparado com `.env.production.example` — nenhuma variável nova faltando
 - [ ] Diagnóstico pré-deploy aprovado: branch, `git ls-remote`, containers, **health de baseline**
+- [ ] Rede `proxy` e `/srv/caddy-sites` existem, e o `caddy validate` passa com os sites atuais (ver "Proxy compartilhado")
 - [ ] Cada migration pendente analisada individualmente
 - [ ] Backup criado e validado por `"$BACKUP_FILE"` na mesma sessão de shell
 - [ ] Impacto do seed parcial (`SEED_MODE=access`) apresentado

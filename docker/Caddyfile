@@ -29,3 +29,10 @@
 # 	reverse_proxy /api/* api:3333
 # 	reverse_proxy web:3000
 # }
+
+# ----- SITES DE OUTROS SISTEMAS DA VPS ----------------------------------------
+# Arquivos em /srv/caddy-sites (host), montados em /etc/caddy/sites. Só blocos de
+# site com domínio próprio: nada de bloco global, :80/:443 genérico ou domínio da
+# Central. Um arquivo inválido aqui impede o Caddy de subir no próximo restart e
+# derruba a Central — validar sempre antes do reload (ver docs/deploy.md).
+import /etc/caddy/sites/*.caddy
